@@ -1,0 +1,195 @@
+import { NextRequest } from "next/server";
+
+type WidgetTheme = {
+  headerHsl: string;
+  backgroundHsl: string;
+  textHsl: string;
+  mutedTextHsl: string;
+  userBubbleHsl: string;
+  botBubbleHsl: string;
+  accentHsl: string;
+  fontFamily: string;
+};
+
+type WidgetConfig = {
+  botId: string;
+  tenantId: string;
+  botName: string;
+  greeting: string;
+  fallbackMessage: string;
+  logoUrl: string | null;
+  bannerText: string;
+  messageEndpoint: string;
+  theme: WidgetTheme;
+};
+
+type WidgetConfigResponse = {
+  success: true;
+  data: WidgetConfig;
+};
+
+type ErrorResponse = {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    requestId: string;
+  };
+};
+
+const BOT_ID_PATTERN = /^[a-zA-Z0-9_-]{3,80}$/;
+const HSL_PATTERN = /^\d{1,3}\s+\d{1,3}%\s+\d{1,3}%$/;
+
+const DEFAULT_THEME: WidgetTheme = {
+  headerHsl: "224 20% 18%",
+  backgroundHsl: "224 25% 12%",
+  textHsl: "210 40% 98%",
+  mutedTextHsl: "215 20% 75%",
+  userBubbleHsl: "250 85% 60%",
+  botBubbleHsl: "224 20% 18%",
+  accentHsl: "250 85% 60%",
+  fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+};
+
+const DEMO_CONFIGS: Record<string, WidgetConfig> = {
+  "test-id": {
+    botId: "test-id",
+    tenantId: "tenant-demo",
+    botName: "AgentDesk Support",
+    greeting: "Hello. I can help with orders, returns, and product questions.",
+    fallbackMessage: "I could not reach the support engine. Please try again in a moment.",
+    logoUrl: null,
+    bannerText: "Online - responds instantly",
+    messageEndpoint: "/api/chat/message",
+    theme: DEFAULT_THEME,
+  },
+};
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders });
+}
+
+export async function GET(_request: NextRequest, context: { params: Promise<{ botId: string }> }) {
+  const requestId = crypto.randomUUID();
+  const { botId } = await context.params;
+
+  if (!BOT_ID_PATTERN.test(botId)) {
+    return errorResponse("INVALID_BOT_ID", "The requested widget configuration is invalid.", requestId, 422);
+  }
+
+  const config = getConfig(botId);
+  if (!config) {
+    return errorResponse("BOT_NOT_FOUND", "The requested widget configuration was not found.", requestId, 404);
+  }
+
+  return Response.json(
+    {
+      success: true,
+      data: config,
+    } satisfies WidgetConfigResponse,
+    { status: 200, headers: corsHeaders },
+  );
+}
+
+function getConfig(botId: string) {
+  const envConfig = parseEnvConfigs()[botId];
+  const config = envConfig ?? DEMO_CONFIGS[botId];
+
+  if (!config || config.botId !== botId) {
+    return null;
+  }
+
+  return sanitizeConfig(config);
+}
+
+function parseEnvConfigs(): Record<string, WidgetConfig> {
+  const raw = process.env.AGENTDESK_WIDGET_CONFIGS;
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, WidgetConfig>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function sanitizeConfig(config: WidgetConfig): WidgetConfig {
+  return {
+    botId: cleanText(config.botId, 80),
+    tenantId: cleanText(config.tenantId, 80),
+    botName: cleanText(config.botName, 80),
+    greeting: cleanText(config.greeting, 300),
+    fallbackMessage: cleanText(config.fallbackMessage, 300),
+    logoUrl: sanitizeUrl(config.logoUrl),
+    bannerText: cleanText(config.bannerText, 80),
+    messageEndpoint: sanitizeEndpoint(config.messageEndpoint),
+    theme: sanitizeTheme(config.theme),
+  };
+}
+
+function sanitizeTheme(theme: WidgetTheme): WidgetTheme {
+  return {
+    headerHsl: sanitizeHsl(theme.headerHsl, DEFAULT_THEME.headerHsl),
+    backgroundHsl: sanitizeHsl(theme.backgroundHsl, DEFAULT_THEME.backgroundHsl),
+    textHsl: sanitizeHsl(theme.textHsl, DEFAULT_THEME.textHsl),
+    mutedTextHsl: sanitizeHsl(theme.mutedTextHsl, DEFAULT_THEME.mutedTextHsl),
+    userBubbleHsl: sanitizeHsl(theme.userBubbleHsl, DEFAULT_THEME.userBubbleHsl),
+    botBubbleHsl: sanitizeHsl(theme.botBubbleHsl, DEFAULT_THEME.botBubbleHsl),
+    accentHsl: sanitizeHsl(theme.accentHsl, DEFAULT_THEME.accentHsl),
+    fontFamily: cleanText(theme.fontFamily, 180),
+  };
+}
+
+function sanitizeHsl(value: string, fallback: string) {
+  return HSL_PATTERN.test(value) ? value : fallback;
+}
+
+function sanitizeEndpoint(value: string) {
+  if (value.startsWith("/api/")) {
+    return value;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : "/api/chat/message";
+  } catch {
+    return "/api/chat/message";
+  }
+}
+
+function sanitizeUrl(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    return ["https:", "data:"].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function cleanText(value: string, maxLength: number) {
+  return value.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, maxLength);
+}
+
+function errorResponse(code: string, message: string, requestId: string, status: number) {
+  return Response.json(
+    {
+      success: false,
+      error: { code, message, requestId },
+    } satisfies ErrorResponse,
+    { status, headers: corsHeaders },
+  );
+}

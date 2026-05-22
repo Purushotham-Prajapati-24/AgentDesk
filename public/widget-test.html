@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="AgentDesk raw host page for verifying the isolated Shadow DOM support chat widget."
+    />
+    <meta property="og:title" content="AgentDesk Widget Isolation Test" />
+    <meta
+      property="og:description"
+      content="A raw HTML fixture that verifies AgentDesk chat widget style isolation and rendering behavior."
+    />
+    <meta property="og:type" content="website" />
+    <title>AgentDesk Widget Isolation Test</title>
+    <style>
+      body {
+        background: #f8fafc;
+        color: #111827;
+        font-family: Georgia, serif;
+        margin: 0;
+        min-height: 100vh;
+        padding: 48px;
+      }
+
+      button,
+      textarea,
+      div {
+        border-radius: 0 !important;
+        color: red !important;
+        font-size: 32px !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Raw host page with hostile styles</h1>
+    <p>The AgentDesk widget should keep its own typography, colors, and rounded controls inside Shadow DOM.</p>
+    <script src="/widget.js" data-bot-id="test-id"></script>
+  </body>
+</html>
