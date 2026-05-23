@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
-import { useAuth, AuthProvider } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { TenantProvider } from "@/context/TenantContext";
 import { useRouter } from "next/navigation";
 
@@ -39,14 +39,12 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthProvider>
-      <DashboardGuard>
-        <TenantProvider>
-          <div className="flex min-h-screen bg-gray-100">
-            <main className="flex-1 p-8">{children}</main>
-          </div>
-        </TenantProvider>
-      </DashboardGuard>
-    </AuthProvider>
+    <DashboardGuard>
+      <TenantProvider>
+        <div className="flex min-h-screen bg-gray-100">
+          <main className="flex-1 p-8">{children}</main>
+        </div>
+      </TenantProvider>
+    </DashboardGuard>
   );
 }
