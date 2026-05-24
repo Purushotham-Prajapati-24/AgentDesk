@@ -1,7 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, Headphones, Radio, Send, UserRound } from "lucide-react";
 import { io, Socket } from "socket.io-client";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { EmptyState, PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
 
 type Sender = "customer" | "bot" | "agent";
 type SessionStatus = "active" | "paused_by_human" | "closed";
@@ -206,135 +210,127 @@ export default function InboxPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
-        <section className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-500">Live operations</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-normal text-slate-950">Agent inbox</h1>
-          </div>
+    <div className="min-h-screen">
+      <PageHeader
+        kicker="Live operations"
+        title="Inbox with the kill switch in reach."
+        description="Monitor a tenant-scoped session, pause the AI, and respond as the human operator without losing conversation context."
+        action={<ConnectionBadge status={socketStatus} />}
+      />
 
-          <form className="grid gap-2 sm:grid-cols-[160px_180px_auto]" onSubmit={updateRoom}>
-            <label className="text-xs font-semibold text-slate-600">
-              Tenant
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-900"
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[330px_1fr] lg:px-8">
+        <aside className="grid gap-5">
+          <Panel className="p-4">
+            <form className="grid gap-3" onSubmit={updateRoom}>
+              <Input
+                label="Tenant"
                 value={draftRoom.tenantId}
                 onChange={(event) => setDraftRoom((current) => ({ ...current, tenantId: event.target.value }))}
               />
-            </label>
-            <label className="text-xs font-semibold text-slate-600">
-              Session
-              <input
-                className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-slate-900"
+              <Input
+                label="Session"
                 value={draftRoom.sessionId}
                 onChange={(event) => setDraftRoom((current) => ({ ...current, sessionId: event.target.value }))}
               />
-            </label>
-            <button className="h-10 self-end rounded-md bg-slate-950 px-4 text-sm font-semibold text-white" type="submit">
-              Connect
-            </button>
-          </form>
-        </section>
+              <Button size="sm" type="submit" variant="secondary">
+                Connect
+              </Button>
+            </form>
+          </Panel>
 
-        <section className="grid flex-1 gap-4 py-4 lg:grid-cols-[320px_1fr]">
-          <aside className="min-h-[220px] border-r border-slate-200 pr-0 lg:pr-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-700">Active sessions</h2>
-              <ConnectionBadge status={socketStatus} />
+          <Panel className="p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-black">Active sessions</h2>
+              <StatusPill tone="dark">{selectedSession.unread}</StatusPill>
             </div>
 
-            <button className="w-full rounded-lg border border-slate-300 bg-white p-4 text-left shadow-sm" type="button">
+            <button className="hard-hover w-full border-2 border-line bg-panel-warm p-4 text-left" type="button">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950">{selectedSession.customer}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{selectedSession.id}</p>
+                  <p className="truncate text-base font-black text-line">{selectedSession.customer}</p>
+                  <p className="mt-1 truncate font-mono text-xs font-bold text-muted">{selectedSession.id}</p>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                  {selectedSession.unread}
-                </span>
+                <Headphones aria-hidden="true" className="h-6 w-6 text-signal" />
               </div>
-              <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-600">{selectedSession.summary}</p>
-              <p className="mt-3 text-xs font-medium text-slate-500">Tenant: {selectedSession.tenantId}</p>
+              <p className="mt-4 line-clamp-3 text-sm font-semibold leading-6 text-muted">{selectedSession.summary}</p>
+              <p className="mt-4 font-mono text-xs font-bold text-line">Tenant: {selectedSession.tenantId}</p>
             </button>
-          </aside>
+          </Panel>
+        </aside>
 
-          <section className="flex min-h-[640px] flex-col overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">Conversation</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {room.tenantId} / {room.sessionId}
-                </p>
-              </div>
+        <Panel className="flex min-h-[700px] flex-col overflow-hidden">
+          <div className="flex flex-col gap-3 border-b-2 border-line bg-yellow px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-line">Conversation</h2>
+              <p className="mt-1 font-mono text-xs font-bold text-muted">
+                {room.tenantId} / {room.sessionId}
+              </p>
+            </div>
 
-              <button
-                className={takeoverButtonClass(sessionStatus)}
-                type="button"
-                onClick={() => void toggleTakeover()}
-                disabled={socketStatus !== "connected"}
+            <Button
+              type="button"
+              variant={sessionStatus === "paused_by_human" ? "primary" : "danger"}
+              onClick={() => void toggleTakeover()}
+              disabled={socketStatus !== "connected"}
+            >
+              {sessionStatus === "paused_by_human" ? "Resume AI" : "Pause AI / Take Over"}
+            </Button>
+          </div>
+
+          {error ? <div className="border-b-2 border-line bg-coral px-4 py-3 text-sm font-bold text-white">{error}</div> : null}
+
+          <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-panel-warm px-4 py-5">
+            {messages.length === 0 ? (
+              <EmptyState title="Waiting for live messages" description="Connect a tenant-scoped session to watch support traffic in real time." />
+            ) : (
+              messages.map((message) => <MessageBubble key={message.id} message={message} />)
+            )}
+          </div>
+
+          <form className="border-t-2 border-line bg-panel p-4" onSubmit={(event) => void sendAgentMessage(event)}>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className="min-h-12 flex-1 border-2 border-line bg-panel px-3 text-sm font-bold focus:bg-panel-warm disabled:cursor-not-allowed disabled:bg-panel-warm"
+                disabled={sessionStatus !== "paused_by_human" || socketStatus !== "connected"}
+                maxLength={4000}
+                placeholder={sessionStatus === "paused_by_human" ? "Reply as the human agent..." : "Pause AI to unlock manual replies"}
+                value={agentDraft}
+                onChange={(event) => setAgentDraft(event.target.value)}
+              />
+              <Button
+                disabled={sessionStatus !== "paused_by_human" || socketStatus !== "connected" || !agentDraft.trim()}
+                rightIcon={<Send aria-hidden="true" className="h-4 w-4" />}
+                type="submit"
               >
-                {sessionStatus === "paused_by_human" ? "Resume AI" : "Pause AI / Take Over Chat"}
-              </button>
+                Send
+              </Button>
             </div>
-
-            {error ? <div className="border-b border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">{error}</div> : null}
-
-            <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-slate-50 px-4 py-5">
-              {messages.length === 0 ? (
-                <div className="rounded-md border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-                  Waiting for live messages in this tenant-scoped session.
-                </div>
-              ) : (
-                messages.map((message) => <MessageBubble key={message.id} message={message} />)
-              )}
-            </div>
-
-            <form className="border-t border-slate-200 p-4" onSubmit={(event) => void sendAgentMessage(event)}>
-              <div className="flex gap-2">
-                <input
-                  className="h-11 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-900 disabled:bg-slate-100"
-                  disabled={sessionStatus !== "paused_by_human" || socketStatus !== "connected"}
-                  maxLength={4000}
-                  placeholder={
-                    sessionStatus === "paused_by_human"
-                      ? "Reply as the human agent..."
-                      : "Pause AI to unlock manual replies"
-                  }
-                  value={agentDraft}
-                  onChange={(event) => setAgentDraft(event.target.value)}
-                />
-                <button
-                  className="h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                  disabled={sessionStatus !== "paused_by_human" || socketStatus !== "connected" || !agentDraft.trim()}
-                  type="submit"
-                >
-                  Send
-                </button>
-              </div>
-            </form>
-          </section>
-        </section>
+          </form>
+        </Panel>
       </div>
-    </main>
+    </div>
   );
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isCustomer = message.sender === "customer";
   const isAgent = message.sender === "agent";
+  const Icon = message.sender === "bot" ? Bot : message.sender === "agent" ? Headphones : UserRound;
 
   return (
     <div className={`flex ${isCustomer ? "justify-start" : "justify-end"}`}>
       <article className={messageBubbleClass(message.sender)}>
-        <div className="mb-1 flex items-center justify-between gap-3">
-          <span className="text-xs font-semibold uppercase tracking-normal">{message.sender}</span>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 font-mono text-xs font-black uppercase">
+            <Icon aria-hidden="true" className="h-4 w-4" />
+            {message.sender}
+          </span>
           {typeof message.shouldCallRag === "boolean" ? (
-            <span className="text-xs font-medium">{message.shouldCallRag ? "AI active" : "AI bypassed"}</span>
+            <span className="font-mono text-xs font-bold">{message.shouldCallRag ? "RAG active" : "AI bypassed"}</span>
           ) : null}
         </div>
-        <p className="text-sm leading-6">{message.content}</p>
-        <time className={`mt-2 block text-xs ${isAgent ? "text-emerald-100" : "text-slate-500"}`}>
+        <p className="text-sm font-semibold leading-6">{message.content}</p>
+        <time className={`mt-3 block font-mono text-xs font-bold ${isAgent ? "text-white/80" : "text-muted"}`}>
           {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </time>
       </article>
@@ -344,31 +340,28 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 function ConnectionBadge({ status }: { status: "connecting" | "connected" | "disconnected" }) {
   const label = status === "connected" ? "Connected" : status === "connecting" ? "Connecting" : "Offline";
-  const className =
-    status === "connected"
-      ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-      : status === "connecting"
-        ? "bg-amber-50 text-amber-700 ring-amber-200"
-        : "bg-slate-100 text-slate-600 ring-slate-200";
+  const tone = status === "connected" ? "warn" : status === "connecting" ? "hot" : "danger";
 
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${className}`}>{label}</span>;
+  return (
+    <StatusPill tone={tone}>
+      <span className="inline-flex items-center gap-2">
+        <Radio aria-hidden="true" className="h-3.5 w-3.5" />
+        {label}
+      </span>
+    </StatusPill>
+  );
 }
 
 function messageBubbleClass(sender: Sender) {
   if (sender === "agent") {
-    return "max-w-[76%] rounded-lg bg-emerald-700 px-4 py-3 text-white shadow-sm";
+    return "max-w-[82%] rounded-[18px] border-2 border-line bg-signal px-4 py-3 text-white shadow-[4px_4px_0_#17120D]";
   }
 
   if (sender === "bot") {
-    return "max-w-[76%] rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-indigo-950 shadow-sm";
+    return "max-w-[82%] rounded-[18px] border-2 border-line bg-yellow px-4 py-3 text-line shadow-[4px_4px_0_rgba(23,18,13,0.25)]";
   }
 
-  return "max-w-[76%] rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-950 shadow-sm";
-}
-
-function takeoverButtonClass(status: SessionStatus) {
-  const base = "h-10 rounded-md px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60";
-  return status === "paused_by_human" ? `${base} bg-emerald-700 text-white` : `${base} bg-amber-500 text-slate-950`;
+  return "max-w-[82%] rounded-[18px] border-2 border-line bg-panel px-4 py-3 text-line shadow-[4px_4px_0_rgba(23,18,13,0.2)]";
 }
 
 function mapSocketMessage(message: SocketEventMessage): ChatMessage {

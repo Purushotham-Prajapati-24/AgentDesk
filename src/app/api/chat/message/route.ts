@@ -80,6 +80,19 @@ export async function POST(request: Request) {
       return streamStaticMessage(fallbackMessage);
     }
 
+    const shouldCallRag = await checkRagPermission(parsed.value.tenant_id, parsed.value.session_token);
+    if (!shouldCallRag) {
+      return new Response(encoder.encode("data: [DONE]\n\n"), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+        },
+      });
+    }
+
     const balance = await getCreditBalance(databases, parsed.value.tenant_id);
     if (balance <= 0) {
       return streamStaticMessage(fallbackMessage);
@@ -449,4 +462,30 @@ function stringValue(value: unknown, fallback: string) {
 
 function isSafeId(value: string) {
   return /^[a-zA-Z0-9_-]{3,160}$/.test(value);
+}
+
+async function checkRagPermission(tenantId: string, sessionId: string): Promise<boolean> {
+  const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL ?? "http://127.0.0.1:4000";
+  try {
+    const response = await fetch(`${wsUrl.replace(/\/$/, "")}/rag-permission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        session_id: sessionId,
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!response.ok) {
+      return true;
+    }
+
+    const body = (await response.json()) as { success: boolean; data?: { shouldCallRag: boolean } };
+    return body.success && body.data ? body.data.shouldCallRag : true;
+  } catch {
+    return true;
+  }
 }

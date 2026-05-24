@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AlertTriangle, ReceiptText } from "lucide-react";
 import { getTenantBillingSnapshot } from "@/lib/ledger";
 import { useTenant } from "@/context/TenantContext";
+import { EmptyState, MetricTile, PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
 
 type BillingSnapshot = {
   balance: number;
@@ -50,73 +52,70 @@ export default function BillingPage() {
   }, [tenant?.$id]);
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5">
-        <section className="border-b border-slate-200 pb-5">
-          <p className="text-sm font-semibold leading-6 text-slate-500">Billing ledger</p>
-          <h1 className="text-2xl font-semibold leading-tight">Usage and balance</h1>
-          <p className="mt-2 max-w-[65ch] text-sm leading-6 text-slate-600">
-            Review top-ups, token debits, active sessions, message volume, and document storage for the current tenant.
-          </p>
-        </section>
+    <div className="min-h-screen">
+      <PageHeader
+        kicker="Billing ledger"
+        title="Credits, volume, and operating cost."
+        description="Track top-ups, token debits, active sessions, message volume, and document storage for the current tenant."
+        action={<StatusPill tone="warn">Tenant: {tenant?.$id ?? "Unavailable"}</StatusPill>}
+      />
 
-        {error ? <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
-
-        <section className="grid gap-4 py-5 md:grid-cols-4">
-          <MetricTile label="Balance" value={formatAmount(snapshot?.balance ?? 0)} />
-          <MetricTile label="Active sessions" value={String(snapshot?.stats.activeSessions ?? 0)} />
-          <MetricTile label="Messages" value={String(snapshot?.stats.totalMessages ?? 0)} />
-          <MetricTile label="Storage" value={formatBytes(snapshot?.stats.documentStorageBytes ?? 0)} />
-        </section>
-
-        <section className="overflow-hidden rounded-lg border border-slate-300 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="text-base font-semibold leading-tight">Transaction history</h2>
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:px-8">
+        {error ? (
+          <div className="flex items-center gap-3 border-2 border-line bg-coral px-4 py-3 font-bold text-white" role="alert">
+            <AlertTriangle aria-hidden="true" className="h-5 w-5" />
+            {error}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-normal text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(snapshot?.transactions ?? []).length === 0 ? (
+        ) : null}
+
+        <section className="grid gap-4 md:grid-cols-4">
+          <MetricTile label="Balance" value={formatAmount(snapshot?.balance ?? 0)} detail="available credits" tone="warn" />
+          <MetricTile label="Active sessions" value={String(snapshot?.stats.activeSessions ?? 0)} detail="live support lines" />
+          <MetricTile label="Messages" value={String(snapshot?.stats.totalMessages ?? 0)} detail="conversation volume" tone="hot" />
+          <MetricTile label="Storage" value={formatBytes(snapshot?.stats.documentStorageBytes ?? 0)} detail="knowledge payload" tone="dark" />
+        </section>
+
+        <Panel className="overflow-hidden">
+          <div className="flex items-center justify-between border-b-2 border-line bg-yellow px-4 py-3">
+            <div className="flex items-center gap-2">
+              <ReceiptText aria-hidden="true" className="h-5 w-5" />
+              <h2 className="text-lg font-black">Transaction history</h2>
+            </div>
+            <StatusPill tone="dark">{snapshot?.transactions.length ?? 0} rows</StatusPill>
+          </div>
+          {(snapshot?.transactions ?? []).length === 0 ? (
+            <div className="p-5">
+              <EmptyState title="No ledger entries yet" description="Credits and usage debits will appear here after billing events are recorded." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+                <thead className="bg-line text-xs uppercase text-panel">
                   <tr>
-                    <td className="px-4 py-6 text-center text-slate-500" colSpan={4}>
-                      No ledger transactions found for this tenant.
-                    </td>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Description</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
                   </tr>
-                ) : (
-                  snapshot?.transactions.map((transaction) => (
-                    <tr className="border-t border-slate-200" key={transaction.id}>
-                      <td className="px-4 py-3 text-slate-600">{formatDate(transaction.created)}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-900">{transaction.transactionType}</td>
-                      <td className="px-4 py-3 text-slate-600">{transaction.description}</td>
-                      <td className={`px-4 py-3 text-right font-semibold ${transaction.amount < 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                </thead>
+                <tbody>
+                  {snapshot?.transactions.map((transaction) => (
+                    <tr className="border-t-2 border-line bg-panel odd:bg-panel-warm" key={transaction.id}>
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-muted">{formatDate(transaction.created)}</td>
+                      <td className="px-4 py-3 font-black text-line">{transaction.transactionType}</td>
+                      <td className="px-4 py-3 font-semibold text-muted">{transaction.description}</td>
+                      <td className={`px-4 py-3 text-right font-mono font-black ${transaction.amount < 0 ? "text-coral" : "text-success"}`}>
                         {formatAmount(transaction.amount)}
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
       </div>
-    </main>
-  );
-}
-
-function MetricTile({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="rounded-lg border border-slate-300 bg-white p-4 shadow-sm">
-      <p className="text-sm font-semibold leading-6 text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold leading-tight text-slate-950">{value}</p>
-    </article>
+    </div>
   );
 }
 

@@ -19,6 +19,7 @@
             this.isOpen = false;
             this.isSending = false;
             this.sessionToken = getSessionToken(botId);
+            this.socket = null;
             this.shadowRootRef = this.attachShadow({ mode: "open" });
         }
         connectedCallback() {
@@ -48,6 +49,60 @@
                 },
             ];
             this.renderShell();
+            this.initSocket(this.config);
+        }
+        initSocket(config) {
+            if (this.socket) {
+                return;
+            }
+            const scriptUrl = "https://cdn.socket.io/4.7.5/socket.io.min.js";
+            if (!document.querySelector(`script[src="${scriptUrl}"]`)) {
+                const script = document.createElement("script");
+                script.src = scriptUrl;
+                script.onload = () => this.connectSocket(config);
+                document.head.appendChild(script);
+            }
+            else {
+                const checkInterval = window.setInterval(() => {
+                    const windowRef = window;
+                    if (typeof windowRef.io !== "undefined") {
+                        window.clearInterval(checkInterval);
+                        this.connectSocket(config);
+                    }
+                }, 100);
+            }
+        }
+        connectSocket(config) {
+            var _a, _b, _c;
+            const windowRef = window;
+            const wsUrl = (_c = (_b = (_a = windowRef.process) === null || _a === void 0 ? void 0 : _a.env) === null || _b === void 0 ? void 0 : _b.NEXT_PUBLIC_WEBSOCKET_URL) !== null && _c !== void 0 ? _c : "http://127.0.0.1:4000";
+            const namespace = `${wsUrl.replace(/\/$/, "")}/tenant-${config.tenantId}`;
+            try {
+                if (!windowRef.io) {
+                    return;
+                }
+                const socket = windowRef.io(namespace, {
+                    auth: {
+                        tenant_id: config.tenantId,
+                        session_id: this.sessionToken,
+                    },
+                    transports: ["websocket"],
+                });
+                this.socket = socket;
+                if (socket) {
+                    socket.on("agent-message", (message) => {
+                        this.messages.push({
+                            id: message.message_id,
+                            sender: "bot",
+                            content: message.content,
+                        });
+                        this.renderShell();
+                    });
+                }
+            }
+            catch (err) {
+                console.error("Failed to connect to live handoff socket:", err);
+            }
         }
         renderShell() {
             var _a;
@@ -181,9 +236,22 @@
             this.messages.push({ id: createId(), sender: "user", content });
             this.isSending = true;
             this.renderShell();
+            if (this.socket && this.socket.connected) {
+                try {
+                    this.socket.emit("customer-message", {
+                        message_id: createId(),
+                        content,
+                    });
+                }
+                catch (err) {
+                    console.error("Failed to emit customer message over socket:", err);
+                }
+            }
             try {
                 const responseText = await requestBotReply(config, this.sessionToken, content);
-                await this.typeBotMessage(responseText || config.fallbackMessage);
+                if (responseText) {
+                    await this.typeBotMessage(responseText);
+                }
             }
             catch {
                 await this.typeBotMessage(config.fallbackMessage);

@@ -44,6 +44,12 @@
     return;
   }
 
+  type SocketInstance = {
+    connected: boolean;
+    emit: (event: string, payload: { message_id: string; content: string }) => void;
+    on: (event: string, callback: (payload: { message_id: string; content: string }) => void) => void;
+  };
+
   class AgentDeskWidget extends HTMLElement {
     private readonly shadowRootRef: ShadowRoot;
     private config: WidgetConfig | null = null;
@@ -51,6 +57,7 @@
     private isOpen = false;
     private isSending = false;
     private sessionToken = getSessionToken(botId);
+    private socket: SocketInstance | null = null;
 
     constructor() {
       super();
@@ -87,6 +94,74 @@
         },
       ];
       this.renderShell();
+      this.initSocket(this.config);
+    }
+
+    private initSocket(this: AgentDeskWidget, config: WidgetConfig) {
+      if (this.socket) {
+        return;
+      }
+
+      const scriptUrl = "https://cdn.socket.io/4.7.5/socket.io.min.js";
+      if (!document.querySelector(`script[src="${scriptUrl}"]`)) {
+        const script = document.createElement("script");
+        script.src = scriptUrl;
+        script.onload = () => this.connectSocket(config);
+        document.head.appendChild(script);
+      } else {
+        const checkInterval = window.setInterval(() => {
+          const windowRef = window as unknown as {
+            io?: (url: string, options?: unknown) => SocketInstance;
+          };
+          if (typeof windowRef.io !== "undefined") {
+            window.clearInterval(checkInterval);
+            this.connectSocket(config);
+          }
+        }, 100);
+      }
+    }
+
+    private connectSocket(this: AgentDeskWidget, config: WidgetConfig) {
+      const windowRef = window as unknown as {
+        io?: (url: string, options?: unknown) => SocketInstance;
+        process?: {
+          env?: {
+            NEXT_PUBLIC_WEBSOCKET_URL?: string;
+          };
+        };
+      };
+
+      const wsUrl = windowRef.process?.env?.NEXT_PUBLIC_WEBSOCKET_URL ?? "http://127.0.0.1:4000";
+      const namespace = `${wsUrl.replace(/\/$/, "")}/tenant-${config.tenantId}`;
+
+      try {
+        if (!windowRef.io) {
+          return;
+        }
+
+        const socket = windowRef.io(namespace, {
+          auth: {
+            tenant_id: config.tenantId,
+            session_id: this.sessionToken,
+          },
+          transports: ["websocket"],
+        });
+
+        this.socket = socket;
+
+        if (socket) {
+          socket.on("agent-message", (message: { message_id: string; content: string }) => {
+            this.messages.push({
+              id: message.message_id,
+              sender: "bot",
+              content: message.content,
+            });
+            this.renderShell();
+          });
+        }
+      } catch (err) {
+        console.error("Failed to connect to live handoff socket:", err);
+      }
     }
 
     private renderShell() {
@@ -241,9 +316,23 @@
       this.isSending = true;
       this.renderShell();
 
+      // Emit over WebSocket for real-time live agent view
+      if (this.socket && this.socket.connected) {
+        try {
+          this.socket.emit("customer-message", {
+            message_id: createId(),
+            content,
+          });
+        } catch (err) {
+          console.error("Failed to emit customer message over socket:", err);
+        }
+      }
+
       try {
         const responseText = await requestBotReply(config, this.sessionToken, content);
-        await this.typeBotMessage(responseText || config.fallbackMessage);
+        if (responseText) {
+          await this.typeBotMessage(responseText);
+        }
       } catch {
         await this.typeBotMessage(config.fallbackMessage);
       } finally {

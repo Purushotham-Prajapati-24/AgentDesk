@@ -1,26 +1,157 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fff7e8;
+  --foreground: #17120d;
+  --panel: #ffffff;
+  --panel-warm: #ffeac2;
+  --signal: #ff5a1f;
+  --signal-strong: #e73812;
+  --coral: #ff2e63;
+  --yellow: #ffd400;
+  --muted: #5c4033;
+  --line: #17120d;
+  --soft-line: #d8b98b;
+  --danger: #c91f37;
+  --success: #9c6b00;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --color-panel: var(--panel);
+  --color-panel-warm: var(--panel-warm);
+  --color-signal: var(--signal);
+  --color-signal-strong: var(--signal-strong);
+  --color-coral: var(--coral);
+  --color-yellow: var(--yellow);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-soft-line: var(--soft-line);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --font-sans: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-fira-code), ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
-  background: var(--background);
+  min-height: 100%;
+  overflow-x: hidden;
+  background:
+    linear-gradient(90deg, rgba(23, 18, 13, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(23, 18, 13, 0.035) 1px, transparent 1px),
+    var(--background);
+  background-size: 36px 36px;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--yellow);
+  color: var(--foreground);
+}
+
+a,
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a,
+label[for],
+select,
+input[type="color"],
+input[type="file"] {
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  cursor: text;
+}
+
+select,
+button,
+input,
+textarea {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+.signal-panel {
+  border: 2px solid var(--line);
+  background: var(--panel);
+  box-shadow: 7px 7px 0 var(--line);
+}
+
+.signal-panel-soft {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 4px 4px 0 rgba(23, 18, 13, 0.18);
+}
+
+.signal-kicker {
+  font-family: var(--font-fira-code), ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.signal-enter {
+  animation: signal-enter 220ms ease-out both;
+}
+
+.hard-hover {
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out,
+    background-color 180ms ease-out,
+    border-color 180ms ease-out,
+    color 180ms ease-out;
+}
+
+.hard-hover:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--line);
+}
+
+@keyframes signal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }

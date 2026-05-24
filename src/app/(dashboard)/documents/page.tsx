@@ -1,7 +1,11 @@
 "use client";
 
 import { ChangeEvent, DragEvent, FormEvent, useState } from "react";
+import { FileUp, UploadCloud } from "lucide-react";
 import { useTenant } from "@/context/TenantContext";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
 
 type UploadState = {
   status: "idle" | "uploading" | "success" | "error";
@@ -57,64 +61,73 @@ export default function DocumentsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-5">
-        <section className="border-b border-slate-200 pb-5">
-          <p className="text-sm font-semibold leading-6 text-slate-500">Knowledge base</p>
-          <h1 className="text-2xl font-semibold leading-tight">Document ingestion</h1>
-          <p className="mt-2 max-w-[65ch] text-sm leading-6 text-slate-600">
-            Upload tenant-scoped source files for parsing and vector ingestion. Supported formats are PDF, DOCX, CSV, TXT,
-            and Markdown.
-          </p>
-        </section>
+    <div className="min-h-screen">
+      <PageHeader
+        kicker="Knowledge base"
+        title="Drop the facts before the bot talks."
+        description="Upload tenant-scoped source files for parsing and vector ingestion. Supported formats are PDF, DOCX, CSV, TXT, and Markdown."
+        action={<StatusPill tone="warn">Tenant: {tenant?.$id ?? "Unavailable"}</StatusPill>}
+      />
 
-        <form className="mt-5 rounded-lg border border-slate-300 bg-white p-5 shadow-sm" onSubmit={uploadDocument}>
-          <label className="block text-sm font-semibold text-slate-700">
-            Bot ID
-            <input
-              className="mt-1 h-11 w-full rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-slate-950"
+      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[360px_1fr] lg:px-8">
+        <Panel className="h-fit p-5">
+          <p className="signal-kicker text-muted">Accepted payloads</p>
+          <div className="mt-5 grid gap-3">
+            {["PDF policies", "DOCX manuals", "CSV tables", "TXT notes", "Markdown guides"].map((item) => (
+              <div className="flex items-center gap-3 border-2 border-line bg-panel-warm px-3 py-2 font-bold" key={item}>
+                <FileUp aria-hidden="true" className="h-4 w-4 text-signal" />
+                {item}
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel className="p-5">
+          <form onSubmit={uploadDocument}>
+            <Input
+              label="Bot ID"
               value={botId}
               onChange={(event) => setBotId(event.target.value)}
+              hint="Documents are scoped to this bot and the active tenant."
             />
-          </label>
 
-          <label
-            className="mt-4 flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-slate-500"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={handleDrop}
-          >
-            <span className="text-base font-semibold text-slate-900">{file ? file.name : "Drop a document here"}</span>
-            <span className="mt-2 text-sm leading-6 text-slate-600">or click to choose a PDF, DOCX, CSV, TXT, or MD file</span>
-            <input className="sr-only" type="file" accept=".pdf,.docx,.csv,.txt,.md" onChange={handleFileChange} />
-          </label>
+            <label
+              className="mt-5 flex min-h-72 cursor-pointer flex-col items-center justify-center border-2 border-dashed border-line bg-yellow/60 px-6 py-10 text-center transition hover:bg-yellow"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={handleDrop}
+            >
+              <UploadCloud aria-hidden="true" className="h-12 w-12 text-line" />
+              <span className="mt-5 text-2xl font-black text-line">{file ? file.name : "Drop source file"}</span>
+              <span className="mt-2 max-w-md text-sm font-bold leading-6 text-muted">
+                Click or drop a PDF, DOCX, CSV, TXT, or MD file. The upload API will extract text before vector processing.
+              </span>
+              <input className="sr-only" type="file" accept=".pdf,.docx,.csv,.txt,.md" onChange={handleFileChange} />
+            </label>
 
-          {uploadState.message ? (
-            <p className={uploadMessageClass(uploadState.status)} role="status">
-              {uploadState.message}
-            </p>
-          ) : null}
+            {uploadState.message ? (
+              <p className={uploadMessageClass(uploadState.status)} role="status">
+                {uploadState.message}
+              </p>
+            ) : null}
 
-          <button
-            className="mt-4 h-11 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={uploadState.status === "uploading"}
-            type="submit"
-          >
-            Upload Document
-          </button>
-        </form>
+            <Button className="mt-5" loading={uploadState.status === "uploading"} type="submit">
+              Upload document
+            </Button>
+          </form>
+        </Panel>
       </div>
-    </main>
+    </div>
   );
 }
 
 function uploadMessageClass(status: UploadState["status"]) {
   if (status === "success") {
-    return "mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700";
+    return "mt-5 border-2 border-line bg-yellow px-3 py-2 text-sm font-bold text-line";
   }
 
   if (status === "error") {
-    return "mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700";
+    return "mt-5 border-2 border-line bg-coral px-3 py-2 text-sm font-bold text-white";
   }
 
-  return "mt-4 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-700";
+  return "mt-5 border-2 border-line bg-panel-warm px-3 py-2 text-sm font-bold text-line";
 }
