@@ -21,6 +21,7 @@
     logoUrl: string | null;
     bannerText: string;
     messageEndpoint: string;
+    websocketEndpoint: string | null;
     theme: WidgetTheme;
   };
 
@@ -38,11 +39,15 @@
   const scriptUrl = currentScript?.src ? new URL(currentScript.src, window.location.href) : null;
   const scriptOrigin = scriptUrl?.origin ?? window.location.origin;
   const botId = currentScript?.dataset.botId?.trim() ?? "";
+  const embedMode = currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
   const configUrl = currentScript?.dataset.configUrl?.trim() || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
 
   if (!botId) {
     return;
   }
+
+  // Derived storage key — declared here so botId is guaranteed to be initialized.
+  const MESSAGES_KEY = `agentdesk:messages:${STORAGE_VERSION}:${botId}`;
 
   type SocketInstance = {
     connected: boolean;
@@ -54,7 +59,7 @@
     private readonly shadowRootRef: ShadowRoot;
     private config: WidgetConfig | null = null;
     private messages: ChatMessage[] = [];
-    private isOpen = false;
+    private isOpen = embedMode === "inline";
     private isSending = false;
     private sessionToken = getSessionToken(botId);
     private socket: SocketInstance | null = null;
@@ -81,18 +86,26 @@
           throw new Error("Widget configuration mismatch");
         }
 
-        this.config = normalizeConfig(body.data);
+      this.config = normalizeConfig(body.data);
       } catch {
         this.config = buildFallbackConfig(botId);
       }
 
-      this.messages = [
-        {
-          id: createId(),
-          sender: "bot",
-          content: this.config.greeting,
-        },
-      ];
+      // Restore any persisted messages from a previous mount.
+      // Only fall back to the greeting if there is no prior history.
+      const persisted = loadMessages();
+      if (persisted.length > 0) {
+        this.messages = persisted;
+      } else {
+        this.messages = [
+          {
+            id: createId(),
+            sender: "bot",
+            content: this.config.greeting,
+          },
+        ];
+        saveMessages(this.messages);
+      }
       this.renderShell();
       this.initSocket(this.config);
     }
@@ -106,7 +119,7 @@
       if (!document.querySelector(`script[src="${scriptUrl}"]`)) {
         const script = document.createElement("script");
         script.src = scriptUrl;
-        script.onload = () => this.connectSocket(config);
+        script.onload = () => void this.connectSocket(config);
         document.head.appendChild(script);
       } else {
         const checkInterval = window.setInterval(() => {
@@ -115,23 +128,27 @@
           };
           if (typeof windowRef.io !== "undefined") {
             window.clearInterval(checkInterval);
-            this.connectSocket(config);
+            void this.connectSocket(config);
           }
         }, 100);
       }
     }
 
-    private connectSocket(this: AgentDeskWidget, config: WidgetConfig) {
+    private async connectSocket(this: AgentDeskWidget, config: WidgetConfig) {
       const windowRef = window as unknown as {
         io?: (url: string, options?: unknown) => SocketInstance;
-        process?: {
-          env?: {
-            NEXT_PUBLIC_WEBSOCKET_URL?: string;
-          };
-        };
       };
 
-      const wsUrl = windowRef.process?.env?.NEXT_PUBLIC_WEBSOCKET_URL ?? "http://127.0.0.1:4000";
+      const wsUrl = normalizeWebSocketEndpoint(config.websocketEndpoint);
+      if (!wsUrl) {
+        return;
+      }
+
+      const isHealthy = await checkLiveHandoffHealth(wsUrl);
+      if (!isHealthy) {
+        return;
+      }
+
       const namespace = `${wsUrl.replace(/\/$/, "")}/tenant-${config.tenantId}`;
 
       try {
@@ -144,7 +161,6 @@
             tenant_id: config.tenantId,
             session_id: this.sessionToken,
           },
-          transports: ["websocket"],
         });
 
         this.socket = socket;
@@ -156,6 +172,7 @@
               sender: "bot",
               content: message.content,
             });
+            saveMessages(this.messages);
             this.renderShell();
           });
         }
@@ -170,11 +187,16 @@
     }
 
     private createWidget(config: WidgetConfig) {
-      const wrapper = createElement("section", "ad-widget");
-      const pane = createElement("div", `ad-chat-pane${this.isOpen ? " active" : ""}`);
+      const wrapper = createElement("section", `ad-widget ${embedMode}`);
+      const pane = createElement("div", `ad-chat-pane${this.isOpen || embedMode === "inline" ? " active" : ""}`);
       pane.setAttribute("aria-live", "polite");
 
       pane.append(this.createHeader(config), this.createMessageList(), this.createQuickActions(), this.createForm(config));
+
+      if (embedMode === "inline") {
+        wrapper.append(pane);
+        return wrapper;
+      }
 
       const launcher = createElement("button", "ad-launcher-button");
       launcher.type = "button";
@@ -313,6 +335,7 @@
       const config = explicitConfig ?? this.config ?? buildFallbackConfig(botId);
       const content = text.slice(0, MAX_MESSAGE_LENGTH);
       this.messages.push({ id: createId(), sender: "user", content });
+      saveMessages(this.messages);
       this.isSending = true;
       this.renderShell();
 
@@ -349,6 +372,7 @@
       for (let index = 0; index < chars.length; index += 1) {
         message.content += chars[index];
         if (index % 3 === 0 || index === chars.length - 1) {
+          saveMessages(this.messages);
           this.renderShell();
           await delay(12);
         }
@@ -494,6 +518,7 @@
       logoUrl: null,
       bannerText: "Online - responds instantly",
       messageEndpoint: `${scriptOrigin}/api/chat/message`,
+      websocketEndpoint: null,
       theme: {
         headerHsl: "224 20% 18%",
         backgroundHsl: "224 25% 12%",
@@ -536,6 +561,15 @@
         z-index: 2147483647;
       }
 
+      .ad-widget.inline {
+        bottom: auto;
+        height: 100vh;
+        inset: 0;
+        position: fixed;
+        right: auto;
+        width: 100vw;
+      }
+
       .ad-chat-pane {
         background: var(--ad-bg-primary);
         border: 1px solid var(--ad-border-color);
@@ -553,6 +587,16 @@
         width: min(380px, calc(100vw - 32px));
         backdrop-filter: blur(16px) saturate(180%);
         -webkit-backdrop-filter: blur(16px) saturate(180%);
+      }
+
+      .ad-widget.inline .ad-chat-pane {
+        border: 0;
+        border-radius: 0;
+        height: 100vh;
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+        width: 100vw;
       }
 
       .ad-chat-pane.active {
@@ -854,16 +898,45 @@
   function getSessionToken(currentBotId: string) {
     const key = `agentdesk:session:${STORAGE_VERSION}:${currentBotId}`;
     try {
-      const stored = window.localStorage.getItem(key);
+      const stored = window.sessionStorage.getItem(key);
       if (stored) {
         return stored;
       }
 
       const token = createId();
-      window.localStorage.setItem(key, token);
+      window.sessionStorage.setItem(key, token);
       return token;
     } catch {
       return createId();
+    }
+  }
+
+  function saveMessages(messages: ChatMessage[]) {
+    try {
+      // Only keep the last 80 messages to avoid sessionStorage size limits.
+      const trimmed = messages.slice(-80);
+      window.sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(trimmed));
+    } catch {
+      // Ignore quota errors — messages are still in memory.
+    }
+  }
+
+  function loadMessages(): ChatMessage[] {
+    try {
+      const raw = window.sessionStorage.getItem(MESSAGES_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter(
+        (m): m is ChatMessage =>
+          typeof m === "object" &&
+          m !== null &&
+          typeof (m as ChatMessage).id === "string" &&
+          typeof (m as ChatMessage).sender === "string" &&
+          typeof (m as ChatMessage).content === "string",
+      );
+    } catch {
+      return [];
     }
   }
 
@@ -872,6 +945,36 @@
       return window.crypto.randomUUID();
     }
     return `ad_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+  }
+
+  function normalizeWebSocketEndpoint(value: string | null) {
+    if (!value) {
+      return null;
+    }
+
+    try {
+      const url = new URL(value, scriptOrigin);
+      return ["http:", "https:", "ws:", "wss:"].includes(url.protocol) ? url.toString().replace(/\/$/, "") : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function checkLiveHandoffHealth(baseUrl: string) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 2500);
+
+    try {
+      const response = await fetch(`${baseUrl}/health`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+    }
   }
 
   function delay(ms: number) {
@@ -894,5 +997,6 @@
   }
 
   const mount = document.createElement(elementName);
+  mount.setAttribute("data-agentdesk-mode", embedMode);
   document.body.append(mount);
 })();

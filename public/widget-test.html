@@ -5,37 +5,310 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="AgentDesk raw host page for verifying the isolated Shadow DOM support chat widget."
+      content="AgentDesk test page for verifying script widget and iframe widget embeds with a user-provided bot ID."
     />
-    <meta property="og:title" content="AgentDesk Widget Isolation Test" />
+    <meta property="og:title" content="AgentDesk Widget Test" />
     <meta
       property="og:description"
-      content="A raw HTML fixture that verifies AgentDesk chat widget style isolation and rendering behavior."
+      content="A raw HTML fixture that verifies AgentDesk widget distribution modes."
     />
     <meta property="og:type" content="website" />
-    <title>AgentDesk Widget Isolation Test</title>
+    <title>AgentDesk Widget Test</title>
     <style>
+      :root {
+        color-scheme: dark;
+        --bg: #07090b;
+        --panel: #101418;
+        --panel-2: #161b21;
+        --border: #2a3138;
+        --text: #f5f1e8;
+        --muted: #aab2bd;
+        --accent: #22d3ee;
+        --hot: #f59e0b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      main {
+        display: grid;
+        gap: 24px;
+        margin: 0 auto;
+        max-width: 1180px;
+        padding: 32px 20px 96px;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        padding: 28px 20px;
+      }
+
+      .header-inner {
+        margin: 0 auto;
+        max-width: 1180px;
+      }
+
+      .kicker {
+        color: var(--accent);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0;
+        margin: 0 0 10px;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        font-size: clamp(32px, 5vw, 56px);
+        line-height: 1;
+        margin: 0;
+      }
+
+      p {
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.7;
+        margin: 10px 0 0;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px;
+      }
+
+      .controls {
+        align-items: end;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: minmax(0, 1fr) auto;
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+      }
+
+      label span,
+      .section-label {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+
+      input {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 700;
+        min-height: 44px;
+        outline: none;
+        padding: 0 12px;
+        width: 100%;
+      }
+
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
+      }
+
+      .button {
+        background: var(--hot);
+        border: 0;
+        border-radius: 6px;
+        color: #111827;
+        cursor: pointer;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 900;
+        min-height: 44px;
+        padding: 0 16px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .test-frame {
+        background: #ffffff;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        height: 640px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      iframe {
+        border: 0;
+        display: block;
+        height: 100%;
+        width: 100%;
+      }
+
+      .hostile-zone {
         background: #f8fafc;
         color: #111827;
         font-family: Georgia, serif;
-        margin: 0;
-        min-height: 100vh;
-        padding: 48px;
+        height: 100%;
+        overflow: auto;
+        padding: 28px;
       }
 
-      button,
-      textarea,
-      div {
+      .hostile-zone button,
+      .hostile-zone textarea,
+      .hostile-zone div {
         border-radius: 0 !important;
         color: red !important;
         font-size: 32px !important;
       }
+
+      .hostile-zone h2 {
+        color: #111827;
+        font-size: 30px;
+        margin: 0;
+      }
+
+      .hostile-zone p {
+        color: #374151;
+        font-family: Georgia, serif;
+        font-size: 18px;
+        font-weight: 400;
+      }
+
+      .status {
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 700;
+        margin-top: 14px;
+        padding-top: 12px;
+        word-break: break-all;
+      }
+
+      @media (max-width: 900px) {
+        .controls,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
-    <h1>Raw host page with hostile styles</h1>
-    <p>The AgentDesk widget should keep its own typography, colors, and rounded controls inside Shadow DOM.</p>
-    <script src="/widget.js" data-bot-id="test-id"></script>
+    <header>
+      <div class="header-inner">
+        <p class="kicker">AgentDesk embed verification</p>
+        <h1>Widget test console</h1>
+        <p>Enter a bot ID to test the Shadow DOM script widget and iframe distribution on the same page.</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <form class="controls" id="bot-form">
+          <label>
+            <span>Bot ID</span>
+            <input id="bot-id" name="botId" autocomplete="off" placeholder="6a12e617000759c91ccc" value="test-id" />
+          </label>
+          <button class="button" type="submit">Render tests</button>
+        </form>
+        <div class="status" id="status">Ready.</div>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <div class="section-label">Script widget</div>
+          <p>This panel intentionally applies hostile CSS. The floating AgentDesk launcher should remain isolated in Shadow DOM.</p>
+          <div class="test-frame">
+            <div class="hostile-zone" id="script-host">
+              <h2>Raw host page with hostile styles</h2>
+              <p>The launcher appears at the bottom-right of the browser viewport. Open it to test chat.</p>
+              <button type="button">Host button</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="section-label">Iframe widget</div>
+          <p>The iframe loads <code>/embed/[botId]</code> with the same bot ID.</p>
+          <div class="test-frame">
+            <iframe id="iframe-preview" title="AgentDesk iframe widget preview"></iframe>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById("bot-form");
+      const input = document.getElementById("bot-id");
+      const iframe = document.getElementById("iframe-preview");
+      const status = document.getElementById("status");
+
+      function getBotIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("botId") || params.get("bot_id") || "";
+      }
+
+      function cleanBotId(value) {
+        return String(value || "").trim();
+      }
+
+      function removePreviousScriptWidget() {
+        document.querySelectorAll("script[data-agentdesk-test-script='true']").forEach((script) => script.remove());
+        document.querySelectorAll("agentdesk-widget").forEach((widget) => widget.remove());
+      }
+
+      function renderTests(botId, updateUrl) {
+        const clean = cleanBotId(botId);
+        if (!/^[a-zA-Z0-9_-]{3,160}$/.test(clean)) {
+          status.textContent = "Enter a valid bot ID using letters, numbers, underscores, or hyphens.";
+          return;
+        }
+
+        input.value = clean;
+        removePreviousScriptWidget();
+
+        const script = document.createElement("script");
+        script.src = `/widget.js?t=${Date.now()}`;
+        script.async = true;
+        script.dataset.agentdeskTestScript = "true";
+        script.dataset.botId = clean;
+        document.body.append(script);
+
+        iframe.src = `/embed/${encodeURIComponent(clean)}`;
+        status.textContent = `Rendering script widget and iframe for bot ID: ${clean}`;
+
+        if (updateUrl) {
+          const url = new URL(window.location.href);
+          url.searchParams.set("botId", clean);
+          window.history.replaceState(null, "", url.toString());
+        }
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        renderTests(input.value, true);
+      });
+
+      renderTests(getBotIdFromUrl() || input.value, false);
+    </script>
   </body>
 </html>

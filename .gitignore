@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -10,37 +10,70 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# Next.js build output
 /.next/
 /out/
-
-# production
 /build
 
-# misc
-.DS_Store
-*.pem
+# TypeScript build cache
+*.tsbuildinfo
+next-env.d.ts
 
-# debug
+# Environment files — never commit secrets
+.env*
+
+# One-off debug & maintenance scripts (root-level .mjs files)
+check-tenants.mjs
+create-collection.mjs
+fix-schema.mjs
+get-document-files-attributes.mjs
+get-ledger-attributes.mjs
+list-collections.mjs
+reset-tenants.mjs
+setup-missing-collections.mjs
+setup-schema.mjs
+update-all-collections.mjs
+update-collection.mjs
+test-ensure.mjs
+test-get.mjs
+test-guest.mjs
+test-pdf.mjs
+test-verify.mjs
+
+# Agent tooling & AI assistant config (not part of the app)
+/.agent
+/processStatus
+CLAUDE.md
+
+# Docs folder (design artefacts, not shipped code)
+/docs
+
+# Vercel deployment config
+.vercel
+
+# OS / IDE artefacts
+.DS_Store
+Thumbs.db
+*.pem
+*.sublime-workspace
+*.sublime-project
+.idea/
+.vscode/settings.json
+.vscode/*.code-workspace
+
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# Test coverage
+/coverage
 
-# vercel
-.vercel
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
 
 
 .agent
-docs
-processStatus
+node_modules
+
+

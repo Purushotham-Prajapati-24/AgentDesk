@@ -38,11 +38,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .then((currentUser) => {
         if (isActive) {
           setUser(currentUser);
+          if (typeof window !== "undefined") {
+            try {
+              const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "6a12a61100219ba50305";
+              const fallbackKey = `cookieFallback`;
+              const fallbackStr = localStorage.getItem(fallbackKey);
+              if (fallbackStr) {
+                const fallbacks = JSON.parse(fallbackStr);
+                const secret = fallbacks[`a_session_${projectId.toLowerCase()}`] || fallbacks[`a_session_${projectId.toLowerCase()}_legacy`];
+                if (secret) {
+                  import("@/app/auth-actions").then(m => m.syncSession(secret));
+                }
+              }
+            } catch (e) {
+              // ignore sync errors
+            }
+          }
         }
       })
       .catch(() => {
         if (isActive) {
           setUser(null);
+          if (typeof window !== "undefined") {
+            const keys = Object.keys(localStorage);
+            keys.forEach(key => {
+              if (key.startsWith("cookieFallback")) {
+                localStorage.removeItem(key);
+              }
+            });
+          }
         }
       })
       .finally(() => {
@@ -59,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await account.deleteSession("current");
-      document.cookie = "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
+      import("@/app/auth-actions").then(m => m.clearSessionCookie());
       setUser(null);
       router.push("/login");
     } catch (error) {

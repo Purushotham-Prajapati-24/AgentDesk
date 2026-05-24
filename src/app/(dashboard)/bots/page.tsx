@@ -115,7 +115,7 @@ export default function BotsPage() {
   }
 
   if (tenantLoading) {
-    return <main className="p-6 font-bold text-muted">Loading workspace...</main>;
+    return <main className="p-6 font-bold text-muted-foreground">Loading workspace...</main>;
   }
 
   return (
@@ -129,10 +129,10 @@ export default function BotsPage() {
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[340px_1fr] lg:px-8">
         <Panel className="h-fit p-4">
-          <div className="flex items-center justify-between gap-3 border-b-2 border-line pb-4">
+          <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
             <div>
-              <p className="signal-kicker text-muted">Roster</p>
-              <h2 className="text-2xl font-black">Bots</h2>
+              <p className="studio-kicker text-muted-foreground">Roster</p>
+              <h2 className="text-2xl font-bold">Bots</h2>
             </div>
             <Button
               leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
@@ -156,17 +156,17 @@ export default function BotsPage() {
               bots.map((bot) => (
                 <button
                   className={`group w-full border-2 p-3 text-left text-sm transition hover:-translate-y-0.5 ${
-                    bot.$id === selectedId ? "border-line bg-yellow" : "border-line bg-panel hover:bg-panel-warm"
+                    bot.$id === selectedId ? "border-border bg-primary/10" : "border-border bg-card hover:bg-secondary/60"
                   }`}
                   key={bot.$id}
                   onClick={() => selectBot(bot)}
                   type="button"
                 >
-                  <span className="flex items-center gap-2 font-black text-line">
-                    <BotIcon aria-hidden="true" className="h-4 w-4 text-signal" />
+                  <span className="flex items-center gap-2 font-bold text-foreground">
+                    <BotIcon aria-hidden="true" className="h-4 w-4 text-primary" />
                     {bot.name}
                   </span>
-                  <span className="mt-2 block truncate font-mono text-xs font-bold text-muted">{bot.$id}</span>
+                  <span className="mt-2 block truncate font-mono text-xs font-bold text-muted-foreground">{bot.$id}</span>
                 </button>
               ))
             )}
@@ -175,19 +175,19 @@ export default function BotsPage() {
 
         <Panel className="p-5">
           <form onSubmit={saveBot}>
-            <section className="mb-5 flex flex-col gap-3 border-b-2 border-line pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <section className="mb-5 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="signal-kicker text-muted">Tenant: {tenant?.$id ?? "Unavailable"}</p>
-                <h2 className="text-3xl font-black leading-tight">{selectedBot ? "Edit bot" : "Create bot"}</h2>
+                <p className="studio-kicker text-muted-foreground">Tenant: {tenant?.$id ?? "Unavailable"}</p>
+                <h2 className="text-3xl font-bold leading-tight">{selectedBot ? "Edit bot" : "Create bot"}</h2>
               </div>
               <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
             </section>
 
             <div className="grid gap-4">
               <label className="block">
-                <span className="signal-kicker mb-2 block text-muted">Bot name</span>
+                <span className="studio-kicker mb-2 block text-muted-foreground">Bot name</span>
                 <input
-                  className="min-h-11 w-full border-2 border-line bg-panel px-3 text-sm font-bold focus:bg-panel-warm"
+                  className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
                   maxLength={80}
                   required
                   value={form.name}
@@ -196,9 +196,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="signal-kicker mb-2 block text-muted">System prompt</span>
+                <span className="studio-kicker mb-2 block text-muted-foreground">System prompt</span>
                 <textarea
-                  className="min-h-60 w-full border-2 border-line bg-panel px-3 py-3 font-mono text-sm leading-6 focus:bg-panel-warm"
+                  className="min-h-60 w-full border border-border bg-card px-3 py-3 font-mono text-sm leading-6 focus:bg-secondary/60"
                   maxLength={4000}
                   required
                   value={form.system_prompt}
@@ -207,9 +207,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="signal-kicker mb-2 block text-muted">Fallback message</span>
+                <span className="studio-kicker mb-2 block text-muted-foreground">Fallback message</span>
                 <textarea
-                  className="min-h-28 w-full border-2 border-line bg-panel px-3 py-3 text-sm font-bold leading-6 focus:bg-panel-warm"
+                  className="min-h-28 w-full border border-border bg-card px-3 py-3 text-sm font-bold leading-6 focus:bg-secondary/60"
                   maxLength={500}
                   required
                   value={form.fallback_message}
@@ -218,7 +218,7 @@ export default function BotsPage() {
               </label>
             </div>
 
-            {status ? <p className="mt-5 border-2 border-line bg-panel-warm px-3 py-2 text-sm font-bold text-line">{status}</p> : null}
+            {status ? <p className="mt-5 border border-border bg-secondary/60 px-3 py-2 text-sm font-bold text-foreground">{status}</p> : null}
 
             <div className="mt-5 flex flex-wrap gap-3">
               <Button disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
@@ -248,3 +248,4 @@ function botToForm(bot: Bot): BotForm {
     fallback_message: bot.fallback_message,
   };
 }
+

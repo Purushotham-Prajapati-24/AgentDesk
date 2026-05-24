@@ -62,7 +62,7 @@ export default function BillingPage() {
 
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:px-8">
         {error ? (
-          <div className="flex items-center gap-3 border-2 border-line bg-coral px-4 py-3 font-bold text-white" role="alert">
+          <div className="flex items-center gap-3 border border-border bg-destructive px-4 py-3 font-bold text-white" role="alert">
             <AlertTriangle aria-hidden="true" className="h-5 w-5" />
             {error}
           </div>
@@ -76,10 +76,10 @@ export default function BillingPage() {
         </section>
 
         <Panel className="overflow-hidden">
-          <div className="flex items-center justify-between border-b-2 border-line bg-yellow px-4 py-3">
+          <div className="flex items-center justify-between border-b border-border bg-primary/10 px-4 py-3">
             <div className="flex items-center gap-2">
               <ReceiptText aria-hidden="true" className="h-5 w-5" />
-              <h2 className="text-lg font-black">Transaction history</h2>
+              <h2 className="text-lg font-bold">Transaction history</h2>
             </div>
             <StatusPill tone="dark">{snapshot?.transactions.length ?? 0} rows</StatusPill>
           </div>
@@ -90,7 +90,7 @@ export default function BillingPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-                <thead className="bg-line text-xs uppercase text-panel">
+                <thead className="bg-card-elevated text-xs uppercase text-foreground">
                   <tr>
                     <th className="px-4 py-3">Date</th>
                     <th className="px-4 py-3">Type</th>
@@ -100,11 +100,11 @@ export default function BillingPage() {
                 </thead>
                 <tbody>
                   {snapshot?.transactions.map((transaction) => (
-                    <tr className="border-t-2 border-line bg-panel odd:bg-panel-warm" key={transaction.id}>
-                      <td className="px-4 py-3 font-mono text-xs font-bold text-muted">{formatDate(transaction.created)}</td>
-                      <td className="px-4 py-3 font-black text-line">{transaction.transactionType}</td>
-                      <td className="px-4 py-3 font-semibold text-muted">{transaction.description}</td>
-                      <td className={`px-4 py-3 text-right font-mono font-black ${transaction.amount < 0 ? "text-coral" : "text-success"}`}>
+                    <tr className="border-t border-border bg-card odd:bg-secondary/60" key={transaction.id}>
+                      <td className="px-4 py-3 font-mono text-xs font-bold text-muted-foreground">{formatDate(transaction.created)}</td>
+                      <td className="px-4 py-3 font-bold text-foreground">{transaction.transactionType}</td>
+                      <td className="px-4 py-3 font-semibold text-muted-foreground">{transaction.description}</td>
+                      <td className={`px-4 py-3 text-right font-mono font-bold ${transaction.amount < 0 ? "text-destructive" : "text-success"}`}>
                         {formatAmount(transaction.amount)}
                       </td>
                     </tr>
@@ -139,3 +139,4 @@ function formatDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
+

@@ -7,16 +7,18 @@
     const scriptUrl = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.src) ? new URL(currentScript.src, window.location.href) : null;
     const scriptOrigin = (_a = scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin) !== null && _a !== void 0 ? _a : window.location.origin;
     const botId = (_c = (_b = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
+    const embedMode = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.mode) === "inline" ? "inline" : "launcher";
     const configUrl = ((_d = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.configUrl) === null || _d === void 0 ? void 0 : _d.trim()) || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
     if (!botId) {
         return;
     }
+    const MESSAGES_KEY = `agentdesk:messages:${STORAGE_VERSION}:${botId}`;
     class AgentDeskWidget extends HTMLElement {
         constructor() {
             super();
             this.config = null;
             this.messages = [];
-            this.isOpen = false;
+            this.isOpen = embedMode === "inline";
             this.isSending = false;
             this.sessionToken = getSessionToken(botId);
             this.socket = null;
@@ -41,13 +43,20 @@
             catch {
                 this.config = buildFallbackConfig(botId);
             }
-            this.messages = [
-                {
-                    id: createId(),
-                    sender: "bot",
-                    content: this.config.greeting,
-                },
-            ];
+            const persisted = loadMessages();
+            if (persisted.length > 0) {
+                this.messages = persisted;
+            }
+            else {
+                this.messages = [
+                    {
+                        id: createId(),
+                        sender: "bot",
+                        content: this.config.greeting,
+                    },
+                ];
+                saveMessages(this.messages);
+            }
             this.renderShell();
             this.initSocket(this.config);
         }
@@ -59,7 +68,7 @@
             if (!document.querySelector(`script[src="${scriptUrl}"]`)) {
                 const script = document.createElement("script");
                 script.src = scriptUrl;
-                script.onload = () => this.connectSocket(config);
+                script.onload = () => void this.connectSocket(config);
                 document.head.appendChild(script);
             }
             else {
@@ -67,15 +76,21 @@
                     const windowRef = window;
                     if (typeof windowRef.io !== "undefined") {
                         window.clearInterval(checkInterval);
-                        this.connectSocket(config);
+                        void this.connectSocket(config);
                     }
                 }, 100);
             }
         }
-        connectSocket(config) {
-            var _a, _b, _c;
+        async connectSocket(config) {
             const windowRef = window;
-            const wsUrl = (_c = (_b = (_a = windowRef.process) === null || _a === void 0 ? void 0 : _a.env) === null || _b === void 0 ? void 0 : _b.NEXT_PUBLIC_WEBSOCKET_URL) !== null && _c !== void 0 ? _c : "http://127.0.0.1:4000";
+            const wsUrl = normalizeWebSocketEndpoint(config.websocketEndpoint);
+            if (!wsUrl) {
+                return;
+            }
+            const isHealthy = await checkLiveHandoffHealth(wsUrl);
+            if (!isHealthy) {
+                return;
+            }
             const namespace = `${wsUrl.replace(/\/$/, "")}/tenant-${config.tenantId}`;
             try {
                 if (!windowRef.io) {
@@ -86,7 +101,6 @@
                         tenant_id: config.tenantId,
                         session_id: this.sessionToken,
                     },
-                    transports: ["websocket"],
                 });
                 this.socket = socket;
                 if (socket) {
@@ -96,6 +110,7 @@
                             sender: "bot",
                             content: message.content,
                         });
+                        saveMessages(this.messages);
                         this.renderShell();
                     });
                 }
@@ -110,10 +125,14 @@
             this.shadowRootRef.replaceChildren(createStyles(config.theme), this.createWidget(config));
         }
         createWidget(config) {
-            const wrapper = createElement("section", "ad-widget");
-            const pane = createElement("div", `ad-chat-pane${this.isOpen ? " active" : ""}`);
+            const wrapper = createElement("section", `ad-widget ${embedMode}`);
+            const pane = createElement("div", `ad-chat-pane${this.isOpen || embedMode === "inline" ? " active" : ""}`);
             pane.setAttribute("aria-live", "polite");
             pane.append(this.createHeader(config), this.createMessageList(), this.createQuickActions(), this.createForm(config));
+            if (embedMode === "inline") {
+                wrapper.append(pane);
+                return wrapper;
+            }
             const launcher = createElement("button", "ad-launcher-button");
             launcher.type = "button";
             launcher.setAttribute("aria-label", this.isOpen ? "Close support chat" : "Open support chat");
@@ -234,6 +253,7 @@
             const config = (_a = explicitConfig !== null && explicitConfig !== void 0 ? explicitConfig : this.config) !== null && _a !== void 0 ? _a : buildFallbackConfig(botId);
             const content = text.slice(0, MAX_MESSAGE_LENGTH);
             this.messages.push({ id: createId(), sender: "user", content });
+            saveMessages(this.messages);
             this.isSending = true;
             this.renderShell();
             if (this.socket && this.socket.connected) {
@@ -268,6 +288,7 @@
             for (let index = 0; index < chars.length; index += 1) {
                 message.content += chars[index];
                 if (index % 3 === 0 || index === chars.length - 1) {
+                    saveMessages(this.messages);
                     this.renderShell();
                     await delay(12);
                 }
@@ -394,6 +415,7 @@
             logoUrl: null,
             bannerText: "Online - responds instantly",
             messageEndpoint: `${scriptOrigin}/api/chat/message`,
+            websocketEndpoint: null,
             theme: {
                 headerHsl: "224 20% 18%",
                 backgroundHsl: "224 25% 12%",
@@ -435,6 +457,15 @@
         z-index: 2147483647;
       }
 
+      .ad-widget.inline {
+        bottom: auto;
+        height: 100vh;
+        inset: 0;
+        position: fixed;
+        right: auto;
+        width: 100vw;
+      }
+
       .ad-chat-pane {
         background: var(--ad-bg-primary);
         border: 1px solid var(--ad-border-color);
@@ -452,6 +483,16 @@
         width: min(380px, calc(100vw - 32px));
         backdrop-filter: blur(16px) saturate(180%);
         -webkit-backdrop-filter: blur(16px) saturate(180%);
+      }
+
+      .ad-widget.inline .ad-chat-pane {
+        border: 0;
+        border-radius: 0;
+        height: 100vh;
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+        width: 100vw;
       }
 
       .ad-chat-pane.active {
@@ -751,16 +792,42 @@
     function getSessionToken(currentBotId) {
         const key = `agentdesk:session:${STORAGE_VERSION}:${currentBotId}`;
         try {
-            const stored = window.localStorage.getItem(key);
+            const stored = window.sessionStorage.getItem(key);
             if (stored) {
                 return stored;
             }
             const token = createId();
-            window.localStorage.setItem(key, token);
+            window.sessionStorage.setItem(key, token);
             return token;
         }
         catch {
             return createId();
+        }
+    }
+    function saveMessages(messages) {
+        try {
+            const trimmed = messages.slice(-80);
+            window.sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(trimmed));
+        }
+        catch {
+        }
+    }
+    function loadMessages() {
+        try {
+            const raw = window.sessionStorage.getItem(MESSAGES_KEY);
+            if (!raw)
+                return [];
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed))
+                return [];
+            return parsed.filter((m) => typeof m === "object" &&
+                m !== null &&
+                typeof m.id === "string" &&
+                typeof m.sender === "string" &&
+                typeof m.content === "string");
+        }
+        catch {
+            return [];
         }
     }
     function createId() {
@@ -769,6 +836,35 @@
             return window.crypto.randomUUID();
         }
         return `ad_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+    }
+    function normalizeWebSocketEndpoint(value) {
+        if (!value) {
+            return null;
+        }
+        try {
+            const url = new URL(value, scriptOrigin);
+            return ["http:", "https:", "ws:", "wss:"].includes(url.protocol) ? url.toString().replace(/\/$/, "") : null;
+        }
+        catch {
+            return null;
+        }
+    }
+    async function checkLiveHandoffHealth(baseUrl) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 2500);
+        try {
+            const response = await fetch(`${baseUrl}/health`, {
+                cache: "no-store",
+                signal: controller.signal,
+            });
+            return response.ok;
+        }
+        catch {
+            return false;
+        }
+        finally {
+            window.clearTimeout(timeout);
+        }
     }
     function delay(ms) {
         return new Promise((resolve) => {
@@ -787,5 +883,6 @@
         customElements.define(elementName, AgentDeskWidget);
     }
     const mount = document.createElement(elementName);
+    mount.setAttribute("data-agentdesk-mode", embedMode);
     document.body.append(mount);
 })();

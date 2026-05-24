@@ -4,16 +4,29 @@ import { Client, Account, Databases, Storage, Users } from "node-appwrite";
 import { cookies } from "next/headers";
 
 export async function createSessionClient() {
+  const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "";
   const client = new Client()
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
-    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "");
+    .setProject(projectId);
 
-  const session = (await cookies()).get("session");
-  if (!session || !session.value) {
-    throw new Error("No session");
+  const cookieStore = await cookies();
+
+  // Appwrite session secrets are long tokens (>10 chars). Filter out any blank/stale
+  // phantom cookies that may have been left behind by incorrect client-side logout code.
+  const MIN_SECRET_LENGTH = 10;
+  const findValidSecret = (name: string) =>
+    cookieStore.getAll(name).find(c => c.value.length >= MIN_SECRET_LENGTH)?.value;
+
+  const sessionSecret =
+    findValidSecret("session") ??
+    findValidSecret(`a_session_${projectId.toLowerCase()}`) ??
+    findValidSecret(`a_session_${projectId.toLowerCase()}_legacy`);
+
+  if (!sessionSecret) {
+    throw new Error("No session. Received cookies: " + cookieStore.getAll().map(c => c.name).join(", "));
   }
 
-  client.setSession(session.value);
+  client.setSession(sessionSecret);
 
   return {
     get account() {
@@ -25,6 +38,18 @@ export async function createSessionClient() {
     get storage() {
       return new Storage(client);
     }
+  };
+}
+
+export async function createGuestClient() {
+  const client = new Client()
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "");
+
+  return {
+    get account() {
+      return new Account(client);
+    },
   };
 }
 

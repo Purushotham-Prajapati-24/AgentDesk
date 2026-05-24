@@ -1,4 +1,7 @@
 import { NextRequest } from "next/server";
+import type { Models } from "node-appwrite";
+import { createAdminClient } from "@/lib/server/appwrite";
+import { getPublicServerWebSocketUrl } from "@/lib/server/websocket-url";
 
 type WidgetTheme = {
   headerHsl: string;
@@ -20,12 +23,20 @@ type WidgetConfig = {
   logoUrl: string | null;
   bannerText: string;
   messageEndpoint: string;
+  websocketEndpoint: string | null;
   theme: WidgetTheme;
 };
 
 type WidgetConfigResponse = {
   success: true;
   data: WidgetConfig;
+};
+
+type BotDocument = Models.Document & {
+  tenant_id?: unknown;
+  name?: unknown;
+  fallback_message?: unknown;
+  theme_config?: unknown;
 };
 
 type ErrorResponse = {
@@ -57,10 +68,11 @@ const DEMO_CONFIGS: Record<string, WidgetConfig> = {
     tenantId: "tenant-demo",
     botName: "AgentDesk Support",
     greeting: "Hello. I can help with orders, returns, and product questions.",
-    fallbackMessage: "I could not reach the support engine. Please try again in a moment.",
+    fallbackMessage: "I do not have indexed support context for this demo bot yet. Upload a document for this bot, then ask again.",
     logoUrl: null,
     bannerText: "Online - responds instantly",
     messageEndpoint: "/api/chat/message",
+    websocketEndpoint: null,
     theme: DEFAULT_THEME,
   },
 };
@@ -84,7 +96,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ bo
     return errorResponse("INVALID_BOT_ID", "The requested widget configuration is invalid.", requestId, 422);
   }
 
-  const config = getConfig(botId);
+  const config = await getConfig(botId);
   if (!config) {
     return errorResponse("BOT_NOT_FOUND", "The requested widget configuration was not found.", requestId, 404);
   }
@@ -98,7 +110,12 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ bo
   );
 }
 
-function getConfig(botId: string) {
+async function getConfig(botId: string) {
+  const appwriteConfig = await getAppwriteBotConfig(botId);
+  if (appwriteConfig) {
+    return sanitizeConfig(appwriteConfig);
+  }
+
   const envConfig = parseEnvConfigs()[botId];
   const config = envConfig ?? DEMO_CONFIGS[botId];
 
@@ -107,6 +124,33 @@ function getConfig(botId: string) {
   }
 
   return sanitizeConfig(config);
+}
+
+async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null> {
+  try {
+    const { databases } = await createAdminClient();
+    const bot = (await databases.getDocument(databaseId(), botsCollectionId(), botId)) as BotDocument;
+    const themeConfig = parseThemeConfig(bot.theme_config);
+    const theme = {
+      ...DEFAULT_THEME,
+      ...themeConfig.theme,
+    };
+
+    return {
+      botId,
+      tenantId: cleanText(stringValue(bot.tenant_id, ""), 80),
+      botName: cleanText(stringValue(bot.name, "AgentDesk Support"), 80),
+      greeting: cleanText(stringValue(themeConfig.greeting, "Hello. I can help with orders, returns, and product questions."), 300),
+      fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
+      logoUrl: null,
+      bannerText: cleanText(stringValue(themeConfig.bannerText, "Online - responds instantly"), 80),
+      messageEndpoint: "/api/chat/message",
+      websocketEndpoint: null,
+      theme,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function parseEnvConfigs(): Record<string, WidgetConfig> {
@@ -123,6 +167,19 @@ function parseEnvConfigs(): Record<string, WidgetConfig> {
   }
 }
 
+function parseThemeConfig(value: unknown): Partial<WidgetConfig> & { theme?: Partial<WidgetTheme> } {
+  if (typeof value !== "string" || !value.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<WidgetConfig> & { theme?: Partial<WidgetTheme> };
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function sanitizeConfig(config: WidgetConfig): WidgetConfig {
   return {
     botId: cleanText(config.botId, 80),
@@ -133,6 +190,7 @@ function sanitizeConfig(config: WidgetConfig): WidgetConfig {
     logoUrl: sanitizeUrl(config.logoUrl),
     bannerText: cleanText(config.bannerText, 80),
     messageEndpoint: sanitizeEndpoint(config.messageEndpoint),
+    websocketEndpoint: sanitizeWebSocketEndpoint(config.websocketEndpoint) ?? getPublicServerWebSocketUrl(),
     theme: sanitizeTheme(config.theme),
   };
 }
@@ -167,6 +225,19 @@ function sanitizeEndpoint(value: string) {
   }
 }
 
+function sanitizeWebSocketEndpoint(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    return ["http:", "https:", "ws:", "wss:"].includes(url.protocol) ? url.toString().replace(/\/$/, "") : null;
+  } catch {
+    return null;
+  }
+}
+
 function sanitizeUrl(value: string | null) {
   if (!value) {
     return null;
@@ -182,6 +253,18 @@ function sanitizeUrl(value: string | null) {
 
 function cleanText(value: string, maxLength: number) {
   return value.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, maxLength);
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function databaseId() {
+  return process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "agentdesk";
+}
+
+function botsCollectionId() {
+  return process.env.APPWRITE_BOTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID ?? "bots";
 }
 
 function errorResponse(code: string, message: string, requestId: string, status: number) {

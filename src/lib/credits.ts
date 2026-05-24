@@ -54,7 +54,7 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
         Query.equal("status", "active"),
         Query.limit(1),
       ]),
-      databases.listDocuments(databaseId(), messagesCollectionId(), [Query.limit(1)]),
+      databases.listDocuments(databaseId(), messagesCollectionId(), [Query.equal("tenant_id", tenantId), Query.limit(1)]),
       databases.listDocuments(databaseId(), documentsCollectionId(), [Query.equal("tenant_id", tenantId), Query.limit(PAGE_LIMIT)]),
     ]);
 
@@ -120,7 +120,7 @@ function databaseId() {
 }
 
 function ledgerCollectionId() {
-  return process.env.APPWRITE_LEDGER_COLLECTION_ID ?? "ledger_transactions";
+  return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger_transactions";
 }
 
 function sessionsCollectionId() {

@@ -49,13 +49,24 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       try {
         const prefs = user.prefs as TenantPreferences;
-        const tenantId = prefs.tenant_id;
-        const userRole = prefs.role;
+        let tenantId = prefs.tenant_id;
+        let userRole = prefs.role;
+
+        if (!tenantId) {
+          const { ensureTenant } = await import("@/app/auth-actions");
+          const result = await ensureTenant(user.$id);
+          if (result.success && result.tenantId) {
+            tenantId = result.tenantId;
+            userRole = "admin";
+          } else {
+            console.error("Failed to auto-provision tenant:", result.error);
+          }
+        }
 
         if (tenantId) {
           const tenantDoc = await databases.getDocument(
-            process.env.APPWRITE_DATABASE_ID || "agentdesk",
-            process.env.APPWRITE_TENANTS_COLLECTION_ID || "tenants",
+            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || "agentdesk",
+            process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID || "tenants",
             tenantId
           ) as TenantDocument;
           

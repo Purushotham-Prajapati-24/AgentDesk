@@ -2,10 +2,11 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, Radio } from "lucide-react";
+import { ArrowLeft, LockKeyhole, Mail, Radio, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Signal";
+import { DarkVeil } from "@/components/reactbits/DarkVeil";
 import { loginWithMagicLink } from "@/app/auth-actions";
 
 export default function LoginPage() {
@@ -18,56 +19,59 @@ export default function LoginPage() {
     setLoading(true);
     setMessage(null);
 
-    const result = await loginWithMagicLink(email);
-
-    if (result.success) {
+    try {
+      const result = await loginWithMagicLink(email);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
       setMessage({ type: "success", text: "Magic link dispatched. Check your inbox." });
-    } else {
-      setMessage({ type: "error", text: result.error || "Failed to send magic link." });
+    } catch (error: unknown) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to send magic link." });
     }
     setLoading(false);
   };
 
   return (
-    <main className="grid min-h-screen bg-background text-line lg:grid-cols-[1fr_480px]">
-      <section className="relative flex min-h-[50vh] flex-col justify-between overflow-hidden border-b-2 border-line bg-line p-5 text-panel lg:min-h-screen lg:border-b-0 lg:border-r-2 lg:p-8">
-        <Link className="inline-flex w-fit items-center gap-2 text-sm font-black text-yellow" href="/">
+    <main className="grid min-h-screen bg-background text-foreground lg:grid-cols-[1fr_480px]">
+      <section className="relative flex min-h-[50vh] flex-col justify-between overflow-hidden border-b border-border bg-card p-5 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-8">
+        <DarkVeil />
+        <Link className="relative inline-flex w-fit items-center gap-2 text-sm font-semibold text-primary" href="/">
           <ArrowLeft aria-hidden="true" className="h-4 w-4" />
           Back to workspace
         </Link>
 
-        <div className="signal-enter">
-          <StatusPill tone="warn">Access gate</StatusPill>
-          <h1 className="mt-5 max-w-3xl text-[clamp(4rem,12vw,9rem)] font-black uppercase leading-[0.78]">
-            Verify the operator.
+        <div className="studio-enter relative">
+          <StatusPill tone="hot">Access gate</StatusPill>
+          <h1 className="mt-5 max-w-3xl text-[clamp(3.5rem,10vw,7rem)] font-bold leading-[0.9]">
+            Verify the operator console.
           </h1>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="border-2 border-panel p-3">
-            <p className="font-mono text-2xl font-black text-yellow">01</p>
-            <p className="mt-1 text-sm font-bold">Email token</p>
+        <div className="relative grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-border bg-secondary/50 p-3">
+            <p className="font-mono text-2xl font-bold text-primary">01</p>
+            <p className="mt-1 text-sm font-semibold">Email token</p>
           </div>
-          <div className="border-2 border-panel p-3">
-            <p className="font-mono text-2xl font-black text-yellow">02</p>
-            <p className="mt-1 text-sm font-bold">Tenant context</p>
+          <div className="rounded-lg border border-border bg-secondary/50 p-3">
+            <p className="font-mono text-2xl font-bold text-primary">02</p>
+            <p className="mt-1 text-sm font-semibold">Tenant context</p>
           </div>
-          <div className="border-2 border-panel p-3">
-            <p className="font-mono text-2xl font-black text-yellow">03</p>
-            <p className="mt-1 text-sm font-bold">Live desk</p>
+          <div className="rounded-lg border border-border bg-secondary/50 p-3">
+            <p className="font-mono text-2xl font-bold text-primary">03</p>
+            <p className="mt-1 text-sm font-semibold">Live desk</p>
           </div>
         </div>
       </section>
 
       <section className="flex items-center p-5 lg:p-8">
-        <form className="signal-panel w-full p-5 sm:p-6" onSubmit={handleSubmit}>
-          <div className="flex items-center gap-3 border-b-2 border-line pb-5">
-            <span className="flex h-12 w-12 items-center justify-center border-2 border-line bg-signal text-white">
+        <form className="studio-surface w-full rounded-xl p-5 sm:p-6" onSubmit={handleSubmit}>
+          <div className="flex items-center gap-3 border-b border-border pb-5">
+            <span className="flex h-12 w-12 items-center justify-center rounded-md border border-primary/50 bg-primary/10 text-primary">
               <Radio aria-hidden="true" className="h-5 w-5" />
             </span>
             <div>
-              <p className="signal-kicker text-muted">AgentDesk</p>
-              <h2 className="text-2xl font-black">Magic link sign in</h2>
+              <p className="studio-kicker text-muted-foreground">AgentDesk</p>
+              <h2 className="text-2xl font-bold">Magic link sign in</h2>
             </div>
           </div>
 
@@ -89,7 +93,7 @@ export default function LoginPage() {
           {message ? (
             <div
               className={`mt-5 border-2 px-3 py-3 text-sm font-bold ${
-                message.type === "success" ? "border-line bg-yellow text-line" : "border-line bg-coral text-white"
+                message.type === "success" ? "border-success/50 bg-success/10 text-success" : "border-destructive/50 bg-destructive/10 text-destructive"
               }`}
               role="status"
             >
@@ -100,6 +104,16 @@ export default function LoginPage() {
           <Button className="mt-6 w-full" loading={loading} leftIcon={<Mail aria-hidden="true" className="h-4 w-4" />} type="submit">
             Send magic link
           </Button>
+          <div className="mt-5 grid gap-2 text-xs font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-2">
+              <ShieldCheck aria-hidden="true" className="h-4 w-4 text-accent" />
+              One-time Appwrite session verification
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <LockKeyhole aria-hidden="true" className="h-4 w-4 text-accent" />
+              Dashboard access resolves tenant context after sign-in
+            </span>
+          </div>
         </form>
       </section>
     </main>

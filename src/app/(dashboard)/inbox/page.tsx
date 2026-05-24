@@ -1,11 +1,18 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Headphones, Radio, Send, UserRound } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Bot, ChevronLeft, ChevronRight, Headphones, Radio, Search, Send, UserRound } from "lucide-react";
 import { io, Socket } from "socket.io-client";
+import {
+  listConversationMessages,
+  listConversationSessions,
+  type ConversationSummary,
+} from "@/app/inbox-actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { EmptyState, PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
+import { useTenant } from "@/context/TenantContext";
+import { getClientWebSocketUrl } from "@/lib/websocket-url";
 
 type Sender = "customer" | "bot" | "agent";
 type SessionStatus = "active" | "paused_by_human" | "closed";
@@ -52,7 +59,8 @@ type AckResponse<T> =
       };
     };
 
-const DEFAULT_WS_URL = process.env.NEXT_PUBLIC_WEBSOCKET_URL ?? "http://127.0.0.1:4000";
+const WEB_SOCKET_URL = getClientWebSocketUrl();
+const WEB_SOCKET_CONFIG_ERROR = "Live handoff is not configured. Set NEXT_PUBLIC_WEBSOCKET_URL to your Socket.IO service URL.";
 const DEFAULT_ROOM: Room = {
   tenantId: "tenant_demo",
   sessionId: "session_demo",
@@ -75,65 +83,125 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 ];
 
 export default function InboxPage() {
+  const { tenant } = useTenant();
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [draftRoom, setDraftRoom] = useState<Room>(DEFAULT_ROOM);
-  const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
+  const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">(WEB_SOCKET_URL ? "connecting" : "disconnected");
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("active");
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [agentDraft, setAgentDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
+  const [historySearchInput, setHistorySearchInput] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyCursorStack, setHistoryCursorStack] = useState<string[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [history, setHistory] = useState<ConversationSummary[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
 
-  const selectedSession = useMemo(
-    () => ({
-      id: room.sessionId,
-      tenantId: room.tenantId,
-      customer: "Website visitor",
-      summary: latestCustomerMessage(messages),
-      unread: messages.filter((message) => message.sender === "customer").length,
-    }),
-    [messages, room],
-  );
+  useEffect(() => {
+    if (!WEB_SOCKET_URL) {
+      return;
+    }
+
+    const wsUrl = WEB_SOCKET_URL;
+    const abortController = new AbortController();
+    let socket: Socket | null = null;
+    let disposed = false;
+
+    async function connectWhenHealthy() {
+      const healthy = await checkLiveHandoffHealth(wsUrl, abortController.signal);
+      if (disposed) {
+        return;
+      }
+
+      if (!healthy) {
+        setSocketStatus("disconnected");
+        setError(`Live handoff server is unavailable at ${wsUrl}. Start the WebSocket service or update NEXT_PUBLIC_WEBSOCKET_URL.`);
+        return;
+      }
+
+      const namespace = `${wsUrl}/tenant-${room.tenantId}`;
+      socket = io(namespace, {
+        auth: {
+          tenant_id: room.tenantId,
+          session_id: room.sessionId,
+        },
+        reconnectionAttempts: 5,
+        timeout: 8000,
+      });
+
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        setSocketStatus("connected");
+        setError(null);
+      });
+      socket.on("disconnect", () => {
+        setSocketStatus("disconnected");
+      });
+      socket.on("connect_error", (connectionError) => {
+        setSocketStatus("disconnected");
+        setError(`Unable to connect to the live handoff server at ${wsUrl}. ${connectionError.message}`);
+      });
+      socket.on("session-state", (state: SessionState) => setSessionStatus(state.status));
+      socket.on("bot-status-toggle", (state: SessionState) => setSessionStatus(state.status));
+      socket.on("customer-message", (message: SocketEventMessage) => {
+        appendMessage(setMessages, mapSocketMessage(message));
+      });
+      socket.on("agent-message", (message: SocketEventMessage) => {
+        appendMessage(setMessages, mapSocketMessage(message));
+      });
+      socket.on("server-error", (response: AckResponse<never>) => {
+        if (!response.success) {
+          setError(response.error.message);
+        }
+      });
+    }
+
+    void connectWhenHealthy();
+
+    return () => {
+      disposed = true;
+      abortController.abort();
+      socket?.disconnect();
+      socketRef.current = null;
+    };
+  }, [room]);
 
   useEffect(() => {
-    const namespace = `${DEFAULT_WS_URL.replace(/\/$/, "")}/tenant-${room.tenantId}`;
-    const socket = io(namespace, {
-      auth: {
-        tenant_id: room.tenantId,
-        session_id: room.sessionId,
-      },
-      reconnectionAttempts: 5,
-      transports: ["websocket"],
-    });
+    if (!tenant?.$id) {
+      return;
+    }
 
-    socketRef.current = socket;
+    let isActive = true;
+    listConversationSessions({
+      tenantId: tenant.$id,
+      search: historySearch,
+      cursor: historyCursor,
+    }).then((response) => {
+      if (!isActive) {
+        return;
+      }
 
-    socket.on("connect", () => setSocketStatus("connected"));
-    socket.on("disconnect", () => setSocketStatus("disconnected"));
-    socket.on("connect_error", () => {
-      setSocketStatus("disconnected");
-      setError("Unable to connect to the live handoff server.");
-    });
-    socket.on("session-state", (state: SessionState) => setSessionStatus(state.status));
-    socket.on("bot-status-toggle", (state: SessionState) => setSessionStatus(state.status));
-    socket.on("customer-message", (message: SocketEventMessage) => {
-      appendMessage(setMessages, mapSocketMessage(message));
-    });
-    socket.on("agent-message", (message: SocketEventMessage) => {
-      appendMessage(setMessages, mapSocketMessage(message));
-    });
-    socket.on("server-error", (response: AckResponse<never>) => {
-      if (!response.success) {
-        setError(response.error.message);
+      setHistoryLoading(false);
+      if (response.success) {
+        setHistory(response.data.sessions);
+        setHistoryNextCursor(response.data.nextCursor);
+      } else {
+        setHistory([]);
+        setHistoryNextCursor(null);
+        setError(response.error);
       }
     });
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      isActive = false;
     };
-  }, [room]);
+  }, [tenant?.$id, historySearch, historyCursor]);
 
   useEffect(() => {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" });
@@ -146,9 +214,72 @@ export default function InboxPage() {
       return;
     }
     setMessages([]);
-    setSocketStatus("connecting");
-    setError(null);
+    setSelectedConversationId(null);
+    setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
+    setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
+  }
+
+  function searchHistory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setHistoryLoading(true);
+    setHistoryCursor(null);
+    setHistoryCursorStack([]);
+    setHistorySearch(historySearchInput.trim());
+  }
+
+  function nextHistoryPage() {
+    if (!historyNextCursor) {
+      return;
+    }
+
+    setHistoryLoading(true);
+    setHistoryCursorStack((current) => [...current, historyCursor ?? ""]);
+    setHistoryCursor(historyNextCursor);
+  }
+
+  function previousHistoryPage() {
+    setHistoryLoading(true);
+    setHistoryCursorStack((current) => {
+      const previous = [...current];
+      const cursor = previous.pop() ?? "";
+      setHistoryCursor(cursor || null);
+      return previous;
+    });
+  }
+
+  async function selectConversation(conversation: ConversationSummary) {
+    if (!tenant?.$id) {
+      setError("Tenant context is not ready.");
+      return;
+    }
+
+    setSelectedConversationId(conversation.id);
+    setSessionStatus(conversation.status);
+    setDraftRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
+    setRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
+    setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
+    setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
+
+    const response = await listConversationMessages({
+      tenantId: tenant.$id,
+      sessionId: conversation.id,
+    });
+
+    if (!response.success) {
+      setMessages([]);
+      setError(response.error);
+      return;
+    }
+
+    setMessages(
+      response.data.messages.map((message) => ({
+        id: message.id,
+        sender: message.sender,
+        content: message.content,
+        createdAt: message.createdAt,
+      })),
+    );
   }
 
   async function toggleTakeover() {
@@ -240,29 +371,84 @@ export default function InboxPage() {
 
           <Panel className="p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-black">Active sessions</h2>
-              <StatusPill tone="dark">{selectedSession.unread}</StatusPill>
+              <h2 className="text-lg font-bold">Conversation history</h2>
+              <StatusPill tone="dark">{historyLoading ? "..." : history.length}</StatusPill>
             </div>
 
-            <button className="hard-hover w-full border-2 border-line bg-panel-warm p-4 text-left" type="button">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-black text-line">{selectedSession.customer}</p>
-                  <p className="mt-1 truncate font-mono text-xs font-bold text-muted">{selectedSession.id}</p>
-                </div>
-                <Headphones aria-hidden="true" className="h-6 w-6 text-signal" />
-              </div>
-              <p className="mt-4 line-clamp-3 text-sm font-semibold leading-6 text-muted">{selectedSession.summary}</p>
-              <p className="mt-4 font-mono text-xs font-bold text-line">Tenant: {selectedSession.tenantId}</p>
-            </button>
+            <form className="mb-4 flex gap-2" onSubmit={searchHistory}>
+              <input
+                className="min-h-10 min-w-0 flex-1 border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
+                placeholder="Search session, bot, status"
+                value={historySearchInput}
+                onChange={(event) => setHistorySearchInput(event.target.value)}
+              />
+              <Button aria-label="Search history" size="sm" type="submit" variant="secondary">
+                <Search aria-hidden="true" className="h-4 w-4" />
+              </Button>
+            </form>
+
+            <div className="grid gap-2">
+              {history.length === 0 ? (
+                <EmptyState title="No stored conversations" description="Persisted widget sessions will appear here after customers chat." />
+              ) : (
+                history.map((conversation) => (
+                  <button
+                    className={`transition hover:-translate-y-0.5 w-full border p-4 text-left ${
+                      selectedConversationId === conversation.id ? "border-primary/70 bg-primary/10" : "border-border bg-secondary/60"
+                    }`}
+                    key={conversation.id}
+                    onClick={() => void selectConversation(conversation)}
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-bold text-foreground">{conversation.sessionToken}</p>
+                        <p className="mt-1 truncate font-mono text-xs font-bold text-muted-foreground">{conversation.botId}</p>
+                      </div>
+                      <Headphones aria-hidden="true" className="h-6 w-6 text-primary" />
+                    </div>
+                    <p className="mt-4 line-clamp-3 text-sm font-semibold leading-6 text-muted-foreground">{conversation.lastMessage}</p>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                      <StatusPill tone={conversation.status === "paused_by_human" ? "hot" : conversation.status === "closed" ? "dark" : "warn"}>
+                        {conversation.status}
+                      </StatusPill>
+                      <span className="font-mono text-xs font-bold text-muted-foreground">{conversation.messageCount} messages</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <Button
+                disabled={historyCursorStack.length === 0 || historyLoading}
+                leftIcon={<ChevronLeft aria-hidden="true" className="h-4 w-4" />}
+                onClick={previousHistoryPage}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Prev
+              </Button>
+              <Button
+                disabled={!historyNextCursor || historyLoading}
+                rightIcon={<ChevronRight aria-hidden="true" className="h-4 w-4" />}
+                onClick={nextHistoryPage}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Next
+              </Button>
+            </div>
           </Panel>
         </aside>
 
         <Panel className="flex min-h-[700px] flex-col overflow-hidden">
-          <div className="flex flex-col gap-3 border-b-2 border-line bg-yellow px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border bg-primary/10 px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-2xl font-black text-line">Conversation</h2>
-              <p className="mt-1 font-mono text-xs font-bold text-muted">
+              <h2 className="text-2xl font-bold text-foreground">Conversation</h2>
+              <p className="mt-1 font-mono text-xs font-bold text-muted-foreground">
                 {room.tenantId} / {room.sessionId}
               </p>
             </div>
@@ -277,9 +463,9 @@ export default function InboxPage() {
             </Button>
           </div>
 
-          {error ? <div className="border-b-2 border-line bg-coral px-4 py-3 text-sm font-bold text-white">{error}</div> : null}
+          {error ? <div className="border-b border-border bg-destructive px-4 py-3 text-sm font-bold text-white">{error}</div> : null}
 
-          <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-panel-warm px-4 py-5">
+          <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-secondary/60 px-4 py-5">
             {messages.length === 0 ? (
               <EmptyState title="Waiting for live messages" description="Connect a tenant-scoped session to watch support traffic in real time." />
             ) : (
@@ -287,10 +473,10 @@ export default function InboxPage() {
             )}
           </div>
 
-          <form className="border-t-2 border-line bg-panel p-4" onSubmit={(event) => void sendAgentMessage(event)}>
+          <form className="border-t border-border bg-card p-4" onSubmit={(event) => void sendAgentMessage(event)}>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
-                className="min-h-12 flex-1 border-2 border-line bg-panel px-3 text-sm font-bold focus:bg-panel-warm disabled:cursor-not-allowed disabled:bg-panel-warm"
+                className="min-h-12 flex-1 border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60 disabled:cursor-not-allowed disabled:bg-secondary/60"
                 disabled={sessionStatus !== "paused_by_human" || socketStatus !== "connected"}
                 maxLength={4000}
                 placeholder={sessionStatus === "paused_by_human" ? "Reply as the human agent..." : "Pause AI to unlock manual replies"}
@@ -321,7 +507,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     <div className={`flex ${isCustomer ? "justify-start" : "justify-end"}`}>
       <article className={messageBubbleClass(message.sender)}>
         <div className="mb-2 flex items-center justify-between gap-3">
-          <span className="flex items-center gap-2 font-mono text-xs font-black uppercase">
+          <span className="flex items-center gap-2 font-mono text-xs font-bold uppercase">
             <Icon aria-hidden="true" className="h-4 w-4" />
             {message.sender}
           </span>
@@ -330,7 +516,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
           ) : null}
         </div>
         <p className="text-sm font-semibold leading-6">{message.content}</p>
-        <time className={`mt-3 block font-mono text-xs font-bold ${isAgent ? "text-white/80" : "text-muted"}`}>
+        <time className={`mt-3 block font-mono text-xs font-bold ${isAgent ? "text-white/80" : "text-muted-foreground"}`}>
           {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </time>
       </article>
@@ -354,14 +540,14 @@ function ConnectionBadge({ status }: { status: "connecting" | "connected" | "dis
 
 function messageBubbleClass(sender: Sender) {
   if (sender === "agent") {
-    return "max-w-[82%] rounded-[18px] border-2 border-line bg-signal px-4 py-3 text-white shadow-[4px_4px_0_#17120D]";
+    return "max-w-[82%] rounded-[18px] border border-primary/50 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_36px_rgba(0,0,0,0.28)]";
   }
 
   if (sender === "bot") {
-    return "max-w-[82%] rounded-[18px] border-2 border-line bg-yellow px-4 py-3 text-line shadow-[4px_4px_0_rgba(23,18,13,0.25)]";
+    return "max-w-[82%] rounded-[18px] border border-accent/40 bg-accent/10 px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.22)]";
   }
 
-  return "max-w-[82%] rounded-[18px] border-2 border-line bg-panel px-4 py-3 text-line shadow-[4px_4px_0_rgba(23,18,13,0.2)]";
+  return "max-w-[82%] rounded-[18px] border border-border bg-card px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.2)]";
 }
 
 function mapSocketMessage(message: SocketEventMessage): ChatMessage {
@@ -383,11 +569,27 @@ function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMe
   });
 }
 
-function latestCustomerMessage(messages: ChatMessage[]) {
-  const message = [...messages].reverse().find((item) => item.sender === "customer");
-  return message?.content ?? "No customer messages yet.";
-}
-
 function isSafeId(value: string) {
   return /^[a-zA-Z0-9_-]{3,120}$/.test(value);
 }
+
+async function checkLiveHandoffHealth(baseUrl: string, signal: AbortSignal) {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  const timeout = window.setTimeout(abort, 2500);
+  signal.addEventListener("abort", abort, { once: true });
+
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+    signal.removeEventListener("abort", abort);
+  }
+}
+

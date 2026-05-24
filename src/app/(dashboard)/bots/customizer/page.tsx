@@ -30,16 +30,16 @@ type SaveState =
   | { status: "error"; message: string };
 
 const DEFAULT_STATE: CustomizerState = {
-  botId: "test-id",
-  tenantId: "tenant_demo",
+  botId: "",
+  tenantId: "",
   botName: "AgentDesk Support",
   greeting: "You hit the support line. I can check policy, answer from documents, or bring in an operator.",
-  headerColor: "#17120D",
-  backgroundColor: "#FFF7E8",
-  textColor: "#17120D",
-  userBubbleColor: "#FF5A1F",
-  botBubbleColor: "#FFD400",
-  accentColor: "#FF2E63",
+  headerColor: "#0D1013",
+  backgroundColor: "#050607",
+  textColor: "#F5F1E8",
+  userBubbleColor: "#F59E0B",
+  botBubbleColor: "#14191E",
+  accentColor: "#22D3EE",
   fontFamily: "Fira",
 };
 
@@ -58,6 +58,7 @@ export default function WidgetCustomizerPage() {
   const [saveState, setSaveState] = useState<SaveState>({ status: "idle", message: "" });
 
   const themeConfig = useMemo(() => buildThemeConfig(config), [config]);
+  const snippets = useMemo(() => buildEmbedSnippets(config.botId), [config.botId]);
 
   async function saveTheme(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,9 +100,9 @@ export default function WidgetCustomizerPage() {
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[380px_1fr] lg:px-8">
         <Panel className="p-5">
           <form className="space-y-5" onSubmit={saveTheme}>
-            <section className="border-b-2 border-line pb-4">
-              <p className="signal-kicker text-muted">Control deck</p>
-              <h2 className="mt-1 text-2xl font-black">Theme controls</h2>
+            <section className="border-b border-border pb-4">
+              <p className="studio-kicker text-muted-foreground">Control deck</p>
+              <h2 className="mt-1 text-2xl font-bold">Theme controls</h2>
             </section>
 
             <section className="grid gap-3">
@@ -109,9 +110,9 @@ export default function WidgetCustomizerPage() {
               <TextField label="Bot ID" value={config.botId} onChange={(botId) => setConfig({ ...config, botId })} />
               <TextField label="Bot name" value={config.botName} onChange={(botName) => setConfig({ ...config, botName })} />
               <label className="block">
-                <span className="signal-kicker mb-2 block text-muted">Greeting message</span>
+                <span className="studio-kicker mb-2 block text-muted-foreground">Greeting message</span>
                 <textarea
-                  className="min-h-28 w-full border-2 border-line bg-panel px-3 py-2 text-sm font-bold leading-6 focus:bg-panel-warm"
+                  className="min-h-28 w-full border border-border bg-card px-3 py-2 text-sm font-bold leading-6 focus:bg-secondary/60"
                   maxLength={300}
                   value={config.greeting}
                   onChange={(event) => setConfig({ ...config, greeting: event.target.value })}
@@ -129,9 +130,9 @@ export default function WidgetCustomizerPage() {
             </section>
 
             <label className="block">
-              <span className="signal-kicker mb-2 block text-muted">Font</span>
+              <span className="studio-kicker mb-2 block text-muted-foreground">Font</span>
               <select
-                className="min-h-11 w-full border-2 border-line bg-panel px-3 text-sm font-bold focus:bg-panel-warm"
+                className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
                 value={config.fontFamily}
                 onChange={(event) => setConfig({ ...config, fontFamily: event.target.value as FontChoice })}
               >
@@ -159,13 +160,19 @@ export default function WidgetCustomizerPage() {
           </form>
         </Panel>
 
-        <section className="relative min-h-[720px] border-2 border-line bg-line p-5 text-panel shadow-[7px_7px_0_#17120D]">
-          <div className="absolute left-5 top-5 flex items-center gap-2 border-2 border-panel bg-yellow px-3 py-2 font-mono text-xs font-black text-line">
+        <section className="studio-surface relative min-h-[720px] rounded-xl p-5 text-foreground">
+          <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-2 font-mono text-xs font-bold text-primary">
             <Paintbrush aria-hidden="true" className="h-4 w-4" />
             WIDGET ARTIFACT
           </div>
           <div className="flex min-h-[680px] items-center justify-center pt-14">
             <WidgetPreview config={config} />
+          </div>
+          <div className="grid gap-3 border-t border-border pt-5 lg:grid-cols-2">
+            <CodeBlock label="Script" value={snippets.script} />
+            <CodeBlock label="Iframe" value={snippets.iframe} />
+            <CodeBlock label="React" value={snippets.react} />
+            <CodeBlock label="Vue" value={snippets.vue} />
           </div>
         </section>
       </div>
@@ -176,9 +183,9 @@ export default function WidgetCustomizerPage() {
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="block">
-      <span className="signal-kicker mb-2 block text-muted">{label}</span>
+      <span className="studio-kicker mb-2 block text-muted-foreground">{label}</span>
       <input
-        className="min-h-11 w-full border-2 border-line bg-panel px-3 text-sm font-bold focus:bg-panel-warm"
+        className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -190,16 +197,16 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   return (
     <label className="grid grid-cols-[1fr_56px] items-end gap-3">
       <span>
-        <span className="signal-kicker mb-2 block text-muted">{label}</span>
+        <span className="studio-kicker mb-2 block text-muted-foreground">{label}</span>
         <input
-          className="min-h-11 w-full border-2 border-line bg-panel px-3 font-mono text-sm font-bold focus:bg-panel-warm"
+          className="min-h-11 w-full border border-border bg-card px-3 font-mono text-sm font-bold focus:bg-secondary/60"
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
       </span>
       <input
         aria-label={`${label} color picker`}
-        className="h-11 w-14 border-2 border-line bg-panel p-1"
+        className="h-11 w-14 border border-border bg-card p-1"
         type="color"
         value={normalizeHex(value)}
         onChange={(event) => onChange(event.target.value)}
@@ -208,22 +215,31 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
+function CodeBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border border-border bg-card/80 p-3">
+      <p className="studio-kicker mb-2 text-muted-foreground">{label}</p>
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-foreground">{value}</pre>
+    </div>
+  );
+}
+
 function WidgetPreview({ config }: { config: CustomizerState }) {
   return (
     <div
-      className="flex h-[620px] w-full max-w-[390px] flex-col overflow-hidden border-2 border-panel shadow-[12px_12px_0_#FFD400]"
+      className="flex h-[620px] w-full max-w-[390px] flex-col overflow-hidden rounded-2xl border border-border shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
       style={{
         background: config.backgroundColor,
         color: config.textColor,
         fontFamily: fontStacks[config.fontFamily],
       }}
     >
-      <div className="flex items-center gap-3 border-b-2 border-black px-4 py-4 text-white" style={{ background: config.headerColor }}>
-        <div className="flex h-11 w-11 items-center justify-center border-2 border-white font-black" style={{ background: config.accentColor }}>
+      <div className="flex items-center gap-3 border-b border-black/30 px-4 py-4 text-white" style={{ background: config.headerColor }}>
+        <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/30 font-bold" style={{ background: config.accentColor }}>
           {config.botName.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-black leading-tight">{config.botName}</p>
+          <p className="truncate text-sm font-bold leading-tight">{config.botName}</p>
           <p className="text-xs font-bold leading-5 opacity-80">Online - answers with source context</p>
         </div>
       </div>
@@ -240,12 +256,12 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
         </PreviewBubble>
       </div>
 
-      <div className="border-t-2 border-black p-4">
+      <div className="border-t border-black/30 p-4">
         <div className="flex gap-2">
-          <div className="flex min-h-11 flex-1 items-center border-2 border-black bg-white px-3 text-sm font-bold text-[#5C4033]">
+          <div className="flex min-h-11 flex-1 items-center rounded-md border border-white/10 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
             Write your message here...
           </div>
-          <button className="min-h-11 border-2 border-black px-4 text-sm font-black text-white" style={{ background: config.accentColor }} type="button">
+          <button className="min-h-11 rounded-md border border-white/20 px-4 text-sm font-bold text-white" style={{ background: config.accentColor }} type="button">
             Send
           </button>
         </div>
@@ -267,7 +283,7 @@ function PreviewBubble({
 }) {
   return (
     <div className={`flex ${align === "right" ? "justify-end" : "justify-start"}`}>
-      <p className="max-w-[78%] rounded-[18px] border-2 border-black px-4 py-3 text-sm font-bold leading-6" style={{ background: color, color: textColor }}>
+      <p className="max-w-[78%] rounded-[18px] border border-white/10 px-4 py-3 text-sm font-bold leading-6" style={{ background: color, color: textColor }}>
         {children}
       </p>
     </div>
@@ -281,12 +297,23 @@ function buildThemeConfig(config: CustomizerState) {
       headerHsl: hexToHsl(config.headerColor),
       backgroundHsl: hexToHsl(config.backgroundColor),
       textHsl: hexToHsl(config.textColor),
-      mutedTextHsl: "24 24% 28%",
+      mutedTextHsl: "214 12% 66%",
       userBubbleHsl: hexToHsl(config.userBubbleColor),
       botBubbleHsl: hexToHsl(config.botBubbleColor),
       accentHsl: hexToHsl(config.accentColor),
       fontFamily: fontStacks[config.fontFamily],
     },
+  };
+}
+
+function buildEmbedSnippets(botId: string) {
+  const safeBotId = botId || "YOUR_BOT_ID";
+
+  return {
+    script: `<script src="https://YOUR_DOMAIN/widget.js" data-bot-id="${safeBotId}" async></script>`,
+    iframe: `<iframe src="https://YOUR_DOMAIN/embed/${safeBotId}" title="AgentDesk support" style="width:100%;height:640px;border:0"></iframe>`,
+    react: `import { AgentDeskWidget } from "@agentdesk/widget/react";\n\n<AgentDeskWidget botId="${safeBotId}" />`,
+    vue: `const AgentDeskWidget = createAgentDeskVueComponent(Vue);\n\n<AgentDeskWidget bot-id="${safeBotId}" />`,
   };
 }
 
@@ -322,7 +349,7 @@ function getHue(red: number, green: number, blue: number, max: number, delta: nu
 }
 
 function normalizeHex(value: string) {
-  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#FF5A1F";
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#F59E0B";
 }
 
 function isSafeId(value: string) {
@@ -331,12 +358,13 @@ function isSafeId(value: string) {
 
 function saveMessageClass(status: SaveState["status"]) {
   if (status === "success") {
-    return "border-2 border-line bg-yellow px-3 py-2 text-sm font-bold text-line";
+    return "border border-border bg-primary/10 px-3 py-2 text-sm font-bold text-foreground";
   }
 
   if (status === "error") {
-    return "border-2 border-line bg-coral px-3 py-2 text-sm font-bold text-white";
+    return "border border-border bg-destructive px-3 py-2 text-sm font-bold text-white";
   }
 
-  return "border-2 border-line bg-panel-warm px-3 py-2 text-sm font-bold text-line";
+  return "border border-border bg-secondary/60 px-3 py-2 text-sm font-bold text-foreground";
 }
+

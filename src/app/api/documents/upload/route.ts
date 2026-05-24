@@ -1,8 +1,7 @@
-import { ID } from "node-appwrite";
+import { ID, type Users } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
-import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
-import { createSessionClient } from "@/lib/server/appwrite";
+import { createAdminClient } from "@/lib/server/appwrite";
+import { getDocumentType, parseDocument, SUPPORTED_DOCUMENT_TYPES, type SupportedDocumentType } from "@/lib/server/document-parser";
 
 type UploadMetadata = {
   tenant_id: string;
@@ -16,18 +15,18 @@ type UploadMetadata = {
   created: string;
 };
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const SUPPORTED_TYPES = new Set(["pdf", "docx", "csv", "txt", "md"]);
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const tenantId = stringField(formData, "tenant_id");
     const botId = stringField(formData, "bot_id");
+    const userId = stringField(formData, "user_id");
     const file = formData.get("file");
 
-    if (!isSafeId(tenantId) || !isSafeId(botId)) {
-      return jsonError("INVALID_SCOPE", "tenant_id and bot_id are required.", 422);
+    if (!isSafeId(tenantId) || !isSafeId(botId) || !userId) {
+      return jsonError("INVALID_SCOPE", "tenant_id, bot_id, and user_id are required.", 422);
     }
 
     if (!(file instanceof File)) {
@@ -35,16 +34,16 @@ export async function POST(request: Request) {
     }
 
     if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
-      return jsonError("INVALID_FILE_SIZE", "File must be between 1 byte and 10MB.", 422);
+      return jsonError("INVALID_FILE_SIZE", "File must be between 1 byte and 25MB.", 422);
     }
 
     const fileType = getFileType(file.name);
-    if (!SUPPORTED_TYPES.has(fileType)) {
-      return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOCX, CSV, TXT, and MD.", 422);
+    if (!fileType || !SUPPORTED_DOCUMENT_TYPES.has(fileType)) {
+      return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOC, DOCX, CSV, TXT, and MD.", 422);
     }
 
-    const { account, databases, storage } = await createSessionClient();
-    await assertTenantAccess(account, tenantId);
+    const { users, databases, storage } = await createAdminClient();
+    await assertTenantAccess(users, userId, tenantId);
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const parsedText = await parseDocument(buffer, fileType);
@@ -72,27 +71,8 @@ export async function POST(request: Request) {
   }
 }
 
-async function parseDocument(buffer: Buffer, fileType: string) {
-  if (fileType === "pdf") {
-    const parser = new PDFParse({ data: buffer });
-    try {
-      const result = await parser.getText();
-      return normalizeText(result.text);
-    } finally {
-      await parser.destroy();
-    }
-  }
-
-  if (fileType === "docx") {
-    const result = await mammoth.extractRawText({ buffer });
-    return normalizeText(result.value);
-  }
-
-  return normalizeText(buffer.toString("utf8"));
-}
-
-async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessionClient>>["account"], tenantId: string) {
-  const user = await account.get();
+async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
+  const user = await users.get(userId);
   const prefs = user.prefs as { tenant_id?: string };
   if (prefs.tenant_id !== tenantId) {
     throw new Error("You do not have access to this tenant.");
@@ -104,17 +84,12 @@ function stringField(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getFileType(fileName: string) {
-  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
-  return extension === "markdown" ? "md" : extension;
+function getFileType(fileName: string): SupportedDocumentType | "" {
+  return getDocumentType(fileName);
 }
 
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^\w.\- ]+/g, "").trim().slice(0, 180) || "document";
-}
-
-function normalizeText(text: string) {
-  return text.replace(/\u0000/g, "").replace(/\r\n/g, "\n").trim();
 }
 
 function databaseId() {
@@ -126,7 +101,7 @@ function documentsCollectionId() {
 }
 
 function storageBucketId() {
-  return process.env.APPWRITE_DOCUMENTS_BUCKET_ID ?? "documents";
+  return process.env.APPWRITE_DOCUMENTS_BUCKET_ID ?? process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID ?? "documents";
 }
 
 function isSafeId(value: string) {
@@ -138,5 +113,9 @@ function jsonError(code: string, message: string, status: number) {
 }
 
 function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.startsWith("PARSER_FAILED:")) {
+    return "Document parser failed for this file.";
+  }
+
   return error instanceof Error ? error.message : "Document upload failed.";
 }

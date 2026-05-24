@@ -1,4 +1,5 @@
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
@@ -245,7 +246,7 @@ function errorBody(code, message) {
   };
 }
 
-const isEntrypoint = import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`;
+const isEntrypoint = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
 if (isEntrypoint) {
   const { server } = createHandoffServer();
   server.listen(PORT, () => {

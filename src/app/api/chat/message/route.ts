@@ -1,5 +1,8 @@
 import { ID, Query, type Models } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
+import { getServerWebSocketUrl } from "@/lib/server/websocket-url";
+import { streamCompletionWithFallback } from "@/lib/server/llm-providers";
+import { retrieveContextChunks } from "@/lib/server/retrieval";
 
 type ChatRequest = {
   tenant_id: string;
@@ -20,36 +23,27 @@ type LedgerDocument = Models.Document & {
   amount?: unknown;
 };
 
-type QdrantPoint = {
-  payload?: {
-    tenant_id?: string;
-    bot_id?: string;
-    file_id?: string;
-    content?: string;
-    chunk_index?: number;
-  };
-  score?: number;
-};
-
-type OpenAIEmbeddingResponse = {
-  data?: Array<{ embedding?: number[] }>;
-};
-
-type OpenAIStreamChunk = {
-  choices?: Array<{
-    delta?: {
-      content?: string;
-    };
-  }>;
-  usage?: {
-    total_tokens?: number;
-  };
+type SessionDocument = Models.Document & {
+  tenant_id?: unknown;
+  bot_id?: unknown;
+  session_token?: unknown;
+  status?: unknown;
+  created?: unknown;
+  updated?: unknown;
 };
 
 const MAX_MESSAGE_LENGTH = 1200;
-const MIN_RELEVANCE_SCORE = 0.15;
 const CREDIT_PER_TOKEN = Number.parseFloat(process.env.CREDIT_PER_TOKEN ?? "0.001");
 const encoder = new TextEncoder();
+
+const DEMO_BOTS: Record<string, Partial<BotDocument> & { tenant_id: string; name: string; fallback_message: string }> = {
+  "test-id": {
+    tenant_id: "tenant-demo",
+    name: "AgentDesk Support",
+    system_prompt: "Answer customer support questions clearly and concisely.",
+    fallback_message: "I do not have indexed support context for this demo bot yet. Upload a document for this bot, then ask again.",
+  },
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,13 +92,11 @@ export async function POST(request: Request) {
       return streamStaticMessage(fallbackMessage);
     }
 
-    if (!process.env.OPENAI_API_KEY) {
-      return streamStaticMessage(fallbackMessage);
-    }
+    void persistCustomerMessage(databases, parsed.value);
 
-    const embedding = await createEmbedding(parsed.value.message);
-    const contextChunks = await searchKnowledgeBase(embedding, parsed.value.tenant_id, parsed.value.bot_id);
+    const contextChunks = await retrieveContextChunks(parsed.value.message, parsed.value.tenant_id, parsed.value.bot_id);
     if (contextChunks.length === 0) {
+      void persistBotMessage(databases, parsed.value, fallbackMessage, 0);
       return streamStaticMessage(fallbackMessage);
     }
 
@@ -115,6 +107,9 @@ export async function POST(request: Request) {
       message: parsed.value.message,
       onComplete: (tokenCount) => {
         void debitCredits(databases, parsed.value.tenant_id, parsed.value.bot_id, parsed.value.session_token, tokenCount);
+      },
+      onMessageComplete: (content, tokenCount) => {
+        void persistBotMessage(databases, parsed.value, content || fallbackMessage, tokenCount);
       },
     });
   } catch {
@@ -156,8 +151,17 @@ async function parseChatRequest(request: Request) {
 }
 
 async function getTenantBot(databases: Awaited<ReturnType<typeof createAdminClient>>["databases"], tenantId: string, botId: string) {
-  const bot = (await databases.getDocument(databaseId(), botsCollectionId(), botId)) as BotDocument;
-  return stringValue(bot.tenant_id, "") === tenantId ? bot : null;
+  try {
+    const bot = (await databases.getDocument(databaseId(), botsCollectionId(), botId)) as BotDocument;
+    return stringValue(bot.tenant_id, "") === tenantId ? bot : null;
+  } catch {
+    const demoBot = DEMO_BOTS[botId];
+    if (demoBot && (tenantId === demoBot.tenant_id || tenantId === demoBot.tenant_id.replace("-", "_"))) {
+      return demoBot as BotDocument;
+    }
+
+    throw new Error(`Bot ${botId} was not found.`);
+  }
 }
 
 async function getCreditBalance(databases: Awaited<ReturnType<typeof createAdminClient>>["databases"], tenantId: string) {
@@ -172,81 +176,20 @@ async function getCreditBalance(databases: Awaited<ReturnType<typeof createAdmin
   }, 0);
 }
 
-async function createEmbedding(message: string) {
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: openAiHeaders(),
-    body: JSON.stringify({
-      model: "text-embedding-3-small",
-      input: message,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Embedding request failed");
-  }
-
-  const body = (await response.json()) as OpenAIEmbeddingResponse;
-  const embedding = body.data?.[0]?.embedding;
-  if (!embedding || embedding.length === 0) {
-    throw new Error("Embedding response was empty");
-  }
-
-  return embedding;
-}
-
-async function searchKnowledgeBase(vector: number[], tenantId: string, botId: string) {
-  const qdrantUrl = process.env.QDRANT_URL;
-  const qdrantApiKey = process.env.QDRANT_API_KEY;
-  const collection = process.env.QDRANT_COLLECTION ?? "agent_knowledge_base";
-
-  if (!qdrantUrl || !qdrantApiKey) {
-    return [];
-  }
-
-  const response = await fetch(`${qdrantUrl.replace(/\/$/, "")}/collections/${collection}/points/search`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "api-key": qdrantApiKey,
-    },
-    body: JSON.stringify({
-      vector,
-      limit: 4,
-      with_payload: true,
-      filter: {
-        must: [
-          { key: "tenant_id", match: { value: tenantId } },
-          { key: "bot_id", match: { value: botId } },
-        ],
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Qdrant search failed");
-  }
-
-  const body = (await response.json()) as { result?: QdrantPoint[] };
-  return (body.result ?? [])
-    .filter((point) => (point.score ?? 0) >= MIN_RELEVANCE_SCORE)
-    .map((point) => formatContextChunk(point))
-    .filter(Boolean)
-    .slice(0, 4);
-}
-
 function streamCompletion({
   bot,
   contextChunks,
   fallbackMessage,
   message,
   onComplete,
+  onMessageComplete,
 }: {
   bot: BotDocument;
   contextChunks: string[];
   fallbackMessage: string;
   message: string;
   onComplete: (tokenCount: number) => void;
+  onMessageComplete: (content: string, tokenCount: number) => void;
 }) {
   let completionText = "";
   let streamedTokenCount = 0;
@@ -254,42 +197,33 @@ function streamCompletion({
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: openAiHeaders(),
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            stream: true,
-            stream_options: { include_usage: true },
-            messages: [
-              { role: "system", content: buildSystemPrompt(bot, contextChunks, fallbackMessage) },
-              { role: "user", content: message },
-            ],
-          }),
+        await streamCompletionWithFallback({
+          system: buildSystemPrompt(bot, contextChunks, fallbackMessage),
+          user: message,
+          fallbackMessage,
+          onToken: (token) => {
+            completionText += token;
+            streamedTokenCount = estimateTokens(completionText) + estimateTokens(message);
+            controller.enqueue(sse({ token }));
+          },
+          onComplete: (content, tokenCount) => {
+            completionText = content;
+            streamedTokenCount = tokenCount;
+          },
         });
-
-        if (!response.ok || !response.body) {
-          throw new Error("Completion request failed");
-        }
-
-        for await (const token of readOpenAiStream(response.body)) {
-          completionText += token.content;
-          streamedTokenCount = token.totalTokens ?? estimateTokens(completionText) + estimateTokens(message);
-
-          if (token.content) {
-            controller.enqueue(sse({ token: token.content }));
-          }
-        }
 
         if (mentionsSystemInternals(completionText)) {
           controller.enqueue(sse({ token: fallbackMessage }));
         }
 
         controller.enqueue(sseDone());
-        onComplete(streamedTokenCount || estimateTokens(completionText) + estimateTokens(message));
+        const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
+        onComplete(finalTokenCount);
+        onMessageComplete(completionText, finalTokenCount);
       } catch {
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());
+        onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
       } finally {
         controller.close();
       }
@@ -297,40 +231,6 @@ function streamCompletion({
   });
 
   return sseResponse(stream);
-}
-
-async function* readOpenAiStream(body: ReadableStream<Uint8Array>) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const read = await reader.read();
-    if (read.done) {
-      break;
-    }
-
-    buffer += decoder.decode(read.value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data:")) {
-        continue;
-      }
-
-      const data = line.slice(5).trim();
-      if (!data || data === "[DONE]") {
-        continue;
-      }
-
-      const chunk = JSON.parse(data) as OpenAIStreamChunk;
-      yield {
-        content: chunk.choices?.[0]?.delta?.content ?? "",
-        totalTokens: chunk.usage?.total_tokens,
-      };
-    }
-  }
 }
 
 async function debitCredits(
@@ -344,10 +244,79 @@ async function debitCredits(
   await databases.createDocument(databaseId(), ledgerCollectionId(), ID.unique(), {
     tenant_id: tenantId,
     amount: debit,
-    transaction_type: "DEBIT_TOKEN",
+    tansaction_type: "DEBIT_TOKEN",
     description: `Chat debit for bot ${botId} session ${sessionToken}`,
     created: new Date().toISOString(),
   });
+}
+
+async function persistCustomerMessage(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  request: ChatRequest,
+) {
+  await persistMessage(databases, request, "customer", request.message, 0);
+}
+
+async function persistBotMessage(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  request: ChatRequest,
+  content: string,
+  tokenCount: number,
+) {
+  await persistMessage(databases, request, "bot", content, tokenCount);
+}
+
+async function persistMessage(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  request: ChatRequest,
+  sender: "customer" | "bot",
+  content: string,
+  tokenCount: number,
+) {
+  try {
+    const session = await ensureSession(databases, request);
+    await databases.createDocument(databaseId(), messagesCollectionId(), ID.unique(), {
+      tenant_id: request.tenant_id,
+      session_id: session.$id,
+      sender,
+      content: content.slice(0, 4000),
+      tokens_used: Math.max(0, tokenCount),
+      created: new Date().toISOString(),
+    });
+  } catch (err) {
+    // Log the error so silent failures are visible in dev, but never crash chat delivery.
+    console.error("[persistMessage] Failed to persist message:", err);
+  }
+}
+
+async function ensureSession(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  request: ChatRequest,
+) {
+  const existing = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+    Query.equal("tenant_id", request.tenant_id),
+    Query.equal("bot_id", request.bot_id),
+    Query.equal("session_token", request.session_token),
+    Query.limit(1),
+  ]);
+
+  const session = existing.documents[0] as SessionDocument | undefined;
+  if (session) {
+    await databases.updateDocument(databaseId(), sessionsCollectionId(), session.$id, {
+      status: "active",
+      updated: new Date().toISOString(),
+    });
+    return session;
+  }
+
+  return (await databases.createDocument(databaseId(), sessionsCollectionId(), ID.unique(), {
+    tenant_id: request.tenant_id,
+    bot_id: request.bot_id,
+    session_token: request.session_token,
+    status: "active",
+    created: new Date().toISOString(),
+    updated: new Date().toISOString(),
+  })) as SessionDocument;
 }
 
 function buildSystemPrompt(bot: BotDocument, contextChunks: string[], fallbackMessage: string) {
@@ -416,15 +385,6 @@ function jsonError(code: string, message: string, status: number) {
   );
 }
 
-function formatContextChunk(point: QdrantPoint) {
-  const payload = point.payload;
-  if (!payload?.content || !payload.tenant_id || !payload.bot_id) {
-    return "";
-  }
-
-  return `Source File: [${payload.file_id ?? "knowledge-base"}]\nChunk: ${payload.chunk_index ?? 0}\n---\n${payload.content}`;
-}
-
 function containsPromptInjection(message: string) {
   return /ignore previous instructions|system prompt|developer message|dan mode|act as a terminal/i.test(message);
 }
@@ -437,13 +397,6 @@ function estimateTokens(text: string) {
   return Math.ceil(text.length / 4);
 }
 
-function openAiHeaders() {
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
-  };
-}
-
 function databaseId() {
   return process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "agentdesk";
 }
@@ -453,7 +406,15 @@ function botsCollectionId() {
 }
 
 function ledgerCollectionId() {
-  return process.env.APPWRITE_LEDGER_COLLECTION_ID ?? "ledger_transactions";
+  return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger";
+}
+
+function sessionsCollectionId() {
+  return process.env.APPWRITE_SESSIONS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_SESSIONS_COLLECTION_ID ?? "sessions";
+}
+
+function messagesCollectionId() {
+  return process.env.APPWRITE_MESSAGES_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID ?? "messages";
 }
 
 function stringValue(value: unknown, fallback: string) {
@@ -465,9 +426,13 @@ function isSafeId(value: string) {
 }
 
 async function checkRagPermission(tenantId: string, sessionId: string): Promise<boolean> {
-  const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL ?? "http://127.0.0.1:4000";
+  const wsUrl = getServerWebSocketUrl();
+  if (!wsUrl) {
+    return true;
+  }
+
   try {
-    const response = await fetch(`${wsUrl.replace(/\/$/, "")}/rag-permission`, {
+    const response = await fetch(`${wsUrl}/rag-permission`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

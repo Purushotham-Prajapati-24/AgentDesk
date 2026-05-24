@@ -1,8 +1,9 @@
 import React from "react";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
-type ButtonSize = "sm" | "md" | "lg";
+type ButtonSize = "sm" | "md" | "lg" | "icon";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -13,17 +14,18 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClass: Record<ButtonVariant, string> = {
-  primary: "border-line bg-signal text-white shadow-[4px_4px_0_#17120D] hover:bg-signal-strong",
-  secondary: "border-line bg-yellow text-line shadow-[4px_4px_0_#17120D] hover:bg-panel-warm",
-  outline: "border-line bg-panel text-line hover:bg-panel-warm",
-  ghost: "border-transparent bg-transparent text-line hover:border-line hover:bg-panel-warm",
-  danger: "border-line bg-coral text-white shadow-[4px_4px_0_#17120D] hover:bg-danger",
+  primary: "border-primary bg-primary text-primary-foreground hover:bg-[#f7b23a] studio-glow",
+  secondary: "border-border bg-secondary text-secondary-foreground hover:border-primary/60 hover:bg-[#242d35]",
+  outline: "border-border bg-transparent text-foreground hover:border-primary/70 hover:bg-primary/10",
+  ghost: "border-transparent bg-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-foreground",
+  danger: "border-destructive bg-destructive text-destructive-foreground hover:bg-[#ff5c68]",
 };
 
 const sizeClass: Record<ButtonSize, string> = {
   sm: "min-h-9 px-3 text-xs",
   md: "min-h-11 px-4 text-sm",
   lg: "min-h-12 px-5 text-base",
+  icon: "h-10 w-10 p-0",
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -33,18 +35,23 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   leftIcon,
   rightIcon,
-  className = "",
+  className,
   disabled,
   ...props
 }) => {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 border-2 font-bold transition duration-200 ease-out hover:-translate-x-0.5 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0 ${variantClass[variant]} ${sizeClass[size]} ${className}`}
+      className={cn(
+        "inline-flex items-center justify-center gap-2 rounded-md border font-semibold transition duration-200 ease-out hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+        variantClass[variant],
+        sizeClass[size],
+        className,
+      )}
       disabled={disabled || loading}
       {...props}
     >
       {loading ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : leftIcon}
-      <span>{children}</span>
+      {children ? <span>{children}</span> : null}
       {!loading ? rightIcon : null}
     </button>
   );

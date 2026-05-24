@@ -18,8 +18,8 @@ type BotInput = {
   tenant_id: string;
 };
 
-const databaseId = process.env.APPWRITE_DATABASE_ID || "agentdesk";
-const collectionId = process.env.APPWRITE_BOTS_COLLECTION_ID || "bots";
+const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.APPWRITE_DATABASE_ID || "agentdesk";
+const collectionId = process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID || process.env.APPWRITE_BOTS_COLLECTION_ID || "bots";
 const MAX_NAME_LENGTH = 80;
 const MAX_PROMPT_LENGTH = 4000;
 const MAX_FALLBACK_LENGTH = 500;
@@ -50,8 +50,6 @@ export async function createBot(data: BotInput) {
     const bot = await databases.createDocument(databaseId, collectionId, ID.unique(), {
       ...payload,
       theme_config: JSON.stringify(defaultThemeConfig()),
-      created: new Date().toISOString(),
-      updated: new Date().toISOString(),
     });
 
     return { success: true as const, bot: mapBotDocument(bot as BotDocument) };
@@ -66,10 +64,7 @@ export async function updateBot(botId: string, tenantId: string, data: Partial<B
     await assertTenantAccess(account, tenantId);
     await assertBotTenant(databases, botId, tenantId);
 
-    const bot = await databases.updateDocument(databaseId, collectionId, botId, {
-      ...sanitizeBotPatch(data),
-      updated: new Date().toISOString(),
-    });
+    const bot = await databases.updateDocument(databaseId, collectionId, botId, sanitizeBotPatch(data));
 
     return { success: true as const, bot: mapBotDocument(bot as BotDocument) };
   } catch (error: unknown) {
