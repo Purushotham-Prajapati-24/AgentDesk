@@ -1,10 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Bot as BotIcon, Plus, Trash2 } from "lucide-react";
+import { Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
 import { createBot, deleteBot, listBots, updateBot } from "@/app/bot-actions";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState, PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
 
 type Bot = {
@@ -35,6 +36,10 @@ export default function BotsPage() {
   const [form, setForm] = useState<BotForm>(EMPTY_FORM);
   const [status, setStatus] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Bot | null>(null);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
@@ -70,6 +75,16 @@ export default function BotsPage() {
     setStatus("");
   }
 
+  async function handleCopy() {
+    if (!selectedBot) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(selectedBot.$id);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  }
+
   async function saveBot(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!tenant?.$id) {
@@ -95,22 +110,46 @@ export default function BotsPage() {
     setStatus("Bot configuration saved.");
   }
 
-  async function removeSelectedBot() {
-    if (!tenant?.$id || !selectedBot) {
+  function requestDeleteBot() {
+    if (!selectedBot) {
       return;
     }
 
-    const response = await deleteBot(selectedBot.$id, tenant.$id);
+    setDeleteTarget(selectedBot);
+    setDeleteConfirmed(false);
+    setStatus("");
+  }
+
+  function cancelDeleteBot() {
+    if (isDeleting) {
+      return;
+    }
+
+    setDeleteTarget(null);
+    setDeleteConfirmed(false);
+  }
+
+  async function removeSelectedBot() {
+    if (!tenant?.$id || !deleteTarget) {
+      return;
+    }
+
+    setIsDeleting(true);
+    const response = await deleteBot(deleteTarget.$id, tenant.$id);
+    setIsDeleting(false);
+
     if (!response.success) {
       setStatus(response.error);
       return;
     }
 
-    const remainingBots = bots.filter((bot) => bot.$id !== selectedBot.$id);
+    const remainingBots = bots.filter((bot) => bot.$id !== deleteTarget.$id);
     setBots(remainingBots);
     const firstBot = remainingBots[0] ?? null;
     setSelectedId(firstBot?.$id ?? null);
     setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+    setDeleteTarget(null);
+    setDeleteConfirmed(false);
     setStatus("Bot deleted.");
   }
 
@@ -180,7 +219,24 @@ export default function BotsPage() {
                 <p className="studio-kicker text-muted-foreground">Tenant: {tenant?.$id ?? "Unavailable"}</p>
                 <h2 className="text-3xl font-bold leading-tight">{selectedBot ? "Edit bot" : "Create bot"}</h2>
               </div>
-              <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
+              <div className="flex items-center gap-2">
+                <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
+                {selectedBot && (
+                  <Button
+                    className="h-9 w-9 p-0"
+                    onClick={handleCopy}
+                    size="icon"
+                    type="button"
+                    variant="outline"
+                  >
+                    {isCopied ? (
+                      <Check aria-hidden="true" className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Copy aria-hidden="true" className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
             </section>
 
             <div className="grid gap-4">
@@ -227,7 +283,7 @@ export default function BotsPage() {
               <Button
                 disabled={!selectedBot}
                 leftIcon={<Trash2 aria-hidden="true" className="h-4 w-4" />}
-                onClick={() => void removeSelectedBot()}
+                onClick={requestDeleteBot}
                 type="button"
                 variant="danger"
               >
@@ -237,6 +293,53 @@ export default function BotsPage() {
           </form>
         </Panel>
       </div>
+
+      <Dialog open={Boolean(deleteTarget)}>
+        <DialogContent className="max-w-xl">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-destructive/40 bg-destructive/10 text-destructive">
+              <Trash2 aria-hidden="true" className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="studio-kicker text-destructive">Permanent delete</p>
+              <h2 className="mt-1 text-2xl font-bold leading-tight">Delete {deleteTarget?.name ?? "this bot"}?</h2>
+              <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
+                This removes the bot record, its WebChat preferences, uploaded document records, stored document files, and
+                Qdrant knowledge chunks for this tenant/bot scope.
+              </p>
+            </div>
+          </div>
+
+          <label className="mt-5 flex cursor-pointer items-start gap-3 border border-border bg-secondary/50 p-3">
+            <input
+              checked={deleteConfirmed}
+              className="mt-1 h-4 w-4 accent-destructive"
+              disabled={isDeleting}
+              onChange={(event) => setDeleteConfirmed(event.target.checked)}
+              type="checkbox"
+            />
+            <span className="text-sm font-semibold leading-6 text-foreground">
+              I understand this permanently deletes {deleteTarget?.name ?? "this bot"} and its indexed knowledge.
+            </span>
+          </label>
+
+          <div className="mt-5 flex flex-wrap justify-end gap-3">
+            <Button disabled={isDeleting} onClick={cancelDeleteBot} type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button
+              disabled={!deleteTarget || !deleteConfirmed}
+              loading={isDeleting}
+              leftIcon={<Trash2 aria-hidden="true" className="h-4 w-4" />}
+              onClick={() => void removeSelectedBot()}
+              type="button"
+              variant="danger"
+            >
+              Delete permanently
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

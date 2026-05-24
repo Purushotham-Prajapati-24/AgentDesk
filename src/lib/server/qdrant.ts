@@ -126,6 +126,27 @@ export async function upsertKnowledgePoints({
   }
 }
 
+export async function deleteKnowledgePointsForBot(tenantId: string, botId: string) {
+  const config = qdrantConfig();
+  if (!config) {
+    return { skipped: true, deleted: false };
+  }
+
+  const response = await fetch(`${config.url}/collections/${activeCollection()}/points/delete?wait=true`, {
+    method: "POST",
+    headers: qdrantHeaders(config.apiKey),
+    body: JSON.stringify({
+      filter: tenantBotFilter(tenantId, botId),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Qdrant bot knowledge deletion failed.");
+  }
+
+  return { skipped: false, deleted: true };
+}
+
 export async function denseSearch(vector: number[], tenantId: string, botId: string, limit: number) {
   const config = qdrantConfig();
   if (!config) {

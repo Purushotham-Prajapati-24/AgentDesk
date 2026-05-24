@@ -11,6 +11,13 @@ npm start
 
 Default port: `4000`.
 
+## Optional State Backends
+
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: durable shared session state.
+- `SOCKET_IO_REDIS_URL`: Socket.IO pub/sub adapter for clustered websocket instances.
+
+Without Redis configuration, the server uses in-memory state for local development.
+
 ## Client Connection
 
 Connect to a tenant namespace and pass tenant/session identifiers in auth:

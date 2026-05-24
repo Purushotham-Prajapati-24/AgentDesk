@@ -1,7 +1,8 @@
 "use client";
 
-import { ChangeEvent, DragEvent, FormEvent, useState } from "react";
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from "react";
 import { FileUp, UploadCloud } from "lucide-react";
+import { listBots } from "@/app/bot-actions";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
@@ -13,13 +14,44 @@ type UploadState = {
   message: string;
 };
 
+type BotOption = {
+  $id: string;
+  name: string;
+};
+
 export default function DocumentsPage() {
   const { tenant } = useTenant();
   const { user } = useAuth();
   const [botId, setBotId] = useState("");
+  const [bots, setBots] = useState<BotOption[]>([]);
   const [sourceUrl, setSourceUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle", message: "" });
+
+  useEffect(() => {
+    if (!tenant?.$id) {
+      return;
+    }
+
+    let isActive = true;
+    listBots(tenant.$id).then((response) => {
+      if (!isActive) {
+        return;
+      }
+
+      if (!response.success) {
+        setUploadState({ status: "error", message: response.error });
+        return;
+      }
+
+      setBots(response.bots);
+      setBotId((current) => current || response.bots[0]?.$id || "");
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [tenant?.$id]);
 
   async function uploadDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -169,12 +201,24 @@ export default function DocumentsPage() {
 
         <Panel className="p-5">
           <form onSubmit={uploadDocument}>
-            <Input
-              label="Bot ID"
-              value={botId}
-              onChange={(event) => setBotId(event.target.value)}
-              hint="Documents are scoped to this bot and the active tenant."
-            />
+            <label className="block">
+              <span className="studio-kicker mb-2 block text-muted-foreground">Bot</span>
+              <select
+                className="min-h-11 w-full rounded-md border border-input bg-card-elevated px-3 py-2 text-sm font-bold text-foreground focus:border-primary focus:bg-card"
+                value={botId}
+                onChange={(event) => setBotId(event.target.value)}
+              >
+                <option value="">{bots.length === 0 ? "Create a bot before uploading knowledge" : "Select a bot"}</option>
+                {bots.map((bot) => (
+                  <option key={bot.$id} value={bot.$id}>
+                    {bot.name} / {bot.$id}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs font-medium leading-5 text-muted-foreground">
+                Documents are indexed for this exact bot ID. The widget must use the same bot.
+              </p>
+            </label>
 
             <label
               className="mt-5 flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-primary/50 bg-primary/10 px-6 py-10 text-center transition hover:bg-primary/20"

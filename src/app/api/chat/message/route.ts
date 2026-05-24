@@ -23,6 +23,10 @@ type LedgerDocument = Models.Document & {
   amount?: unknown;
 };
 
+type TenantDocument = Models.Document & {
+  credits?: unknown;
+};
+
 type SessionDocument = Models.Document & {
   tenant_id?: unknown;
   bot_id?: unknown;
@@ -70,32 +74,45 @@ export async function POST(request: Request) {
 
     const fallbackMessage = stringValue(bot.fallback_message, "I cannot answer that from the available support context.");
 
+    const durableSession = await findSession(databases, parsed.value);
+    const durableStatus = normalizeSessionStatus(durableSession?.status);
+    if (durableStatus === "paused_by_human") {
+      void persistCustomerMessage(databases, parsed.value);
+      return streamDoneOnly();
+    }
+
+    if (durableStatus === "closed") {
+      return streamStaticMessage(fallbackMessage);
+    }
+
     if (containsPromptInjection(parsed.value.message)) {
       return streamStaticMessage(fallbackMessage);
     }
 
     const shouldCallRag = await checkRagPermission(parsed.value.tenant_id, parsed.value.session_token);
     if (!shouldCallRag) {
-      return new Response(encoder.encode("data: [DONE]\n\n"), {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-        },
-      });
+      void persistCustomerMessage(databases, parsed.value);
+      return streamDoneOnly();
     }
 
     const balance = await getCreditBalance(databases, parsed.value.tenant_id);
     if (balance <= 0) {
-      return streamStaticMessage(fallbackMessage);
+      console.warn("[chat] insufficient credits", {
+        tenantId: parsed.value.tenant_id,
+        botId: parsed.value.bot_id,
+        balance,
+      });
+      return streamStaticMessage("This workspace is out of chat credits. Add credits in Usage before sending more bot replies.");
     }
 
     void persistCustomerMessage(databases, parsed.value);
 
     const contextChunks = await retrieveContextChunks(parsed.value.message, parsed.value.tenant_id, parsed.value.bot_id);
     if (contextChunks.length === 0) {
+      console.info("[chat] no verified context", {
+        tenantId: parsed.value.tenant_id,
+        botId: parsed.value.bot_id,
+      });
       void persistBotMessage(databases, parsed.value, fallbackMessage, 0);
       return streamStaticMessage(fallbackMessage);
     }
@@ -165,15 +182,27 @@ async function getTenantBot(databases: Awaited<ReturnType<typeof createAdminClie
 }
 
 async function getCreditBalance(databases: Awaited<ReturnType<typeof createAdminClient>>["databases"], tenantId: string) {
-  const ledger = await databases.listDocuments(databaseId(), ledgerCollectionId(), [
-    Query.equal("tenant_id", tenantId),
-    Query.limit(100),
+  const [tenant, ledger] = await Promise.all([
+    getTenantCredits(databases, tenantId),
+    databases.listDocuments(databaseId(), ledgerCollectionId(), [
+      Query.equal("tenant_id", tenantId),
+      Query.limit(100),
+    ]),
   ]);
 
   return ledger.documents.reduce((balance, document) => {
     const amount = (document as LedgerDocument).amount;
     return balance + (typeof amount === "number" && Number.isFinite(amount) ? amount : 0);
-  }, 0);
+  }, tenant);
+}
+
+async function getTenantCredits(databases: Awaited<ReturnType<typeof createAdminClient>>["databases"], tenantId: string) {
+  try {
+    const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
+    return typeof tenant.credits === "number" && Number.isFinite(tenant.credits) ? tenant.credits : 0;
+  } catch {
+    return 0;
+  }
 }
 
 function streamCompletion({
@@ -244,7 +273,7 @@ async function debitCredits(
   await databases.createDocument(databaseId(), ledgerCollectionId(), ID.unique(), {
     tenant_id: tenantId,
     amount: debit,
-    tansaction_type: "DEBIT_TOKEN",
+    transaction_type: "DEBIT_TOKEN",
     description: `Chat debit for bot ${botId} session ${sessionToken}`,
     created: new Date().toISOString(),
   });
@@ -293,17 +322,9 @@ async function ensureSession(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
 ) {
-  const existing = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
-    Query.equal("tenant_id", request.tenant_id),
-    Query.equal("bot_id", request.bot_id),
-    Query.equal("session_token", request.session_token),
-    Query.limit(1),
-  ]);
-
-  const session = existing.documents[0] as SessionDocument | undefined;
+  const session = await findSession(databases, request);
   if (session) {
     await databases.updateDocument(databaseId(), sessionsCollectionId(), session.$id, {
-      status: "active",
       updated: new Date().toISOString(),
     });
     return session;
@@ -317,6 +338,20 @@ async function ensureSession(
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
   })) as SessionDocument;
+}
+
+async function findSession(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  request: Pick<ChatRequest, "tenant_id" | "bot_id" | "session_token">,
+) {
+  const existing = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+    Query.equal("tenant_id", request.tenant_id),
+    Query.equal("bot_id", request.bot_id),
+    Query.equal("session_token", request.session_token),
+    Query.limit(1),
+  ]);
+
+  return existing.documents[0] as SessionDocument | undefined;
 }
 
 function buildSystemPrompt(bot: BotDocument, contextChunks: string[], fallbackMessage: string) {
@@ -347,6 +382,17 @@ function streamStaticMessage(message: string) {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(sse({ token: message }));
+      controller.enqueue(sseDone());
+      controller.close();
+    },
+  });
+
+  return sseResponse(stream);
+}
+
+function streamDoneOnly() {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
       controller.enqueue(sseDone());
       controller.close();
     },
@@ -409,6 +455,10 @@ function ledgerCollectionId() {
   return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger";
 }
 
+function tenantsCollectionId() {
+  return process.env.APPWRITE_TENANTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID ?? "tenants";
+}
+
 function sessionsCollectionId() {
   return process.env.APPWRITE_SESSIONS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_SESSIONS_COLLECTION_ID ?? "sessions";
 }
@@ -419,6 +469,10 @@ function messagesCollectionId() {
 
 function stringValue(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function normalizeSessionStatus(value: unknown): "active" | "paused_by_human" | "closed" {
+  return value === "paused_by_human" || value === "closed" ? value : "active";
 }
 
 function isSafeId(value: string) {

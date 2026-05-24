@@ -1,7 +1,7 @@
 import { createEmbedding } from "@/lib/server/embeddings";
-import { bm25Search, denseSearch, type RetrievedPoint } from "@/lib/server/qdrant";
+import { activeCollection, bm25Search, denseSearch, type RetrievedPoint } from "@/lib/server/qdrant";
 
-const MIN_RELEVANCE_SCORE = 0.15;
+const DEFAULT_MIN_RELEVANCE_SCORE = 0.35;
 
 type Candidate = {
   key: string;
@@ -15,6 +15,7 @@ type Candidate = {
 export async function retrieveContextChunks(query: string, tenantId: string, botId: string) {
   const rerankLimit = numberEnv("RAG_RERANK_TOP_K", 8);
   const contextLimit = numberEnv("RAG_CONTEXT_TOP_K", 4);
+  const minRelevanceScore = floatEnv("RAG_MIN_RELEVANCE_SCORE", DEFAULT_MIN_RELEVANCE_SCORE);
   const embedding = await createEmbedding(query);
 
   const [denseResults, bm25Results] = await Promise.all([
@@ -22,17 +23,34 @@ export async function retrieveContextChunks(query: string, tenantId: string, bot
     bm25Search(query, tenantId, botId, rerankLimit).catch(() => []),
   ]);
 
-  return rerankCandidates(query, denseResults, bm25Results)
+  const candidates = rerankCandidates(query, denseResults, bm25Results, minRelevanceScore);
+  if (candidates.length === 0) {
+    console.info("[rag] zero context candidates", {
+      tenantId,
+      botId,
+      collection: activeCollection(),
+      denseCandidateCount: denseResults.length,
+      bm25CandidateCount: bm25Results.length,
+      minRelevanceScore,
+    });
+  }
+
+  return candidates
     .slice(0, contextLimit)
     .map((candidate) => formatContextChunk(candidate.point))
     .filter(Boolean);
 }
 
-export function rerankCandidates(query: string, denseResults: RetrievedPoint[], bm25Results: RetrievedPoint[]) {
+export function rerankCandidates(
+  query: string,
+  denseResults: RetrievedPoint[],
+  bm25Results: RetrievedPoint[],
+  minRelevanceScore = DEFAULT_MIN_RELEVANCE_SCORE,
+) {
   const candidates = new Map<string, Candidate>();
 
   denseResults.forEach((point, index) => {
-    if ((point.score ?? 0) < MIN_RELEVANCE_SCORE) {
+    if ((point.score ?? 0) < minRelevanceScore) {
       return;
     }
 
@@ -124,4 +142,9 @@ function mergePayload(primary: RetrievedPoint, secondary: RetrievedPoint): Retri
 function numberEnv(key: string, fallback: number) {
   const parsed = Number.parseInt(process.env[key] ?? "", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function floatEnv(key: string, fallback: number) {
+  const parsed = Number.parseFloat(process.env[key] ?? "");
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }

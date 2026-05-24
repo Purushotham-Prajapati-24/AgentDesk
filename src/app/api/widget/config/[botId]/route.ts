@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import type { Models } from "node-appwrite";
+import { Query, type Models } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
 import { getPublicServerWebSocketUrl } from "@/lib/server/websocket-url";
 
@@ -37,6 +37,22 @@ type BotDocument = Models.Document & {
   name?: unknown;
   fallback_message?: unknown;
   theme_config?: unknown;
+};
+
+type WebChatConfigDocument = Models.Document & {
+  tenant_id?: unknown;
+  bot_id?: unknown;
+  bot_name?: unknown;
+  avatar_url?: unknown;
+  description?: unknown;
+  header_color?: unknown;
+  background_color?: unknown;
+  text_color?: unknown;
+  user_bubble_color?: unknown;
+  bot_bubble_color?: unknown;
+  accent_color?: unknown;
+  font_family?: unknown;
+  source_citations?: unknown;
 };
 
 type ErrorResponse = {
@@ -130,6 +146,11 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
   try {
     const { databases } = await createAdminClient();
     const bot = (await databases.getDocument(databaseId(), botsCollectionId(), botId)) as BotDocument;
+    const webChatConfig = await getWebChatConfigDocument(databases, stringValue(bot.tenant_id, ""), botId);
+    if (webChatConfig) {
+      return widgetConfigFromWebChatDocument(botId, bot, webChatConfig);
+    }
+
     const themeConfig = parseThemeConfig(bot.theme_config);
     const theme = {
       ...DEFAULT_THEME,
@@ -142,7 +163,7 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
       botName: cleanText(stringValue(bot.name, "AgentDesk Support"), 80),
       greeting: cleanText(stringValue(themeConfig.greeting, "Hello. I can help with orders, returns, and product questions."), 300),
       fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
-      logoUrl: null,
+      logoUrl: sanitizeUrl(themeConfig.logoUrl ?? null),
       bannerText: cleanText(stringValue(themeConfig.bannerText, "Online - responds instantly"), 80),
       messageEndpoint: "/api/chat/message",
       websocketEndpoint: null,
@@ -151,6 +172,52 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
   } catch {
     return null;
   }
+}
+
+async function getWebChatConfigDocument(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  tenantId: string,
+  botId: string,
+) {
+  if (!tenantId) {
+    return null;
+  }
+
+  try {
+    const response = await databases.listDocuments(databaseId(), webChatConfigsCollectionId(), [
+      Query.equal("tenant_id", tenantId),
+      Query.equal("bot_id", botId),
+      Query.limit(1),
+    ]);
+
+    return (response.documents[0] as WebChatConfigDocument | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function widgetConfigFromWebChatDocument(botId: string, bot: BotDocument, config: WebChatConfigDocument): WidgetConfig {
+  return {
+    botId,
+    tenantId: cleanText(stringValue(bot.tenant_id, ""), 80),
+    botName: cleanText(stringValue(config.bot_name, stringValue(bot.name, "AgentDesk Support")), 80),
+    greeting: cleanText(stringValue(config.description, "Hello. I can help with orders, returns, and product questions."), 300),
+    fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
+    logoUrl: sanitizeUrl(stringValue(config.avatar_url, "") || null),
+    bannerText: "Online - responds instantly",
+    messageEndpoint: "/api/chat/message",
+    websocketEndpoint: null,
+    theme: {
+      headerHsl: hexToHsl(stringValue(config.header_color, "#1F2937")),
+      backgroundHsl: hexToHsl(stringValue(config.background_color, "#111827")),
+      textHsl: hexToHsl(stringValue(config.text_color, "#F9FAFB")),
+      mutedTextHsl: DEFAULT_THEME.mutedTextHsl,
+      userBubbleHsl: hexToHsl(stringValue(config.user_bubble_color, "#7C3AED")),
+      botBubbleHsl: hexToHsl(stringValue(config.bot_bubble_color, "#1F2937")),
+      accentHsl: hexToHsl(stringValue(config.accent_color, "#7C3AED")),
+      fontFamily: fontStack(stringValue(config.font_family, "Fira")),
+    },
+  };
 }
 
 function parseEnvConfigs(): Record<string, WidgetConfig> {
@@ -265,6 +332,42 @@ function databaseId() {
 
 function botsCollectionId() {
   return process.env.APPWRITE_BOTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID ?? "bots";
+}
+
+function webChatConfigsCollectionId() {
+  return process.env.APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID ?? "webchat_configs";
+}
+
+function hexToHsl(hex: string) {
+  const normalized = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.replace("#", "") : "7C3AED";
+  const red = Number.parseInt(normalized.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(normalized.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(normalized.slice(4, 6), 16) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+
+  if (delta === 0) {
+    return `0 0% ${Math.round(lightness * 100)}%`;
+  }
+
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1));
+  const hue = getHue(red, green, blue, max, delta);
+  return `${Math.round((hue + 360) % 360)} ${Math.round(saturation * 100)}% ${Math.round(lightness * 100)}%`;
+}
+
+function getHue(red: number, green: number, blue: number, max: number, delta: number) {
+  if (max === red) return 60 * (((green - blue) / delta) % 6);
+  if (max === green) return 60 * ((blue - red) / delta + 2);
+  return 60 * ((red - green) / delta + 4);
+}
+
+function fontStack(font: string) {
+  if (font === "Outfit") return "Outfit, system-ui, sans-serif";
+  if (font === "System") return "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+  if (font === "Mono") return "Fira Code, Consolas, ui-monospace, monospace";
+  return "Fira Sans, system-ui, sans-serif";
 }
 
 function errorResponse(code: string, message: string, requestId: string, status: number) {

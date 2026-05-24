@@ -1,8 +1,34 @@
 "use server";
 
-import { createGuestClient } from "@/lib/server/appwrite";
+import { createAdminClient, createGuestClient, createSessionClient } from "@/lib/server/appwrite";
 import { cookies } from "next/headers";
-import { ID } from "node-appwrite";
+import { ID, Permission, Role, type Models } from "node-appwrite";
+
+export type AuthUser = {
+  $id: string;
+  email: string;
+  name: string;
+  prefs: {
+    tenant_id?: string;
+    role?: "admin" | "agent";
+    [key: string]: unknown;
+  };
+};
+
+export type AuthTenant = {
+  $id: string;
+  name: string;
+  plan: string;
+  balance: number;
+  role: "admin" | "agent";
+};
+
+type TenantDocument = Models.Document & {
+  name?: unknown;
+  plan?: unknown;
+  credits?: unknown;
+  balance?: unknown;
+};
 
 export async function loginWithMagicLink(email: string) {
   const { account } = await createGuestClient();
@@ -38,18 +64,59 @@ export async function verifyMagicLink(userId: string, secret: string) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 24 * 30, // 30 days
     });
+
+    const tenantResult = await ensureTenantForUser(userId);
+    if (!tenantResult.success) {
+      throw new Error(tenantResult.error);
+    }
     
-    return { success: true };
+    const { users } = await createAdminClient();
+    const user = await users.get(userId);
+    return { success: true, user: serializeUser(user), tenant: tenantResult.tenant };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Authentication request failed.";
+export async function getCurrentUser(): Promise<{ success: true; user: AuthUser } | { success: false; error: string }> {
+  try {
+    const { account } = await createSessionClient();
+    const user = await account.get();
+    return { success: true, user: serializeUser(user) };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) };
+  }
 }
 
-export async function clearSessionCookie() {
+export async function getCurrentTenant(): Promise<{ success: true; tenant: AuthTenant } | { success: false; error: string }> {
+  try {
+    const { account } = await createSessionClient();
+    const user = await account.get();
+    const tenantResult = await ensureTenantForUser(user.$id);
+
+    if (!tenantResult.success) {
+      throw new Error(tenantResult.error);
+    }
+
+    return { success: true, tenant: tenantResult.tenant };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+export async function logoutSession() {
+  try {
+    const { account } = await createSessionClient();
+    await account.deleteSession("current");
+  } catch {
+    // Expire the browser cookie even when the Appwrite session is already gone.
+  }
+
+  await clearSessionCookie();
+  return { success: true };
+}
+
+async function clearSessionCookie() {
   const jar = await cookies();
   // Belt-and-suspenders: delete + expire to handle both HttpOnly and any
   // client-visible duplicates that may have been created by old code.
@@ -63,44 +130,40 @@ export async function clearSessionCookie() {
   });
 }
 
-export async function setSessionCookie(secret: string) {
-  (await cookies()).set("session", secret, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-  });
-}
-
-export async function syncSession(secret: string) {
-  if (!secret) return { success: false };
-  (await cookies()).set("session", secret, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-  return { success: true };
-}
-
 export async function ensureTenant(userId: string) {
   try {
-    const { createAdminClient } = await import("@/lib/server/appwrite");
-    const adminClient = await createAdminClient();
-    const adminUsers = adminClient.users;
-    const adminDatabases = adminClient.databases;
-    
-    const user = await adminUsers.get(userId);
-    
-    if (!user.prefs.tenant_id) {
-      const { ID, Permission, Role } = await import("node-appwrite");
-      const tenantId = ID.unique();
-      
-      await adminDatabases.createDocument(
-        process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.APPWRITE_DATABASE_ID || "agentdesk",
-        process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID || process.env.APPWRITE_TENANTS_COLLECTION_ID || "tenants",
+    const { account } = await createSessionClient();
+    const currentUser = await account.get();
+    if (currentUser.$id !== userId) {
+      throw new Error("You cannot provision another operator.");
+    }
+
+    const result = await ensureTenantForUser(userId);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+
+    return { success: true, tenantId: result.tenant.$id };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) };
+  }
+}
+
+async function ensureTenantForUser(userId: string): Promise<{ success: true; tenant: AuthTenant } | { success: false; error: string }> {
+  try {
+    const { users, databases } = await createAdminClient();
+    const user = await users.get(userId);
+    const prefs = user.prefs as AuthUser["prefs"];
+    let tenantId = typeof prefs.tenant_id === "string" ? prefs.tenant_id : "";
+    let role = prefs.role === "admin" || prefs.role === "agent" ? prefs.role : "agent";
+
+    if (!tenantId) {
+      tenantId = ID.unique();
+      role = "admin";
+
+      await databases.createDocument(
+        databaseId(),
+        tenantsCollectionId(),
         tenantId,
         {
           name: "My Workspace",
@@ -110,21 +173,63 @@ export async function ensureTenant(userId: string) {
         [
           Permission.read(Role.user(userId)),
           Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId))
-        ]
+          Permission.delete(Role.user(userId)),
+        ],
       );
-      
-      await adminUsers.updatePrefs(userId, {
-        ...user.prefs,
+
+      await users.updatePrefs(userId, {
+        ...prefs,
         tenant_id: tenantId,
-        role: "admin"
+        role,
       });
-      
-      return { success: true, tenantId };
     }
-    
-    return { success: true, tenantId: user.prefs.tenant_id };
+
+    const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
+    return {
+      success: true,
+      tenant: {
+        $id: tenant.$id,
+        name: stringValue(tenant.name, "Workspace"),
+        plan: stringValue(tenant.plan, "free"),
+        balance: numberValue(tenant.credits ?? tenant.balance),
+        role,
+      },
+    };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
   }
+}
+
+function serializeUser(user: Models.User<Models.Preferences>): AuthUser {
+  const prefs = user.prefs as AuthUser["prefs"];
+  return {
+    $id: user.$id,
+    email: user.email,
+    name: user.name,
+    prefs: {
+      ...prefs,
+      tenant_id: typeof prefs.tenant_id === "string" ? prefs.tenant_id : undefined,
+      role: prefs.role === "admin" || prefs.role === "agent" ? prefs.role : undefined,
+    },
+  };
+}
+
+function databaseId() {
+  return process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.APPWRITE_DATABASE_ID || "agentdesk";
+}
+
+function tenantsCollectionId() {
+  return process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID || process.env.APPWRITE_TENANTS_COLLECTION_ID || "tenants";
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Authentication request failed.";
 }

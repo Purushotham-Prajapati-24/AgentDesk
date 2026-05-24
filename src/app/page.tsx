@@ -74,7 +74,7 @@ export default function Home() {
                     <Button rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>Open live desk</Button>
                   </Link>
                 </ClickSpark>
-                <Link href="/bots/customizer">
+                <Link href="/webchat">
                   <Button variant="secondary" rightIcon={<Workflow aria-hidden="true" className="h-4 w-4" />}>
                     Shape the widget
                   </Button>

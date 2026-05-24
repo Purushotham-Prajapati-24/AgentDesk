@@ -2,20 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { databases } from "@/lib/appwrite";
-import { Models } from "appwrite";
-
-interface TenantPreferences extends Models.Preferences {
-  tenant_id?: string;
-  role?: "admin" | "agent";
-}
-
-type TenantDocument = Models.Document & {
-  name?: unknown;
-  plan?: unknown;
-  balance?: unknown;
-  [key: string]: unknown;
-};
+import { getCurrentTenant } from "@/app/auth-actions";
 
 interface TenantDetails {
   $id: string;
@@ -48,35 +35,19 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       try {
-        const prefs = user.prefs as TenantPreferences;
-        let tenantId = prefs.tenant_id;
-        let userRole = prefs.role;
-
-        if (!tenantId) {
-          const { ensureTenant } = await import("@/app/auth-actions");
-          const result = await ensureTenant(user.$id);
-          if (result.success && result.tenantId) {
-            tenantId = result.tenantId;
-            userRole = "admin";
-          } else {
-            console.error("Failed to auto-provision tenant:", result.error);
-          }
-        }
-
-        if (tenantId) {
-          const tenantDoc = await databases.getDocument(
-            process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || "agentdesk",
-            process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID || "tenants",
-            tenantId
-          ) as TenantDocument;
-          
+        const response = await getCurrentTenant();
+        if (response.success) {
           setTenant({
-            $id: tenantDoc.$id,
-            name: stringValue(tenantDoc.name, "Workspace"),
-            plan: stringValue(tenantDoc.plan, "free"),
-            balance: numberValue(tenantDoc["cred" + "its"]),
+            $id: response.tenant.$id,
+            name: response.tenant.name,
+            plan: response.tenant.plan,
+            balance: response.tenant.balance,
           });
-          setRole(userRole || "agent");
+          setRole(response.tenant.role);
+        } else {
+          setTenant(null);
+          setRole(null);
+          console.error("Failed to fetch tenant data", response.error);
         }
       } catch (error) {
         console.error("Failed to fetch tenant data", error);
@@ -102,11 +73,3 @@ export const useTenant = () => {
   }
   return context;
 };
-
-function stringValue(value: unknown, fallback: string) {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-function numberValue(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}

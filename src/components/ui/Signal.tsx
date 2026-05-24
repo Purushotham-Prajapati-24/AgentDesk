@@ -5,25 +5,29 @@ import { usePathname } from "next/navigation";
 import {
   Bot,
   Boxes,
+  ChartNoAxesCombined,
   CreditCard,
   FileText,
   Inbox,
   LayoutDashboard,
-  MonitorUp,
+  LogOut,
+  MessagesSquare,
   Radio,
   ShieldCheck,
   TestTube2,
 } from "lucide-react";
 import React from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 type StatusTone = "hot" | "warn" | "neutral" | "danger" | "dark" | "info";
 
 const navItems = [
   { href: "/", label: "Workspace", icon: LayoutDashboard },
   { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/monitor", label: "Monitor", icon: ChartNoAxesCombined },
   { href: "/bots", label: "Agents", icon: Bot },
-  { href: "/bots/customizer", label: "Customizer", icon: MonitorUp },
+  { href: "/webchat", label: "WebChat", icon: MessagesSquare },
   { href: "/documents", label: "Knowledge", icon: FileText },
   { href: "/billing", label: "Usage", icon: CreditCard },
   { href: "/widget-test.html", label: "Widget Test", icon: TestTube2 },
@@ -31,6 +35,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -71,11 +76,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            <div className="mt-auto rounded-lg border border-border bg-secondary/60 p-3">
-              <p className="studio-kicker text-muted-foreground">Live fabric</p>
-              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                <Radio aria-hidden="true" className="h-4 w-4 text-accent" />
-                Human handoff ready
+            <div className="mt-auto flex flex-col gap-4">
+              <button
+                className="flex min-h-11 items-center gap-3 rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-muted-foreground transition duration-200 ease-out hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => void logout()}
+                type="button"
+              >
+                <LogOut aria-hidden="true" className="h-4 w-4" />
+                Sign out
+              </button>
+
+              <div className="rounded-lg border border-border bg-secondary/60 p-3">
+                <p className="studio-kicker text-muted-foreground">Live fabric</p>
+                <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Radio aria-hidden="true" className="h-4 w-4 text-accent" />
+                  Human handoff ready
+                </div>
               </div>
             </div>
           </div>

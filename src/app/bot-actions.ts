@@ -1,6 +1,7 @@
 "use server";
 
-import { createSessionClient } from "@/lib/server/appwrite";
+import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
+import { deleteKnowledgePointsForBot } from "@/lib/server/qdrant";
 import { ID, Query, type Models } from "node-appwrite";
 
 type BotDocument = Models.Document & {
@@ -9,6 +10,10 @@ type BotDocument = Models.Document & {
   system_prompt?: unknown;
   fallback_message?: unknown;
   theme_config?: unknown;
+};
+
+type StoredDocument = Models.Document & {
+  storage_path?: unknown;
 };
 
 type BotInput = {
@@ -20,6 +25,12 @@ type BotInput = {
 
 const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.APPWRITE_DATABASE_ID || "agentdesk";
 const collectionId = process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID || process.env.APPWRITE_BOTS_COLLECTION_ID || "bots";
+const webChatConfigsCollectionId =
+  process.env.NEXT_PUBLIC_APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID ||
+  process.env.APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID ||
+  "webchat_configs";
+const documentsCollectionId = process.env.APPWRITE_DOCUMENT_FILES_COLLECTION_ID ?? "document_files";
+const documentsBucketId = process.env.APPWRITE_DOCUMENTS_BUCKET_ID ?? process.env.NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID ?? "documents";
 const MAX_NAME_LENGTH = 80;
 const MAX_PROMPT_LENGTH = 4000;
 const MAX_FALLBACK_LENGTH = 500;
@@ -74,14 +85,91 @@ export async function updateBot(botId: string, tenantId: string, data: Partial<B
 
 export async function deleteBot(botId: string, tenantId: string) {
   try {
-    const { databases, account } = await createSessionClient();
+    const { account } = await createSessionClient();
+    const { databases, storage } = await createAdminClient();
     await assertTenantAccess(account, tenantId);
     await assertBotTenant(databases, botId, tenantId);
+    await deleteKnowledgePointsForBot(tenantId, botId);
+    await deleteBotDocuments(databases, storage, tenantId, botId);
+    await deleteWebChatConfigs(databases, tenantId, botId);
     await databases.deleteDocument(databaseId, collectionId, botId);
     return { success: true as const };
   } catch (error: unknown) {
     return { success: false as const, error: getErrorMessage(error) };
   }
+}
+
+async function deleteWebChatConfigs(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  tenantId: string,
+  botId: string,
+) {
+  try {
+    const response = await listScopedDocuments(databases, webChatConfigsCollectionId, tenantId, botId);
+    await Promise.all(
+      response.map((document) =>
+        databases.deleteDocument(databaseId, webChatConfigsCollectionId, document.$id),
+      ),
+    );
+  } catch (error: unknown) {
+    if (!isMissingResourceError(error)) {
+      throw error;
+    }
+  }
+}
+
+async function deleteBotDocuments(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  storage: Awaited<ReturnType<typeof createAdminClient>>["storage"],
+  tenantId: string,
+  botId: string,
+) {
+  try {
+    const documents = (await listScopedDocuments(databases, documentsCollectionId, tenantId, botId)) as StoredDocument[];
+
+    for (const document of documents) {
+      const storagePath = typeof document.storage_path === "string" ? document.storage_path : "";
+      if (storagePath) {
+        try {
+          await storage.deleteFile(documentsBucketId, storagePath);
+        } catch (error: unknown) {
+          if (!isMissingResourceError(error)) {
+            throw error;
+          }
+        }
+      }
+
+      await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
+    }
+  } catch (error: unknown) {
+    if (!isMissingResourceError(error)) {
+      throw error;
+    }
+  }
+}
+
+async function listScopedDocuments(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  targetCollectionId: string,
+  tenantId: string,
+  botId: string,
+) {
+  const documents: Models.Document[] = [];
+  let cursor: string | null = null;
+
+  do {
+    const queries: string[] = [
+      Query.equal("tenant_id", tenantId),
+      Query.equal("bot_id", botId),
+      Query.limit(100),
+      ...(cursor ? [Query.cursorAfter(cursor)] : []),
+    ];
+    const response = await databases.listDocuments(databaseId, targetCollectionId, queries);
+    documents.push(...response.documents);
+    cursor = response.documents.length === 100 ? response.documents[response.documents.length - 1].$id : null;
+  } while (cursor);
+
+  return documents;
 }
 
 async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessionClient>>["account"], tenantId: string) {
@@ -174,6 +262,15 @@ function stringValue(value: unknown, fallback: string) {
 
 function isSafeId(value: string) {
   return /^[a-zA-Z0-9_-]{3,160}$/.test(value);
+}
+
+function isMissingResourceError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { code?: unknown; type?: unknown };
+  return candidate.code === 404 || candidate.type === "document_not_found" || candidate.type === "collection_not_found";
 }
 
 function getErrorMessage(error: unknown) {

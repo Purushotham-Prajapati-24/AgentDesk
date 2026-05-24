@@ -3,23 +3,31 @@ import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
 import { Server } from "socket.io";
+import { createAdapter } from "@socket.io/redis-adapter";
+import { createClient as createRedisClient } from "redis";
+import {
+  createSessionStore,
+  defaultSessionState,
+  persistAppwriteSessionStatus,
+  readAppwriteSessionStatus,
+} from "./session-store.js";
 
 const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000,http://127.0.0.1:3000";
 const MAX_MESSAGE_LENGTH = 4000;
 const SESSION_STATUSES = new Set(["active", "paused_by_human", "closed"]);
 
-const sessionState = new Map();
-
 export function createHandoffServer(options = {}) {
   const app = express();
   const server = http.createServer(app);
+  const sessionStore = options.sessionStore ?? createSessionStore(options);
   const io = new Server(server, {
     cors: {
       origin: parseCorsOrigins(process.env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN),
       methods: ["GET", "POST"],
     },
   });
+  void configureRedisAdapter(io);
 
   app.disable("x-powered-by");
   app.use(cors({ origin: parseCorsOrigins(process.env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN) }));
@@ -35,22 +43,23 @@ export function createHandoffServer(options = {}) {
     });
   });
 
-  app.post("/rag-permission", (request, response) => {
+  app.post("/rag-permission", async (request, response) => {
     const room = parseRoomPayload(request.body);
     if (!room.ok) {
       response.status(422).json(errorBody("INVALID_ROOM", room.error));
       return;
     }
 
+    const status = await getSessionStatus(sessionStore, room.value);
     response.status(200).json({
       success: true,
       data: {
-        shouldCallRag: getSessionStatus(room.value) !== "paused_by_human",
+        shouldCallRag: status !== "paused_by_human",
       },
     });
   });
 
-  io.of(/^\/tenant-[a-zA-Z0-9_-]+$/).on("connection", (socket) => {
+  io.of(/^\/tenant-[a-zA-Z0-9_-]+$/).on("connection", async (socket) => {
     const joinResult = joinSessionRoom(socket);
     if (!joinResult.ok) {
       socket.emit("server-error", errorBody("INVALID_HANDSHAKE", joinResult.error));
@@ -60,10 +69,10 @@ export function createHandoffServer(options = {}) {
 
     const room = joinResult.value;
     socket.join(roomName(room));
-    socket.emit("session-state", buildSessionState(room));
+    socket.emit("session-state", await buildSessionState(sessionStore, room));
 
     socket.on("customer-message", (payload, acknowledge) => {
-      handleCustomerMessage(socket, room, payload, acknowledge);
+      void handleCustomerMessage(socket, sessionStore, room, payload, acknowledge);
     });
 
     socket.on("agent-message", (payload, acknowledge) => {
@@ -71,21 +80,21 @@ export function createHandoffServer(options = {}) {
     });
 
     socket.on("bot-status-toggle", (payload, acknowledge) => {
-      handleStatusToggle(socket, room, payload, acknowledge);
+      void handleStatusToggle(socket, sessionStore, room, payload, acknowledge);
     });
   });
 
-  return { app, server, io, sessionState: options.sessionState ?? sessionState };
+  return { app, server, io, sessionStore, sessionState: sessionStore.sessionState };
 }
 
-function handleCustomerMessage(socket, room, payload, acknowledge) {
+async function handleCustomerMessage(socket, sessionStore, room, payload, acknowledge) {
   const message = parseMessagePayload(payload, "customer");
   if (!message.ok) {
     acknowledge?.(errorBody("INVALID_MESSAGE", message.error));
     return;
   }
 
-  const status = getSessionStatus(room);
+  const status = await getSessionStatus(sessionStore, room);
   const event = {
     ...message.value,
     tenant_id: room.tenant_id,
@@ -119,7 +128,7 @@ function handleAgentMessage(socket, room, payload, acknowledge) {
   acknowledge?.({ success: true, data: event });
 }
 
-function handleStatusToggle(socket, room, payload, acknowledge) {
+async function handleStatusToggle(socket, sessionStore, room, payload, acknowledge) {
   const status = typeof payload?.status === "string" ? payload.status : "";
   if (!SESSION_STATUSES.has(status)) {
     acknowledge?.(errorBody("INVALID_STATUS", "Status must be active, paused_by_human, or closed."));
@@ -134,7 +143,20 @@ function handleStatusToggle(socket, room, payload, acknowledge) {
     updated_at: new Date().toISOString(),
   };
 
-  sessionState.set(stateKey(room), state);
+  try {
+    await persistAppwriteSessionStatus(room, status);
+  } catch (error) {
+    console.error("[handoff] failed to persist Appwrite session status", {
+      tenant_id: room.tenant_id,
+      session_id: room.session_id,
+      status,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    acknowledge?.(errorBody("STATUS_PERSIST_FAILED", "Session status could not be persisted."));
+    return;
+  }
+
+  await sessionStore.set(room, state);
   socket.to(roomName(room)).emit("bot-status-toggle", state);
   socket.emit("session-state", state);
   acknowledge?.({ success: true, data: state });
@@ -194,24 +216,22 @@ function readHandshakeValue(socket, key) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function buildSessionState(room) {
-  return (
-    sessionState.get(stateKey(room)) ?? {
-      tenant_id: room.tenant_id,
-      session_id: room.session_id,
-      status: "active",
-      updated_by: "system",
-      updated_at: new Date().toISOString(),
-    }
-  );
+async function buildSessionState(sessionStore, room) {
+  const appwriteStatus = await readAppwriteSessionStatus(room).catch(() => null);
+  if (appwriteStatus) {
+    const durableState = {
+      ...defaultSessionState(room),
+      status: appwriteStatus,
+    };
+    await sessionStore.set(room, durableState);
+    return durableState;
+  }
+
+  return (await sessionStore.get(room)) ?? defaultSessionState(room);
 }
 
-function getSessionStatus(room) {
-  return buildSessionState(room).status;
-}
-
-function stateKey(room) {
-  return `${room.tenant_id}:${room.session_id}`;
+async function getSessionStatus(sessionStore, room) {
+  return (await buildSessionState(sessionStore, room)).status;
 }
 
 function roomName(room) {
@@ -244,6 +264,26 @@ function errorBody(code, message) {
       requestId: crypto.randomUUID(),
     },
   };
+}
+
+async function configureRedisAdapter(io) {
+  const redisUrl = process.env.SOCKET_IO_REDIS_URL;
+  if (!redisUrl) {
+    console.info("Socket.IO Redis adapter disabled. Set SOCKET_IO_REDIS_URL to enable clustered pub/sub.");
+    return;
+  }
+
+  const pubClient = createRedisClient({ url: redisUrl });
+  const subClient = pubClient.duplicate();
+
+  try {
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+    io.adapter(createAdapter(pubClient, subClient));
+    console.info("Socket.IO Redis adapter enabled.");
+  } catch (error) {
+    console.error("[handoff] failed to enable Socket.IO Redis adapter", error);
+    await Promise.allSettled([pubClient.quit(), subClient.quit()]);
+  }
 }
 
 const isEntrypoint = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

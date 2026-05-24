@@ -17,6 +17,7 @@ type BillingSnapshot = {
   }>;
   stats: {
     activeSessions: number;
+    activeSessionWindowMinutes: number;
     totalMessages: number;
     documentStorageBytes: number;
   };
@@ -70,7 +71,11 @@ export default function BillingPage() {
 
         <section className="grid gap-4 md:grid-cols-4">
           <MetricTile label="Balance" value={formatAmount(snapshot?.balance ?? 0)} detail="available credits" tone="warn" />
-          <MetricTile label="Active sessions" value={String(snapshot?.stats.activeSessions ?? 0)} detail="live support lines" />
+          <MetricTile
+            label="Active sessions"
+            value={String(snapshot?.stats.activeSessions ?? 0)}
+            detail={`open in last ${snapshot?.stats.activeSessionWindowMinutes ?? 30}m`}
+          />
           <MetricTile label="Messages" value={String(snapshot?.stats.totalMessages ?? 0)} detail="conversation volume" tone="hot" />
           <MetricTile label="Storage" value={formatBytes(snapshot?.stats.documentStorageBytes ?? 0)} detail="knowledge payload" tone="dark" />
         </section>

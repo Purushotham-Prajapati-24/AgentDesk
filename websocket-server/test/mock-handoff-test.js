@@ -1,11 +1,14 @@
 import { once } from "node:events";
 import { io as createClient } from "socket.io-client";
 import { createHandoffServer } from "../server.js";
+import { createMemorySessionStore } from "../session-store.js";
 
 const tenantId = "tenant_demo";
 const sessionId = "session_demo";
 
-const { server, io } = createHandoffServer();
+const backingState = new Map();
+const sessionStore = createMemorySessionStore(backingState);
+const { server, io } = createHandoffServer({ sessionStore });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 
 const address = server.address();
@@ -35,6 +38,7 @@ try {
 
   assert(statusAck.success, "status toggle should be accepted");
   assert(statusAck.data.status === "paused_by_human", "session should be paused by human");
+  assert(backingState.size === 1, "status toggle should persist session state through the store");
 
   const forwardedMessage = once(agent, "customer-message");
   const pausedMessage = await emitWithAck(customer, "customer-message", {
@@ -46,6 +50,15 @@ try {
   assert(pausedMessage.data.should_call_rag === false, "paused customer message should bypass RAG");
   assert(forwardedPayload.content === "I need a human now.", "agent should receive forwarded customer message");
   assert(forwardedPayload.should_call_rag === false, "forwarded message should preserve RAG bypass flag");
+
+  const permission = await fetch(`http://127.0.0.1:${address.port}/rag-permission`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenant_id: tenantId, session_id: sessionId }),
+  }).then((response) => response.json());
+
+  assert(permission.success, "rag-permission should return a success response");
+  assert(permission.data.shouldCallRag === false, "rag-permission should use stored paused status");
 
   const agentMessage = once(customer, "agent-message");
   const agentAck = await emitWithAck(agent, "agent-message", {

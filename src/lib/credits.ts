@@ -16,6 +16,7 @@ export type BillingSnapshot = {
   transactions: LedgerTransaction[];
   stats: {
     activeSessions: number;
+    activeSessionWindowMinutes: number;
     totalMessages: number;
     documentStorageBytes: number;
   };
@@ -33,7 +34,12 @@ type FileDocument = Models.Document & {
   file_size?: unknown;
 };
 
+type TenantDocument = Models.Document & {
+  credits?: unknown;
+};
+
 const PAGE_LIMIT = 100;
+const DEFAULT_ACTIVE_SESSION_WINDOW_MINUTES = 30;
 
 export async function getTenantBillingSnapshot(tenantId: string): Promise<
   | { success: true; data: BillingSnapshot }
@@ -42,18 +48,19 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
   try {
     const { account, databases } = await createSessionClient();
     await assertTenantAccess(account, tenantId);
+    const activeSessionWindowMinutes = numberEnv(
+      "BILLING_ACTIVE_SESSION_WINDOW_MINUTES",
+      DEFAULT_ACTIVE_SESSION_WINDOW_MINUTES,
+    );
 
-    const [ledger, sessions, messages, files] = await Promise.all([
+    const [tenantCredits, ledger, activeSessionCount, messages, files] = await Promise.all([
+      getTenantCredits(databases, tenantId),
       databases.listDocuments(databaseId(), ledgerCollectionId(), [
         Query.equal("tenant_id", tenantId),
         Query.orderDesc("created"),
         Query.limit(PAGE_LIMIT),
       ]),
-      databases.listDocuments(databaseId(), sessionsCollectionId(), [
-        Query.equal("tenant_id", tenantId),
-        Query.equal("status", "active"),
-        Query.limit(1),
-      ]),
+      countOpenRecentSessions(databases, tenantId, activeSessionWindowMinutes),
       databases.listDocuments(databaseId(), messagesCollectionId(), [Query.equal("tenant_id", tenantId), Query.limit(1)]),
       databases.listDocuments(databaseId(), documentsCollectionId(), [Query.equal("tenant_id", tenantId), Query.limit(PAGE_LIMIT)]),
     ]);
@@ -63,10 +70,11 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
     return {
       success: true,
       data: {
-        balance: calculateBalance(transactions),
+        balance: tenantCredits + calculateBalance(transactions),
         transactions,
         stats: {
-          activeSessions: sessions.total,
+          activeSessions: activeSessionCount,
+          activeSessionWindowMinutes,
           totalMessages: messages.total,
           documentStorageBytes: files.documents.reduce(
             (total, document) => total + numberValue((document as FileDocument).file_size),
@@ -78,6 +86,34 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load billing data." };
   }
+}
+
+async function getTenantCredits(
+  databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
+  tenantId: string,
+) {
+  try {
+    const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
+    return numberValue(tenant.credits);
+  } catch {
+    return 0;
+  }
+}
+
+async function countOpenRecentSessions(
+  databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
+  tenantId: string,
+  windowMinutes: number,
+) {
+  const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+  const sessions = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+    Query.equal("tenant_id", tenantId),
+    Query.equal("status", ["active", "paused_by_human"]),
+    Query.greaterThanEqual("updated", cutoff),
+    Query.limit(1),
+  ]);
+
+  return sessions.total;
 }
 
 export async function getTenantCreditBalance(tenantId: string) {
@@ -123,6 +159,10 @@ function ledgerCollectionId() {
   return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger_transactions";
 }
 
+function tenantsCollectionId() {
+  return process.env.APPWRITE_TENANTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID ?? "tenants";
+}
+
 function sessionsCollectionId() {
   return process.env.APPWRITE_SESSIONS_COLLECTION_ID ?? "sessions";
 }
@@ -141,6 +181,11 @@ function numberValue(value: unknown) {
 
 function stringValue(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function numberEnv(key: string, fallback: number) {
+  const parsed = Number.parseInt(process.env[key] ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function isSafeId(value: string) {

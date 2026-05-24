@@ -1,12 +1,11 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { account } from "@/lib/appwrite";
-import { Models } from "appwrite";
+import { getCurrentUser, logoutSession, type AuthUser } from "@/app/auth-actions";
 import { useRouter } from "next/navigation";
 
 interface AuthContextType {
-  user: Models.User<Models.Preferences> | null;
+  user: AuthUser | null;
   loading: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -15,65 +14,31 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const refreshUser = useCallback(async () => {
-    try {
-      const currentUser = await account.get();
-      setUser(currentUser);
-    } catch {
+    const response = await getCurrentUser();
+    if (response.success) {
+      setUser(response.user);
+    } else {
       setUser(null);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, []);
 
   useEffect(() => {
     let isActive = true;
 
-    account
-      .get()
-      .then((currentUser) => {
-        if (isActive) {
-          setUser(currentUser);
-          if (typeof window !== "undefined") {
-            try {
-              const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "6a12a61100219ba50305";
-              const fallbackKey = `cookieFallback`;
-              const fallbackStr = localStorage.getItem(fallbackKey);
-              if (fallbackStr) {
-                const fallbacks = JSON.parse(fallbackStr);
-                const secret = fallbacks[`a_session_${projectId.toLowerCase()}`] || fallbacks[`a_session_${projectId.toLowerCase()}_legacy`];
-                if (secret) {
-                  import("@/app/auth-actions").then(m => m.syncSession(secret));
-                }
-              }
-            } catch (e) {
-              // ignore sync errors
-            }
-          }
-        }
-      })
-      .catch(() => {
-        if (isActive) {
-          setUser(null);
-          if (typeof window !== "undefined") {
-            const keys = Object.keys(localStorage);
-            keys.forEach(key => {
-              if (key.startsWith("cookieFallback")) {
-                localStorage.removeItem(key);
-              }
-            });
-          }
-        }
-      })
-      .finally(() => {
-        if (isActive) {
-          setLoading(false);
-        }
-      });
+    getCurrentUser().then((response) => {
+      if (!isActive) {
+        return;
+      }
+
+      setUser(response.success ? response.user : null);
+      setLoading(false);
+    });
 
     return () => {
       isActive = false;
@@ -82,10 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await account.deleteSession("current");
-      import("@/app/auth-actions").then(m => m.clearSessionCookie());
+      await logoutSession();
       setUser(null);
-      router.push("/login");
+      router.push("/");
     } catch (error) {
       console.error("Logout failed", error);
     }

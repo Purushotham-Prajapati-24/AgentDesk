@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Loader2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,8 +21,13 @@ function VerifyContent() {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [error, setError] = useState("");
+  const verificationStarted = useRef(false);
 
   useEffect(() => {
+    if (verificationStarted.current) {
+      return;
+    }
+
     const userId = searchParams.get("userId");
     const secret = searchParams.get("secret");
 
@@ -34,6 +39,7 @@ function VerifyContent() {
       return;
     }
 
+    verificationStarted.current = true;
     const verify = async () => {
       try {
         const result = await verifyMagicLink(userId, secret);
@@ -46,17 +52,6 @@ function VerifyContent() {
           router.push("/");
         }, 1200);
       } catch (err: unknown) {
-        // React Strict Mode calls useEffect twice. The first call consumes the token 
-        // and succeeds. The second call sees an active session and throws this error.
-        // If we get this error, we are successfully logged in!
-        if (isAppwriteSessionExistsError(err)) {
-          setStatus("success");
-          setTimeout(() => {
-            router.push("/");
-          }, 1200);
-          return;
-        }
-        
         setStatus("error");
         setError(err instanceof Error ? err.message : "Verification failed.");
       }
@@ -66,10 +61,6 @@ function VerifyContent() {
   }, [searchParams, router]);
 
   return <VerifyShell status={status} error={error} />;
-}
-
-function isAppwriteSessionExistsError(error: unknown) {
-  return typeof error === "object" && error !== null && "type" in error && error.type === "user_session_already_exists";
 }
 
 function VerifyShell({ status, error }: { status: "loading" | "success" | "error"; error: string }) {

@@ -45,8 +45,6 @@ test-verify.mjs
 /processStatus
 CLAUDE.md
 
-# Docs folder (design artefacts, not shipped code)
-/docs
 
 # Vercel deployment config
 .vercel
@@ -75,5 +73,5 @@ yarn-error.log*
 
 .agent
 node_modules
-
-
+Docs folder (design artefacts, not shipped code)
+/docs
