@@ -213,7 +213,7 @@ export default function DocsPage() {
               copiedId={copiedId}
               value={`<!-- Paste inside your HTML body -->
 <script
-  src="https://YOUR_DOMAIN/widget.js"
+  src="https://agentdeskbot.vercel.app/widget.js"
   data-bot-id="YOUR_BOT_ID"
   data-theme="webchat-v1"
   data-mode="launcher"
@@ -231,7 +231,7 @@ export default function DocsPage() {
               label="Iframe embed"
               copiedId={copiedId}
               value={`<iframe
-  src="https://YOUR_DOMAIN/embed/YOUR_BOT_ID?theme=webchat-v1"
+  src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID?theme=webchat-v1"
   title="AgentDesk Support"
   style="width: 100%; height: 640px; border: 0;"
 ></iframe>`}
@@ -332,7 +332,7 @@ function toggleWidget() {
     "greeting": "Hello. How can I help you?",
     "logoUrl": null,
     "useCustomIcon": true,
-    "widgetIconUrl": "https://YOUR_DOMAIN/custom-icon.png",
+    "widgetIconUrl": "https://agentdeskbot.vercel.app/custom-icon.png",
     "theme": {
       "headerHsl": "224 20% 18%",
       "backgroundHsl": "224 25% 12%"

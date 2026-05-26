@@ -402,8 +402,8 @@ function buildSnippets(config: WebChatConfig) {
   const theme = config.deploy.themeId || config.deploy.versionTag;
 
   return {
-    script: `<script src="https://YOUR_DOMAIN/widget.js" data-bot-id="${botId}" data-theme="${theme}" async></script>`,
-    iframe: `<iframe src="https://YOUR_DOMAIN/embed/${botId}?theme=${theme}" title="${config.identity.botName}" style="width:100%;height:640px;border:0"></iframe>`,
+    script: `<script src="https://agentdeskbot.vercel.app/widget.js" data-bot-id="${botId}" data-theme="${theme}" async></script>`,
+    iframe: `<iframe src="https://agentdeskbot.vercel.app/embed/${botId}?theme=${theme}" title="${config.identity.botName}" style="width:100%;height:640px;border:0"></iframe>`,
     react: `import { AgentDeskWidget } from "@agentdesk/widget/react";\n\n<AgentDeskWidget botId="${botId}" theme="${theme}" />`,
     vue: `<AgentDeskWidget bot-id="${botId}" theme="${theme}" />`,
   };
