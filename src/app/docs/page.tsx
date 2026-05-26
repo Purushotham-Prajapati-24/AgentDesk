@@ -1,402 +1,329 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
-import { 
-  ArrowLeft, 
-  Bot, 
-  Braces, 
-  BookOpen, 
-  Code, 
-  Copy, 
-  Check, 
-  ExternalLink, 
-  FileText, 
-  HelpCircle, 
-  Inbox, 
-  Layers, 
-  Search, 
-  Settings, 
-  Sparkles, 
-  Terminal, 
-  Workflow 
+import {
+  ArrowLeft,
+  Bot,
+  BookOpen,
+  Check,
+  Copy,
+  ExternalLink,
+  FileText,
+  Inbox,
+  Layers,
+  Palette,
+  Search,
+  Settings,
+  Sparkles,
+  Terminal,
+  Workflow,
 } from "lucide-react";
+
+type DocCategory = "Getting Started" | "Knowledge & Ingestion" | "Widget Embed" | "Developer API";
+type SandboxMode = "launcher" | "inline";
 
 type DocSection = {
   id: string;
   title: string;
-  category: "Getting Started" | "Knowledge & Ingestion" | "Widget Embed" | "Developer API";
+  category: DocCategory;
   content: React.ReactNode;
 };
 
-export default function DocsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeSection, setActiveSection] = useState("introduction");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+type CopyButtonProps = {
+  copied: boolean;
+  onCopy: () => void;
+};
 
-  // Sandbox State
-  const [sandboxBotId, setSandboxBotId] = useState("6a160c5a00212e6e9da0");
-  const [sandboxTheme, setSandboxTheme] = useState("webchat-v1");
-  const [sandboxMode, setSandboxMode] = useState<"launcher" | "inline">("launcher");
+const categories: DocCategory[] = ["Getting Started", "Knowledge & Ingestion", "Widget Embed", "Developer API"];
+
+export default function DocsPage() {
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [activeSection, setActiveSection] = useState<string>("introduction");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sandboxBotId, setSandboxBotId] = useState<string>("6a160c5a00212e6e9da0");
+  const [sandboxTheme, setSandboxTheme] = useState<string>("webchat-v1");
+  const [sandboxMode, setSandboxMode] = useState<SandboxMode>("launcher");
 
   const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      return;
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId(null), 2000);
+    });
   };
 
   const sandboxSnippets = useMemo(() => {
     const host = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
     return {
-      script: `<script\n  src="${host}/widget.js"\n  data-bot-id="${sandboxBotId}"\n  data-theme="${sandboxTheme}"\n  async\n></script>`,
-      iframe: `<iframe\n  src="${host}/embed/${sandboxBotId}?theme=${sandboxTheme}"\n  title="AgentDesk Support"\n  style="width: 100%; height: 640px; border: 0;"\n></iframe>`,
+      script: `<script
+  src="${host}/widget.js"
+  data-bot-id="${sandboxBotId}"
+  data-theme="${sandboxTheme}"
+  data-mode="launcher"
+  async
+></script>`,
+      iframe: `<iframe
+  src="${host}/embed/${sandboxBotId}?theme=${sandboxTheme}"
+  title="AgentDesk Support"
+  style="width: 100%; height: 640px; border: 0;"
+></iframe>`,
     };
   }, [sandboxBotId, sandboxTheme]);
 
-  const docSections: DocSection[] = [
-    {
-      id: "introduction",
-      title: "Introduction",
-      category: "Getting Started",
-      content: (
-        <div className="space-y-6">
-          <p className="text-lg leading-8 text-muted-foreground">
-            Welcome to the <strong>AgentDesk Developer Center</strong>. AgentDesk is a high-performance orchestration workspace designed to ground AI support agents in verified documents while maintaining a secure, real-time fallback mechanism for human operators.
-          </p>
+  const docSections = useMemo<DocSection[]>(
+    () => [
+      {
+        id: "introduction",
+        title: "Introduction",
+        category: "Getting Started",
+        content: (
+          <div className="space-y-6">
+            <p className="text-lg leading-8 text-muted-foreground">
+              AgentDesk is a developer-facing support platform for grounding AI answers in your own knowledge base, embedding WebChat on customer sites, and routing escalations into a live operator inbox.
+            </p>
 
-          <div className="grid gap-4 sm:grid-cols-2 mt-6">
-            <div className="rounded-xl border border-border bg-card/50 p-5 hover:border-primary/30 transition">
-              <Bot className="h-6 w-6 text-primary mb-3" />
-              <h3 className="text-lg font-bold text-foreground">Agent Studio</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-6">
-                Configure identity, baseline greeting prompts, and fine-tune response rules for tenant-scoped agents.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card/50 p-5 hover:border-accent/30 transition">
-              <Inbox className="h-6 w-6 text-accent mb-3" />
-              <h3 className="text-lg font-bold text-foreground">Live Inbox</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-6">
-                Monitor current agent states, pause automation in real-time, and take over the conversation instantly.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card/50 p-5 hover:border-emerald-500/30 transition">
-              <FileText className="h-6 w-6 text-emerald-400 mb-3" />
-              <h3 className="text-lg font-bold text-foreground">Knowledge Base</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-6">
-                Ground your support agents with direct uploads of PDF, DOCX, CSV, TXT, or Markdown documents.
-              </p>
-            </div>
-            <div className="rounded-xl border border-border bg-card/50 p-5 hover:border-indigo-500/30 transition">
-              <Workflow className="h-6 w-6 text-indigo-400 mb-3" />
-              <h3 className="text-lg font-bold text-foreground">Embed Widget</h3>
-              <p className="mt-2 text-sm text-muted-foreground leading-6">
-                Embed your custom-styled chat widget on any website using a single optimized <code>&lt;script&gt;</code> tag or standard <code>&lt;iframe&gt;</code>.
-              </p>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: "quickstart",
-      title: "Quickstart Guide",
-      category: "Getting Started",
-      content: (
-        <div className="space-y-6">
-          <p className="text-muted-foreground">
-            Get an interactive AI support agent live on your website in less than 2 minutes. Follow this step-by-step walkthrough:
-          </p>
-
-          <ol className="space-y-6 list-decimal list-inside pl-2">
-            <li className="text-foreground font-bold">
-              <span className="font-normal text-muted-foreground ml-2">
-                Create your Agent in the <strong>Agent Studio</strong> and assign a unique <strong>Bot ID</strong>.
-              </span>
-            </li>
-            <li className="text-foreground font-bold">
-              <span className="font-normal text-muted-foreground ml-2">
-                Go to the <strong>Knowledge Base</strong>, upload your support articles or policy documents, and let the indexer build your search embeddings.
-              </span>
-            </li>
-            <li className="text-foreground font-bold">
-              <span className="font-normal text-muted-foreground ml-2">
-                Go to the <strong>WebChat Control Room</strong> to configure colors, choose fonts, and toggle feature settings (e.g. enabling human handoff).
-              </span>
-            </li>
-            <li className="text-foreground font-bold">
-              <span className="font-normal text-muted-foreground ml-2">
-                Copy the generated snippet from the <strong>Embed Sandbox</strong> below and paste it directly into your HTML document!
-              </span>
-            </li>
-          </ol>
-
-          <div className="mt-6 border-l-4 border-primary bg-primary/5 p-4 rounded-r-xl">
-            <div className="flex gap-3">
-              <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-foreground">Pro Tip: Local Host Testing</h4>
-                <p className="text-sm text-muted-foreground mt-1 leading-6">
-                  When testing embeds on your local developer machine, you can run a simple HTTP server (like VS Code Live Server or python -m http.server) to load your pages cleanly.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: "knowledge-base",
-      title: "Knowledge Ingestion & RAG",
-      category: "Knowledge & Ingestion",
-      content: (
-        <div className="space-y-6">
-          <p className="text-muted-foreground">
-            AgentDesk utilizes a highly optimized Retrieval-Augmented Generation (RAG) architecture powered by Qdrant vector databases. Instead of responding with generic training context, agents retrieve matching snippets from your uploaded documents to construct fully-grounded support replies.
-          </p>
-
-          <h3 className="text-xl font-bold text-foreground mt-6">Supported Document Formats</h3>
-          <div className="grid gap-3 sm:grid-cols-3 mt-4">
-            <div className="border border-border bg-card/30 p-4 rounded-lg text-center">
-              <strong className="text-foreground block mb-1">Standard Documents</strong>
-              <span className="text-xs text-muted-foreground">PDF, DOCX, TXT, MD</span>
-            </div>
-            <div className="border border-border bg-card/30 p-4 rounded-lg text-center">
-              <strong className="text-foreground block mb-1">Tabular Data</strong>
-              <span className="text-xs text-muted-foreground">CSV (perfect for orders/pricing)</span>
-            </div>
-            <div className="border border-border bg-card/30 p-4 rounded-lg text-center">
-              <strong className="text-foreground block mb-1">Automatic Text Extraction</strong>
-              <span className="text-xs text-muted-foreground">Pre-processed & chunked in milliseconds</span>
-            </div>
-          </div>
-
-          <h3 className="text-xl font-bold text-foreground mt-6">How Answers are Grounded</h3>
-          <div className="relative border border-border bg-card/25 p-5 rounded-xl font-mono text-sm leading-6">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3 mb-4 text-xs text-muted-foreground">
-              <span>Grounding Flowchart</span>
-              <span>Vector Search Context</span>
-            </div>
-            <div className="space-y-2">
-              <div className="text-primary font-bold">1. Customer Query: "How can I return my order?"</div>
-              <div className="text-muted-foreground">↓ AgentDesk performs a hybrid vector search on Qdrant...</div>
-              <div className="text-emerald-400 font-bold">2. Retrieved Chunk: "policy.pdf: Returns are allowed within 30 days of purchase..."</div>
-              <div className="text-muted-foreground">↓ LLM synthesizes response ONLY using the retrieved context...</div>
-              <div className="text-foreground font-bold">3. Generated Response: "Based on our policy document, you can return items within 30 days..."</div>
-            </div>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: "widget-embedding",
-      title: "Widget Embedding Modes",
-      category: "Widget Embed",
-      content: (
-        <div className="space-y-6">
-          <p className="text-muted-foreground">
-            The AgentDesk widget can be embedded using two primary modes: <strong>Launcher Mode</strong> (which injects a floating bubble at the bottom-right corner) and <strong>Inline Mode</strong> (which loads the chat console statically inside any section or page layout).
-          </p>
-
-          <h3 className="text-xl font-bold text-foreground mt-6">1. Launcher Mode (Recommended)</h3>
-          <p className="text-sm text-muted-foreground leading-6">
-            Paste this optimized script tag directly before the closing `&lt;/body&gt;` tag of your site. This injects the floating chat button and handles all lifecycle interactions. Shadow DOM encapsulation ensures the widget styles never interfere with your host page styling.
-          </p>
-
-          <div className="relative group rounded-xl border border-border bg-black overflow-hidden mt-3">
-            <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-2 text-xs text-muted-foreground font-mono">
-              <span>Script launcher</span>
-              <button 
-                onClick={() => copyToClipboard(`<script src="http://localhost:3000/widget.js" data-bot-id="YOUR_BOT_ID" async></script>`, "script-embed-basic")}
-                className="flex items-center gap-1.5 hover:text-foreground font-medium transition"
-              >
-                {copiedId === "script-embed-basic" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FeatureCard
+                icon={<Bot aria-hidden="true" className="h-6 w-6 text-primary" />}
+                title="Agent Studio"
+                text="Configure the bot identity, support brief, fallback behavior, and tenant-scoped instructions."
+              />
+              <FeatureCard
+                icon={<Inbox aria-hidden="true" className="h-6 w-6 text-accent" />}
+                title="Live Inbox"
+                text="Watch conversations, pause automation, and reply as a human operator without losing context."
+              />
+              <FeatureCard
+                icon={<FileText aria-hidden="true" className="h-6 w-6 text-emerald-400" />}
+                title="Knowledge Base"
+                text="Upload PDFs, DOCX files, CSVs, text, Markdown, and URLs for retrieval-grounded answers."
+              />
+              <FeatureCard
+                icon={<Workflow aria-hidden="true" className="h-6 w-6 text-indigo-400" />}
+                title="WebChat Embed"
+                text={
                   <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
+                    Ship a Shadow DOM widget with a single <code>&lt;script&gt;</code> tag, or use an <code>&lt;iframe&gt;</code> on dedicated support pages.
                   </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
+                }
+              />
             </div>
-            <pre className="p-4 font-mono text-xs text-foreground overflow-x-auto leading-5">
-              {`<!-- Paste inside your HTML body -->
+          </div>
+        ),
+      },
+      {
+        id: "quickstart",
+        title: "Quickstart Guide",
+        category: "Getting Started",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              The fastest path mirrors modern WebChat products: configure the bot, publish the widget settings, then paste the generated snippet into your site.
+            </p>
+            <ol className="space-y-4 pl-5 text-sm font-semibold leading-7 text-muted-foreground">
+              <li>
+                <strong className="text-foreground">Create or select a bot.</strong> Use the Bots page to create a tenant-scoped bot and copy its Bot ID.
+              </li>
+              <li>
+                <strong className="text-foreground">Add source material.</strong> Upload documents or ingest URLs so answers can be grounded in retrieved context.
+              </li>
+              <li>
+                <strong className="text-foreground">Configure WebChat.</strong> In WebChat, set identity, appearance, deploy settings, feature toggles, and optional custom launcher icon.
+              </li>
+              <li>
+                <strong className="text-foreground">Embed the snippet.</strong> Use launcher mode for a floating button or iframe mode for a fixed support surface.
+              </li>
+            </ol>
+            <Note title="Local testing">
+              During local development, use the sandbox below to generate snippets against your current origin. For static HTML test pages, serve the file over HTTP instead of opening it directly from disk.
+            </Note>
+          </div>
+        ),
+      },
+      {
+        id: "webchat-configuration",
+        title: "WebChat Configuration",
+        category: "Widget Embed",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              AgentDesk follows the same dashboard mental model as mature WebChat systems: identity, appearance, deploy settings, and feature toggles are configured before publishing the embed.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <FeatureCard icon={<Bot aria-hidden="true" className="h-5 w-5 text-primary" />} title="Bot Identity" text="Bot name, avatar URL, and the short customer-facing operating description." />
+              <FeatureCard icon={<Palette aria-hidden="true" className="h-5 w-5 text-accent" />} title="Bot Appearance" text="Header, background, text, bubble colors, typography, custom CSS, and custom launcher icon controls." />
+              <FeatureCard icon={<Settings aria-hidden="true" className="h-5 w-5 text-success" />} title="Deploy Settings" text="Bot ID, version tag, theme token, rollout posture, and whether customers use launcher or embedded mode." />
+              <FeatureCard icon={<Layers aria-hidden="true" className="h-5 w-5 text-indigo-400" />} title="Feature Toggles" text="Voice, transcript export, file uploads, human handoff, and source citation behavior." />
+            </div>
+            <Note title="Custom launcher icon">
+              In WebChat &gt; Bot Appearance, enable <strong>Use custom launcher icon</strong> and provide a public image URL. The widget config API exposes this as <code>useCustomIcon</code> and <code>widgetIconUrl</code>.
+            </Note>
+          </div>
+        ),
+      },
+      {
+        id: "knowledge-base",
+        title: "Knowledge Ingestion & RAG",
+        category: "Knowledge & Ingestion",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              AgentDesk uses retrieval-augmented generation so bot replies can cite tenant-owned support material instead of relying on generic model memory.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatCard label="Documents" value="PDF, DOCX, TXT, MD" />
+              <StatCard label="Tables" value="CSV" />
+              <StatCard label="Storage" value="Appwrite + Qdrant" />
+            </div>
+            <CodeBlock
+              id="rag-flow"
+              label="Grounding flow"
+              copiedId={copiedId}
+              value={`1. Customer asks: "How can I return my order?"
+2. AgentDesk searches tenant documents in Qdrant.
+3. Matching policy chunks are injected into the answer prompt.
+4. The bot responds from retrieved support context.
+5. If needed, the customer can be escalated to a human operator.`}
+              onCopy={copyToClipboard}
+            />
+          </div>
+        ),
+      },
+      {
+        id: "widget-embedding",
+        title: "Widget Embedding Modes",
+        category: "Widget Embed",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              Use launcher mode for the standard floating WebChat button. Use iframe mode when the chat should live inside a dedicated page section.
+            </p>
+
+            <h3 className="text-xl font-bold text-foreground">Launcher mode</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Paste this before the closing <code>&lt;/body&gt;</code> tag. The widget mounts into Shadow DOM so host page CSS does not leak into the chat UI.
+            </p>
+            <CodeBlock
+              id="script-embed-basic"
+              label="Script launcher"
+              copiedId={copiedId}
+              value={`<!-- Paste inside your HTML body -->
 <script
   src="https://YOUR_DOMAIN/widget.js"
   data-bot-id="YOUR_BOT_ID"
+  data-theme="webchat-v1"
+  data-mode="launcher"
   async
 ></script>`}
-            </pre>
-          </div>
+              onCopy={copyToClipboard}
+            />
 
-          <h3 className="text-xl font-bold text-foreground mt-6">2. Inline Mode (Iframe)</h3>
-          <p className="text-sm text-muted-foreground leading-6">
-            To embed the chat widget as a static block directly within a specific section of your page (e.g., on a dedicated customer support page), use the inline iframe embedding.
-          </p>
-
-          <div className="relative group rounded-xl border border-border bg-black overflow-hidden mt-3">
-            <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-2 text-xs text-muted-foreground font-mono">
-              <span>Iframe embed</span>
-              <button 
-                onClick={() => copyToClipboard(`<iframe src="http://localhost:3000/embed/YOUR_BOT_ID" title="Support" style="width:100%;height:640px;border:0"></iframe>`, "iframe-embed-basic")}
-                className="flex items-center gap-1.5 hover:text-foreground font-medium transition"
-              >
-                {copiedId === "iframe-embed-basic" ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="p-4 font-mono text-xs text-foreground overflow-x-auto leading-5">
-              {`<iframe
-  src="https://YOUR_DOMAIN/embed/YOUR_BOT_ID"
+            <h3 className="text-xl font-bold text-foreground">Inline iframe mode</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Use this for help centers, support pages, or any layout where the chat panel should be visible without a floating launcher.
+            </p>
+            <CodeBlock
+              id="iframe-embed-basic"
+              label="Iframe embed"
+              copiedId={copiedId}
+              value={`<iframe
+  src="https://YOUR_DOMAIN/embed/YOUR_BOT_ID?theme=webchat-v1"
   title="AgentDesk Support"
   style="width: 100%; height: 640px; border: 0;"
 ></iframe>`}
-            </pre>
+              onCopy={copyToClipboard}
+            />
           </div>
-        </div>
-      )
-    },
-    {
-      id: "programmatic-controls",
-      title: "Programmatic Controls",
-      category: "Widget Embed",
-      content: (
-        <div className="space-y-6">
-          <p className="text-muted-foreground">
-            The AgentDesk widget registers itself as an HTML5 Custom Element: <code>&lt;agentdesk-widget&gt;</code>. This exposes native JavaScript controls, allowing you to trigger actions directly from other buttons, forms, or navigation links on your site!
-          </p>
-
-          <h3 className="text-xl font-bold text-foreground mt-6">Toggling the Widget via Custom Buttons</h3>
-          <p className="text-sm text-muted-foreground leading-6">
-            You can call the public <code>.toggle()</code> method directly on the custom element instance.
-          </p>
-
-          <div className="relative group rounded-xl border border-border bg-black overflow-hidden mt-3">
-            <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-2 text-xs text-muted-foreground font-mono">
-              <span>Interactive HTML / JS</span>
-              <button 
-                onClick={() => copyToClipboard(`<!-- Button on your host page -->\n<button onclick="toggleWidget()">Support</button>\n\n<script>\nfunction toggleWidget() {\n  const widget = document.querySelector('agentdesk-widget');\n  if (widget) {\n    widget.toggle();\n  }\n}\n</script>`, "programmatic-js")}
-                className="flex items-center gap-1.5 hover:text-foreground font-medium transition"
-              >
-                {copiedId === "programmatic-js" ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="text-emerald-400">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="p-4 font-mono text-xs text-foreground overflow-x-auto leading-5">
-              {`<!-- Button on your host page -->
+        ),
+      },
+      {
+        id: "programmatic-controls",
+        title: "Programmatic Controls",
+        category: "Widget Embed",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              The launcher script registers an <code>&lt;agentdesk-widget&gt;</code> custom element. Host pages can query it and call public methods such as <code>toggle()</code>.
+            </p>
+            <CodeBlock
+              id="programmatic-js"
+              label="Custom host button"
+              copiedId={copiedId}
+              value={`<!-- Button on your host page -->
 <button onclick="toggleWidget()">Support Chat</button>
 
 <script>
 function toggleWidget() {
   const widget = document.querySelector('agentdesk-widget');
   if (widget) {
-    widget.toggle(); // programmatically opens/closes the chat pane!
+    widget.toggle();
   }
 }
 </script>`}
-            </pre>
+              onCopy={copyToClipboard}
+            />
           </div>
-        </div>
-      )
-    },
-    {
-      id: "live-handoff",
-      title: "Real-time Live Handoff",
-      category: "Developer API",
-      content: (
-        <div className="space-y-6">
-          <p className="text-muted-foreground">
-            A key advantage of AgentDesk is the <strong>Human Takeover Protocol</strong>. If the customer specifically requests a human, or if the AI confidence drops, the agent automatically initiates a live handoff socket session.
-          </p>
-
-          <h3 className="text-xl font-bold text-foreground mt-6">WebSocket Socket.io State</h3>
-          <p className="text-sm text-muted-foreground leading-6">
-            The widget connects to the background WebSocket server (listening on port <code>4000</code>). When the handoff starts:
-          </p>
-
-          <ul className="space-y-3 pl-5 list-disc text-sm text-muted-foreground">
-            <li>
-              <strong className="text-foreground">AI Pause:</strong> The AI engine is paused in-session so it won&apos;t reply over the human operator.
-            </li>
-            <li>
-              <strong className="text-foreground">Socket namespace:</strong> Tunnels customer messages directly into `websocket-server/server.js` namespace <code>/tenant-[tenantId]</code>.
-            </li>
-            <li>
-              <strong className="text-foreground">Operator Handoff Event:</strong> Emitted via <code>customer-message</code> event, notifying human dashboards immediately.
-            </li>
-          </ul>
-
-          <div className="mt-6 border border-yellow-500/20 bg-yellow-500/5 p-4 rounded-xl">
-            <div className="flex gap-3">
-              <ExternalLink className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-foreground">WebSocket Endpoint Contract</h4>
-                <p className="text-sm text-muted-foreground mt-1 leading-6">
-                  The WebSocket service endpoint is served dynamically under `NEXT_PUBLIC_WEBSOCKET_URL`. Make sure your Node.js websocket-server package is running using <code>npm run dev:ws</code>.
-                </p>
-              </div>
-            </div>
+        ),
+      },
+      {
+        id: "live-handoff",
+        title: "Real-time Live Handoff",
+        category: "Developer API",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              When human handoff is enabled, AgentDesk connects customer sessions to the Socket.io service so operators can watch and respond in real time.
+            </p>
+            <ul className="list-disc space-y-3 pl-5 text-sm leading-6 text-muted-foreground">
+              <li>
+                <strong className="text-foreground">Namespace:</strong> widgets connect under <code>/tenant-[tenantId]</code>.
+              </li>
+              <li>
+                <strong className="text-foreground">Customer event:</strong> customer messages are emitted as <code>customer-message</code>.
+              </li>
+              <li>
+                <strong className="text-foreground">Agent event:</strong> operator replies arrive in the widget as <code>agent-message</code>.
+              </li>
+              <li>
+                <strong className="text-foreground">Endpoint:</strong> production URLs should be exposed through <code>NEXT_PUBLIC_WEBSOCKET_URL</code>.
+              </li>
+            </ul>
+            <Note title="Development server">
+              Run the WebSocket service with <code>npm run dev:ws</code> when testing live inbox behavior locally.
+            </Note>
           </div>
-        </div>
-      )
-    },
-    {
-      id: "api-reference",
-      title: "API Reference",
-      category: "Developer API",
-      content: (
-        <div className="space-y-6">
-          <p className="text-muted-foreground">
-            Integrate with the AgentDesk engine directly via REST. We expose endpoints for messaging and configurations.
-          </p>
-
-          <h3 className="text-lg font-bold text-foreground mt-6">1. Post Chat Message</h3>
-          <p className="text-xs font-bold text-muted-foreground"><code>POST /api/chat/message</code></p>
-
-          <div className="relative group rounded-xl border border-border bg-black overflow-hidden mt-3">
-            <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-2 text-xs text-muted-foreground font-mono">
-              <span>JSON request payload</span>
-            </div>
-            <pre className="p-4 font-mono text-xs text-foreground overflow-x-auto leading-5">
-              {`{
+        ),
+      },
+      {
+        id: "api-reference",
+        title: "API Reference",
+        category: "Developer API",
+        content: (
+          <div className="space-y-6">
+            <p className="text-muted-foreground">
+              The public widget uses two server contracts: a config endpoint for rendering and a chat endpoint for sending customer messages.
+            </p>
+            <CodeBlock
+              id="chat-payload"
+              label="POST /api/chat/message"
+              copiedId={copiedId}
+              value={`{
   "bot_id": "6a160c5a00212e6e9da0",
   "tenant_id": "tenant-demo",
-  "session_token": "ad_8aef2...3a",
+  "session_token": "ad_8aef2_3a",
   "message": "Can you check order #1892?"
 }`}
-            </pre>
-          </div>
-
-          <h3 className="text-lg font-bold text-foreground mt-6">2. Retrieve Widget Configuration</h3>
-          <p className="text-xs font-bold text-muted-foreground"><code>GET /api/widget/config/[botId]</code></p>
-
-          <div className="relative group rounded-xl border border-border bg-black overflow-hidden mt-3">
-            <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-2 text-xs text-muted-foreground font-mono">
-              <span>JSON response payload</span>
-            </div>
-            <pre className="p-4 font-mono text-xs text-foreground overflow-x-auto leading-5">
-              {`{
+              onCopy={copyToClipboard}
+            />
+            <CodeBlock
+              id="widget-config-response"
+              label="GET /api/widget/config/[botId]"
+              copiedId={copiedId}
+              value={`{
   "success": true,
   "data": {
     "botId": "6a160c5a00212e6e9da0",
@@ -404,23 +331,25 @@ function toggleWidget() {
     "botName": "AgentDesk Support",
     "greeting": "Hello. How can I help you?",
     "logoUrl": null,
-    "widgetIconUrl": "https://YOUR_DOMAIN/custom-icon.png",
     "useCustomIcon": true,
+    "widgetIconUrl": "https://YOUR_DOMAIN/custom-icon.png",
     "theme": {
       "headerHsl": "224 20% 18%",
       "backgroundHsl": "224 25% 12%"
     }
   }
 }`}
-            </pre>
+              onCopy={copyToClipboard}
+            />
           </div>
-        </div>
-      )
-    }
-  ];
+        ),
+      },
+    ],
+    [copiedId],
+  );
 
-  const filteredSections = docSections.filter(section => {
-    const searchLower = searchQuery.toLowerCase();
+  const filteredSections = docSections.filter((section) => {
+    const searchLower = searchQuery.toLowerCase().trim();
     return (
       section.title.toLowerCase().includes(searchLower) ||
       section.category.toLowerCase().includes(searchLower) ||
@@ -428,64 +357,68 @@ function toggleWidget() {
     );
   });
 
-  const activeSectionData = docSections.find(s => s.id === activeSection) || docSections[0];
+  const activeSectionData = docSections.find((section) => section.id === activeSection) ?? docSections[0];
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
-      {/* Top Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <a className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-primary-foreground" href="#docs-content">
+        Skip to Content
+      </a>
+      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background/85 px-5 py-4 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 font-bold text-foreground hover:text-primary transition">
-            <ArrowLeft className="h-4 w-4" />
+          <Link className="flex items-center gap-2 font-bold text-foreground transition hover:text-primary" href="/">
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             <span>AgentDesk</span>
           </Link>
           <span className="text-border">/</span>
-          <span className="flex items-center gap-1.5 text-sm font-bold text-muted-foreground">
-            <BookOpen className="h-4 w-4 text-primary" />
-            <span>Developer Docs</span>
+          <span className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
+            <BookOpen aria-hidden="true" className="h-4 w-4 text-primary" />
+            Developer Docs
           </span>
         </div>
-        <div className="flex items-center gap-3">
-          <Link href="/login" className="text-xs font-black uppercase tracking-wider text-muted-foreground hover:text-foreground transition">
-            Sign In to Studio
-          </Link>
-        </div>
+        <Link className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground transition hover:text-foreground" href="/login">
+          Sign In
+        </Link>
       </header>
 
-      {/* Main Body */}
-      <div className="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8 px-6 py-8">
-        
-        {/* Left Sidebar */}
+      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-5 py-8 md:grid-cols-[280px_1fr]">
         <aside className="space-y-6">
           <div className="relative">
-            <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
-            <input 
-              type="text" 
+            <Search aria-hidden="true" className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+            <input
+              aria-label="Search documentation"
+              autoComplete="off"
+              className="w-full rounded-lg border border-border bg-card/50 py-2.5 pl-10 pr-4 text-sm font-semibold text-foreground transition focus:border-primary focus:bg-card"
+              name="docs-search"
               placeholder="Search documentation..."
+              spellCheck={false}
+              type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-card/50 border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm text-foreground focus:bg-card focus:border-primary transition"
+              onChange={(event) => setSearchQuery(event.target.value)}
             />
           </div>
 
-          <div className="space-y-6">
-            {(["Getting Started", "Knowledge & Ingestion", "Widget Embed", "Developer API"] as const).map(category => {
-              const categorySections = filteredSections.filter(s => s.category === category);
-              if (categorySections.length === 0) return null;
+          <nav className="space-y-6" aria-label="Documentation sections">
+            {categories.map((category) => {
+              const categorySections = filteredSections.filter((section) => section.category === category);
+              if (categorySections.length === 0) {
+                return null;
+              }
 
               return (
-                <div key={category} className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60">{category}</h4>
+                <div className="space-y-2" key={category}>
+                  <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground/70">{category}</h2>
                   <ul className="space-y-1">
-                    {categorySections.map(section => (
+                    {categorySections.map((section) => (
                       <li key={section.id}>
                         <button
-                          onClick={() => setActiveSection(section.id)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm font-bold leading-normal transition flex items-center justify-between ${
-                            activeSection === section.id 
-                              ? "bg-primary/10 text-primary border-l-2 border-primary" 
-                              : "text-muted-foreground hover:text-foreground hover:bg-card/30"
+                          className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-bold transition ${
+                            activeSection === section.id
+                              ? "border-l-2 border-primary bg-primary/10 text-primary"
+                              : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
                           }`}
+                          type="button"
+                          onClick={() => setActiveSection(section.id)}
                         >
                           <span>{section.title}</span>
                         </button>
@@ -495,160 +428,176 @@ function toggleWidget() {
                 </div>
               );
             })}
-          </div>
+          </nav>
         </aside>
 
-        {/* Right Reading Content Pane */}
-        <main className="space-y-10">
-          
-          <article className="studio-surface p-8 rounded-xl border border-border relative overflow-hidden">
-            <div className="absolute right-4 top-4 text-primary opacity-10">
-              <Terminal className="h-32 w-32" />
-            </div>
-            
+        <main className="space-y-10" id="docs-content">
+          <article className="studio-surface relative overflow-hidden rounded-xl border border-border p-6 sm:p-8">
+            <Terminal aria-hidden="true" className="absolute right-4 top-4 h-32 w-32 text-primary opacity-10" />
             <span className="studio-kicker text-primary">{activeSectionData.category}</span>
-            <h1 className="text-4xl font-extrabold uppercase mt-2 text-foreground tracking-tight">{activeSectionData.title}</h1>
-            
-            <div className="mt-8 text-foreground leading-relaxed">
-              {activeSectionData.content}
-            </div>
+            <h1 className="mt-2 text-4xl font-extrabold uppercase tracking-tight text-foreground">{activeSectionData.title}</h1>
+            <div className="mt-8 leading-relaxed text-foreground">{activeSectionData.content}</div>
           </article>
 
-          {/* Interactive Embed Sandbox Playground */}
-          <section className="studio-surface p-8 rounded-xl border border-border">
-            <span className="studio-kicker text-accent flex items-center gap-1">
-              <Sparkles className="h-3.5 w-3.5" /> Interactive Tool
+          <section className="studio-surface rounded-xl border border-border p-6 sm:p-8">
+            <span className="studio-kicker flex items-center gap-2 text-accent">
+              <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+              Interactive Tool
             </span>
-            <h2 className="text-2xl font-black uppercase mt-2 text-foreground tracking-tight">Embed Code Generator</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Paste your Bot ID and customize options to generate a fully optimized script or iframe code snippet instantly.
+            <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-foreground">Embed Code Generator</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Enter your Bot ID and theme token, then copy the launcher script or inline iframe snippet.
             </p>
 
-            <div className="grid gap-6 mt-6 sm:grid-cols-2">
-              <div className="space-y-4 border-r border-border/40 pr-0 sm:pr-6">
+            <div className="mt-6 grid gap-6 sm:grid-cols-2">
+              <div className="space-y-4 sm:border-r sm:border-border/40 sm:pr-6">
+                <SandboxInput label="Bot ID" value={sandboxBotId} onChange={setSandboxBotId} />
+                <SandboxInput label="Theme token" value={sandboxTheme} onChange={setSandboxTheme} />
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Bot ID</label>
-                  <input 
-                    type="text" 
-                    value={sandboxBotId}
-                    onChange={(e) => setSandboxBotId(e.target.value)}
-                    className="w-full bg-card/60 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:bg-card focus:border-accent transition font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Theme Token</label>
-                  <input 
-                    type="text" 
-                    value={sandboxTheme}
-                    onChange={(e) => setSandboxTheme(e.target.value)}
-                    className="w-full bg-card/60 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:bg-card focus:border-accent transition font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Layout Mode</label>
+                  <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Layout mode</label>
                   <div className="flex gap-2">
-                    <button 
-                      onClick={() => setSandboxMode("launcher")}
-                      className={`flex-1 py-2 text-sm font-bold border rounded-lg transition ${
-                        sandboxMode === "launcher" 
-                          ? "bg-accent/10 border-accent text-accent" 
-                          : "border-border text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Launcher mode
-                    </button>
-                    <button 
-                      onClick={() => setSandboxMode("inline")}
-                      className={`flex-1 py-2 text-sm font-bold border rounded-lg transition ${
-                        sandboxMode === "inline" 
-                          ? "bg-accent/10 border-accent text-accent" 
-                          : "border-border text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      Inline mode
-                    </button>
+                    <ModeButton active={sandboxMode === "launcher"} label="Launcher mode" onClick={() => setSandboxMode("launcher")} />
+                    <ModeButton active={sandboxMode === "inline"} label="Inline mode" onClick={() => setSandboxMode("inline")} />
                   </div>
                 </div>
               </div>
 
-              {/* Code Snippet Outputs */}
-              <div className="flex flex-col justify-between">
-                <div className="space-y-4">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">Generated Snippet</span>
-                  
-                  {sandboxMode === "launcher" ? (
-                    <div className="relative group rounded-lg border border-border bg-black overflow-hidden">
-                      <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-1.5 text-[10px] text-muted-foreground font-mono">
-                        <span>widget script</span>
-                        <button 
-                          onClick={() => copyToClipboard(sandboxSnippets.script, "sandbox-script")}
-                          className="flex items-center gap-1 hover:text-foreground transition"
-                        >
-                          {copiedId === "sandbox-script" ? (
-                            <>
-                              <Check className="h-3 w-3 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <pre className="p-3 font-mono text-[11px] text-foreground overflow-x-auto leading-4">
-                        {sandboxSnippets.script}
-                      </pre>
-                    </div>
-                  ) : (
-                    <div className="relative group rounded-lg border border-border bg-black overflow-hidden">
-                      <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-1.5 text-[10px] text-muted-foreground font-mono">
-                        <span>iframe embed</span>
-                        <button 
-                          onClick={() => copyToClipboard(sandboxSnippets.iframe, "sandbox-iframe")}
-                          className="flex items-center gap-1 hover:text-foreground transition"
-                        >
-                          {copiedId === "sandbox-iframe" ? (
-                            <>
-                              <Check className="h-3 w-3 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-3 w-3" />
-                              <span>Copy</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      <pre className="p-3 font-mono text-[11px] text-foreground overflow-x-auto leading-4">
-                        {sandboxSnippets.iframe}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-
-                <div className="text-xs text-muted-foreground bg-accent/5 border border-accent/10 p-3 rounded-lg mt-4 leading-5">
-                  <strong>Notice:</strong> In script launcher mode, custom launcher icons configured inside the studio will automatically load without code changes!
+              <div className="flex flex-col justify-between gap-4">
+                <CodeBlock
+                  id={sandboxMode === "launcher" ? "sandbox-script" : "sandbox-iframe"}
+                  label={sandboxMode === "launcher" ? "widget script" : "iframe embed"}
+                  copiedId={copiedId}
+                  value={sandboxMode === "launcher" ? sandboxSnippets.script : sandboxSnippets.iframe}
+                  onCopy={copyToClipboard}
+                />
+                <div className="rounded-lg border border-accent/10 bg-accent/5 p-3 text-xs leading-5 text-muted-foreground">
+                  <strong className="text-foreground">Notice:</strong> Custom launcher icons configured in WebChat Bot Appearance load automatically through the widget config API.
                 </div>
               </div>
             </div>
           </section>
-
         </main>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border mt-12 py-6 bg-card/30">
-        <div className="max-w-7xl mx-auto px-6 text-center text-xs text-muted-foreground flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 AgentDesk. Built for secure, auditable, human-in-the-loop AI support.</p>
+      <footer className="mt-12 border-t border-border bg-card/30 py-6">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 text-center text-xs text-muted-foreground sm:flex-row">
+          <p>(c) 2026 AgentDesk. Built for auditable, human-in-the-loop AI support.</p>
           <div className="flex gap-4">
-            <Link href="/" className="hover:text-foreground transition">Platform</Link>
-            <Link href="/login" className="hover:text-foreground transition">Studio</Link>
+            <Link className="transition hover:text-foreground" href="/">
+              Platform
+            </Link>
+            <Link className="transition hover:text-foreground" href="/webchat">
+              WebChat
+            </Link>
           </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+function FeatureCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-card/50 p-5 transition hover:border-primary/30">
+      <div className="mb-3">{icon}</div>
+      <h3 className="text-lg font-bold text-foreground">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-card/30 p-4 text-center">
+      <strong className="mb-1 block text-foreground">{label}</strong>
+      <span className="text-xs font-semibold text-muted-foreground">{value}</span>
+    </div>
+  );
+}
+
+function Note({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-r-xl border-l-4 border-primary bg-primary/5 p-4">
+      <div className="flex gap-3">
+        <ExternalLink aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+        <div>
+          <h4 className="font-bold text-foreground">{title}</h4>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{children}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopyButton({ copied, onCopy }: CopyButtonProps) {
+  return (
+    <button className="flex items-center gap-1.5 font-medium transition hover:text-foreground" type="button" onClick={onCopy}>
+      {copied ? (
+        <>
+          <Check aria-hidden="true" className="h-3.5 w-3.5 text-emerald-400" />
+          <span aria-live="polite" className="text-emerald-400">Copied</span>
+        </>
+      ) : (
+        <>
+          <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+          <span>Copy</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+function CodeBlock({
+  id,
+  label,
+  value,
+  copiedId,
+  onCopy,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  copiedId: string | null;
+  onCopy: (text: string, id: string) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-black">
+      <div className="flex items-center justify-between border-b border-border bg-card/60 px-4 py-2 font-mono text-xs text-muted-foreground">
+        <span>{label}</span>
+        <CopyButton copied={copiedId === id} onCopy={() => onCopy(value, id)} />
+      </div>
+      <pre className="overflow-x-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-foreground">{value}</pre>
+    </div>
+  );
+}
+
+function SandboxInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+      <input
+        autoComplete="off"
+        className="w-full rounded-lg border border-border bg-card/60 px-3 py-2 font-mono text-sm text-foreground transition focus:border-accent focus:bg-card"
+        name={label.toLowerCase().replace(/\s+/g, "-")}
+        spellCheck={false}
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      className={`flex-1 rounded-lg border py-2 text-sm font-bold transition ${
+        active ? "border-accent bg-accent/10 text-accent" : "border-border text-muted-foreground hover:text-foreground"
+      }`}
+      type="button"
+      onClick={onClick}
+    >
+      {label}
+    </button>
   );
 }
