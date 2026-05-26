@@ -37,7 +37,8 @@ export async function loginWithMagicLink(email: string) {
     const headersList = await headers();
     const host = headersList.get("host") || "localhost:3000";
     const protocol = headersList.get("x-forwarded-proto") || "http";
-    const origin = `${protocol}://${host}`;
+    const dynamicOrigin = `${protocol}://${host}`;
+    const origin = process.env.NEXT_PUBLIC_APP_URL || dynamicOrigin;
     
     await account.createMagicURLToken({
       userId: ID.unique(),
