@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, Radio, ShieldCheck } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Signal";
@@ -10,9 +11,20 @@ import { DarkVeil } from "@/components/reactbits/DarkVeil";
 import { loginWithMagicLink } from "@/app/auth-actions";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const queryMessage = getQueryMessage(searchParams.get("error"));
+  const visibleMessage = message ?? queryMessage;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -90,14 +102,14 @@ export default function LoginPage() {
             />
           </div>
 
-          {message ? (
+          {visibleMessage ? (
             <div
               className={`mt-5 border-2 px-3 py-3 text-sm font-bold ${
-                message.type === "success" ? "border-success/50 bg-success/10 text-success" : "border-destructive/50 bg-destructive/10 text-destructive"
+                visibleMessage.type === "success" ? "border-success/50 bg-success/10 text-success" : "border-destructive/50 bg-destructive/10 text-destructive"
               }`}
               role="status"
             >
-              {message.text}
+              {visibleMessage.text}
             </div>
           ) : null}
 
@@ -118,4 +130,16 @@ export default function LoginPage() {
       </section>
     </main>
   );
+}
+
+function getQueryMessage(error: string | null): { type: "error"; text: string } | null {
+  if (error === "invalid_magic_link") {
+    return { type: "error", text: "Invalid magic link. Request a new sign-in link." };
+  }
+
+  if (error === "verification_failed") {
+    return { type: "error", text: "Verification failed. Request a fresh magic link and try again." };
+  }
+
+  return null;
 }

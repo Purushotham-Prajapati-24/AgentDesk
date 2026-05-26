@@ -28,6 +28,10 @@
             this.renderShell();
             void this.loadConfig();
         }
+        toggle() {
+            this.isOpen = !this.isOpen;
+            this.renderShell();
+        }
         async loadConfig() {
             try {
                 const response = await fetchWithTimeout(configUrl, { credentials: "omit" }, DEFAULT_TIMEOUT_MS);
@@ -136,7 +140,18 @@
             const launcher = createElement("button", "ad-launcher-button");
             launcher.type = "button";
             launcher.setAttribute("aria-label", this.isOpen ? "Close support chat" : "Open support chat");
-            launcher.textContent = this.isOpen ? "×" : "✦";
+            if (this.isOpen) {
+                launcher.textContent = "×";
+            }
+            else if (config.useCustomIcon && config.widgetIconUrl) {
+                const image = document.createElement("img");
+                image.src = config.widgetIconUrl;
+                image.alt = "";
+                launcher.append(image);
+            }
+            else {
+                launcher.textContent = "✦";
+            }
             launcher.addEventListener("click", () => {
                 this.isOpen = !this.isOpen;
                 this.renderShell();
@@ -163,16 +178,24 @@
             const status = createElement("span", "ad-status");
             status.textContent = config.bannerText;
             copy.append(title, status);
-            const close = createElement("button", "ad-icon-button");
-            close.type = "button";
-            close.setAttribute("aria-label", "Close support chat");
-            close.textContent = "×";
-            close.addEventListener("click", () => {
-                this.isOpen = false;
-                this.renderShell();
-            });
             identity.append(avatar, copy);
-            header.append(identity, close);
+            header.append(identity);
+            if (embedMode !== "inline") {
+                const close = createElement("button", "ad-icon-button");
+                close.type = "button";
+                close.setAttribute("aria-label", "Close support chat");
+                close.textContent = "×";
+                close.addEventListener("click", () => {
+                    this.isOpen = false;
+                    this.renderShell();
+                    try {
+                        window.parent.postMessage({ type: "agentdesk-widget-close", botId }, "*");
+                    }
+                    catch {
+                    }
+                });
+                header.append(close);
+            }
             return header;
         }
         createMessageList() {
@@ -403,6 +426,8 @@
             ...config,
             theme: { ...buildFallbackConfig(config.botId).theme, ...config.theme },
             logoUrl: config.logoUrl || null,
+            useCustomIcon: config.useCustomIcon === true,
+            widgetIconUrl: normalizeImageUrl(config.widgetIconUrl),
         };
     }
     function buildFallbackConfig(currentBotId) {
@@ -413,6 +438,8 @@
             greeting: "Hello. I can help with orders, policies, and support questions.",
             fallbackMessage: "I could not reach the support engine. Please try again in a moment.",
             logoUrl: null,
+            useCustomIcon: false,
+            widgetIconUrl: null,
             bannerText: "Online - responds instantly",
             messageEndpoint: `${scriptOrigin}/api/chat/message`,
             websocketEndpoint: null,
@@ -478,6 +505,9 @@
         opacity: 0;
         overflow: hidden;
         pointer-events: none;
+        position: absolute;
+        bottom: 80px;
+        right: 0;
         transform: translateY(24px) scale(0.96);
         transition: opacity 180ms ease, transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
         width: min(380px, calc(100vw - 32px));
@@ -491,6 +521,7 @@
         height: 100vh;
         opacity: 1;
         pointer-events: auto;
+        position: static;
         transform: none;
         width: 100vw;
       }
@@ -739,13 +770,20 @@
         justify-content: center;
         position: absolute;
         right: 0;
-        transform: translateY(calc(100% + 14px));
         transition: transform 160ms ease;
         width: 62px;
       }
 
       .ad-launcher-button:hover {
-        transform: translateY(calc(100% + 14px)) scale(1.06);
+        transform: scale(1.06);
+      }
+
+      .ad-launcher-button img {
+        border-radius: inherit;
+        display: block;
+        height: 100%;
+        object-fit: cover;
+        width: 100%;
       }
 
       @keyframes ad-wave-dots {
@@ -844,6 +882,18 @@
         try {
             const url = new URL(value, scriptOrigin);
             return ["http:", "https:", "ws:", "wss:"].includes(url.protocol) ? url.toString().replace(/\/$/, "") : null;
+        }
+        catch {
+            return null;
+        }
+    }
+    function normalizeImageUrl(value) {
+        if (!value) {
+            return null;
+        }
+        try {
+            const url = new URL(value, scriptOrigin);
+            return ["https:", "data:"].includes(url.protocol) ? url.toString() : null;
         }
         catch {
             return null;

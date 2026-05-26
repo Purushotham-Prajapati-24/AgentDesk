@@ -21,6 +21,8 @@ type CustomizerState = {
   botBubbleColor: string;
   accentColor: string;
   fontFamily: FontChoice;
+  useCustomIcon: boolean;
+  widgetIconUrl: string;
 };
 
 type SaveState =
@@ -41,6 +43,8 @@ const DEFAULT_STATE: CustomizerState = {
   botBubbleColor: "#14191E",
   accentColor: "#22D3EE",
   fontFamily: "Fira",
+  useCustomIcon: false,
+  widgetIconUrl: "",
 };
 
 const fontStacks: Record<FontChoice, string> = {
@@ -142,6 +146,24 @@ export default function WidgetCustomizerPage() {
               </select>
             </label>
 
+            <section className="grid gap-3 border-t border-border pt-4">
+              <label className="flex items-center gap-3">
+                <input
+                  className="h-5 w-5 accent-primary"
+                  checked={config.useCustomIcon}
+                  type="checkbox"
+                  onChange={(event) => setConfig({ ...config, useCustomIcon: event.target.checked })}
+                />
+                <span className="text-sm font-bold">Use custom launcher icon</span>
+              </label>
+              <TextField
+                disabled={!config.useCustomIcon}
+                label="Custom launcher icon URL"
+                value={config.widgetIconUrl}
+                onChange={(widgetIconUrl) => setConfig({ ...config, widgetIconUrl })}
+              />
+            </section>
+
             {saveState.message ? (
               <div className={saveMessageClass(saveState.status)} role="status">
                 {saveState.message}
@@ -180,12 +202,13 @@ export default function WidgetCustomizerPage() {
   );
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function TextField({ label, value, disabled = false, onChange }: { label: string; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   return (
     <label className="block">
       <span className="studio-kicker mb-2 block text-muted-foreground">{label}</span>
       <input
-        className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
+        className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -225,47 +248,65 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
 }
 
 function WidgetPreview({ config }: { config: CustomizerState }) {
+  const showCustomIcon = config.useCustomIcon && isHttpUrl(config.widgetIconUrl);
+
   return (
-    <div
-      className="flex h-[620px] w-full max-w-[390px] flex-col overflow-hidden rounded-2xl border border-border shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
-      style={{
-        background: config.backgroundColor,
-        color: config.textColor,
-        fontFamily: fontStacks[config.fontFamily],
-      }}
-    >
-      <div className="flex items-center gap-3 border-b border-black/30 px-4 py-4 text-white" style={{ background: config.headerColor }}>
-        <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/30 font-bold" style={{ background: config.accentColor }}>
-          {config.botName.charAt(0).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold leading-tight">{config.botName}</p>
-          <p className="text-xs font-bold leading-5 opacity-80">Online - answers with source context</p>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4">
-        <PreviewBubble align="left" color={config.botBubbleColor} textColor={config.textColor}>
-          {config.greeting}
-        </PreviewBubble>
-        <PreviewBubble align="right" color={config.userBubbleColor} textColor="#ffffff">
-          Can you help me track my order?
-        </PreviewBubble>
-        <PreviewBubble align="left" color={config.botBubbleColor} textColor={config.textColor}>
-          Yes. I can check policy, source files, and bring in a human operator if the answer needs judgment.
-        </PreviewBubble>
-      </div>
-
-      <div className="border-t border-black/30 p-4">
-        <div className="flex gap-2">
-          <div className="flex min-h-11 flex-1 items-center rounded-md border border-white/10 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
-            Write your message here...
+    <div className="relative">
+      <div
+        className="flex h-[620px] w-full max-w-[390px] flex-col overflow-hidden rounded-2xl border border-border shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
+        style={{
+          background: config.backgroundColor,
+          color: config.textColor,
+          fontFamily: fontStacks[config.fontFamily],
+        }}
+      >
+        <div className="flex items-center gap-3 border-b border-black/30 px-4 py-4 text-white" style={{ background: config.headerColor }}>
+          <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/30 font-bold" style={{ background: config.accentColor }}>
+            {config.botName.charAt(0).toUpperCase()}
           </div>
-          <button className="min-h-11 rounded-md border border-white/20 px-4 text-sm font-bold text-white" style={{ background: config.accentColor }} type="button">
-            Send
-          </button>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold leading-tight">{config.botName}</p>
+            <p className="text-xs font-bold leading-5 opacity-80">Online - answers with source context</p>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4">
+          <PreviewBubble align="left" color={config.botBubbleColor} textColor={config.textColor}>
+            {config.greeting}
+          </PreviewBubble>
+          <PreviewBubble align="right" color={config.userBubbleColor} textColor="#ffffff">
+            Can you help me track my order?
+          </PreviewBubble>
+          <PreviewBubble align="left" color={config.botBubbleColor} textColor={config.textColor}>
+            Yes. I can check policy, source files, and bring in a human operator if the answer needs judgment.
+          </PreviewBubble>
+        </div>
+
+        <div className="border-t border-black/30 p-4">
+          <div className="flex gap-2">
+            <div className="flex min-h-11 flex-1 items-center rounded-md border border-white/10 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
+              Write your message here...
+            </div>
+            <button className="min-h-11 rounded-md border border-white/20 px-4 text-sm font-bold text-white" style={{ background: config.accentColor }} type="button">
+              Send
+            </button>
+          </div>
         </div>
       </div>
+
+      <button
+        aria-label="Launcher preview"
+        className="absolute bottom-[-18px] right-[-18px] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-0 text-3xl font-black text-white shadow-[0_16px_42px_rgba(0,0,0,0.4)] z-10"
+        style={{ background: config.accentColor }}
+        type="button"
+      >
+        {showCustomIcon ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img alt="" className="h-full w-full object-cover" src={config.widgetIconUrl} />
+        ) : (
+          "✦"
+        )}
+      </button>
     </div>
   );
 }
@@ -293,6 +334,8 @@ function PreviewBubble({
 function buildThemeConfig(config: CustomizerState) {
   return {
     greeting: config.greeting,
+    useCustomIcon: config.useCustomIcon,
+    widgetIconUrl: config.widgetIconUrl,
     theme: {
       headerHsl: hexToHsl(config.headerColor),
       backgroundHsl: hexToHsl(config.backgroundColor),
@@ -354,6 +397,15 @@ function normalizeHex(value: string) {
 
 function isSafeId(value: string) {
   return /^[a-zA-Z0-9_-]{3,120}$/.test(value);
+}
+
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function saveMessageClass(status: SaveState["status"]) {

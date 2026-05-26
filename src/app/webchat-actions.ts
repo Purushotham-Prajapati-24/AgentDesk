@@ -85,7 +85,7 @@ export async function listWebChatBots(tenantId: string): Promise<
         };
         return {
           ...summary,
-          config: configDocument ? webChatConfigFromDocument(configDocument) : webChatConfigFromBot(summary),
+          config: configDocument ? webChatConfigFromDocument(configDocument, summary.themeConfig) : webChatConfigFromBot(summary),
         };
       });
 
@@ -152,6 +152,8 @@ function webChatConfigFromBot(bot: Omit<WebChatBotSummary, "config">): WebChatCo
       botBubbleColor: hslToHex(stringValue(theme.botBubbleHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.botBubbleColor,
       accentColor: hslToHex(stringValue(theme.accentHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.accentColor,
       fontFamily: fontChoiceFromStack(stringValue(theme.fontFamily, "")),
+      useCustomIcon: booleanValue(themeConfig.useCustomIcon, DEFAULT_WEBCHAT_CONFIG.appearance.useCustomIcon),
+      widgetIconUrl: stringValue(themeConfig.widgetIconUrl, ""),
       customCss: stringValue(themeConfig.customCss, ""),
     },
     deploy: {
@@ -166,7 +168,9 @@ function webChatConfigFromBot(bot: Omit<WebChatBotSummary, "config">): WebChatCo
   });
 }
 
-function webChatConfigFromDocument(document: WebChatConfigDocument): WebChatConfig {
+function webChatConfigFromDocument(document: WebChatConfigDocument, botThemeConfig = "{}"): WebChatConfig {
+  const themeConfig = parseThemeConfig(botThemeConfig);
+
   return WebChatConfigSchema.parse({
     ...DEFAULT_WEBCHAT_CONFIG,
     identity: {
@@ -182,6 +186,8 @@ function webChatConfigFromDocument(document: WebChatConfigDocument): WebChatConf
       botBubbleColor: stringValue(document.bot_bubble_color, DEFAULT_WEBCHAT_CONFIG.appearance.botBubbleColor),
       accentColor: stringValue(document.accent_color, DEFAULT_WEBCHAT_CONFIG.appearance.accentColor),
       fontFamily: fontChoiceFromValue(document.font_family),
+      useCustomIcon: booleanValue(themeConfig.useCustomIcon, DEFAULT_WEBCHAT_CONFIG.appearance.useCustomIcon),
+      widgetIconUrl: stringValue(themeConfig.widgetIconUrl, ""),
       customCss: stringValue(document.custom_css, ""),
     },
     deploy: {
@@ -274,6 +280,8 @@ function webChatConfigToThemeConfig(config: WebChatConfig) {
     greeting: config.identity.description,
     logoUrl: config.identity.avatarUrl || null,
     bannerText: "Online - responds instantly",
+    useCustomIcon: config.appearance.useCustomIcon,
+    widgetIconUrl: config.appearance.widgetIconUrl || null,
     customCss: config.appearance.customCss,
     webchat: {
       botId: config.deploy.botId,

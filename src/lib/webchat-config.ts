@@ -28,6 +28,8 @@ export const WebChatConfigSchema = z.object({
     botBubbleColor: hexColor,
     accentColor: hexColor,
     fontFamily: z.enum(["Fira", "Outfit", "System", "Mono"]),
+    useCustomIcon: z.boolean(),
+    widgetIconUrl: optionalUrl,
     customCss: z.string().max(2000),
   }),
   deploy: z.object({
@@ -74,6 +76,8 @@ export const DEFAULT_WEBCHAT_CONFIG: WebChatConfig = {
     botBubbleColor: "#14191E",
     accentColor: "#CCFF00",
     fontFamily: "Fira",
+    useCustomIcon: false,
+    widgetIconUrl: "",
     customCss: "",
   },
   deploy: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useWebChatConfig } from "@/context/WebChatConfigContext";
-import { WebChatColorField, WebChatSelect, WebChatTextarea } from "./form-controls";
+import { WebChatColorField, WebChatSelect, WebChatSwitch, WebChatTextarea, WebChatTextField } from "./form-controls";
 
 export function BotAppearanceForm() {
   const { config, updateSection } = useWebChatConfig();
@@ -28,6 +28,22 @@ export function BotAppearanceForm() {
         value={appearance.fontFamily}
         onChange={(fontFamily) => updateSection("appearance", { fontFamily })}
       />
+      <div className="grid gap-3 border border-[var(--webchat-line)] bg-black/20 p-3">
+        <WebChatSwitch
+          checked={appearance.useCustomIcon}
+          description="Show a custom image inside the closed floating launcher button."
+          label="Use custom launcher icon"
+          onChange={(useCustomIcon) => updateSection("appearance", { useCustomIcon })}
+        />
+        <WebChatTextField
+          label="Custom launcher icon URL"
+          maxLength={500}
+          placeholder="https://example.com/support-icon.png"
+          type="url"
+          value={appearance.widgetIconUrl}
+          onChange={(widgetIconUrl) => updateSection("appearance", { widgetIconUrl })}
+        />
+      </div>
       <WebChatTextarea
         label="Custom CSS"
         maxLength={2000}

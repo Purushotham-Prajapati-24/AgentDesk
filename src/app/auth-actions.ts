@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient, createGuestClient, createSessionClient } from "@/lib/server/appwrite";
+import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
 import { cookies } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -31,15 +31,15 @@ type TenantDocument = Models.Document & {
 };
 
 export async function loginWithMagicLink(email: string) {
-  const { account } = await createGuestClient();
+  const { account } = await createAdminClient();
   
   try {
     const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    await account.createMagicURLToken(
-      ID.unique(),
+    await account.createMagicURLToken({
+      userId: ID.unique(),
       email,
-      `${origin}/verify`
-    );
+      url: `${origin}/verify`,
+    });
     return { success: true };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
@@ -47,10 +47,10 @@ export async function loginWithMagicLink(email: string) {
 }
 
 export async function verifyMagicLink(userId: string, secret: string) {
-  const { account } = await createGuestClient();
+  const { account } = await createAdminClient();
   
   try {
-    const session = await account.updateMagicURLSession(userId, secret);
+    const session = await account.createSession({ userId, secret });
     const jar = await cookies();
 
     // Purge any stale/blank session cookie before writing the new one.
@@ -62,7 +62,7 @@ export async function verifyMagicLink(userId: string, secret: string) {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      expires: new Date(session.expire),
     });
 
     const tenantResult = await ensureTenantForUser(userId);

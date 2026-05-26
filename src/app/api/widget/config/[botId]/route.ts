@@ -21,6 +21,8 @@ type WidgetConfig = {
   greeting: string;
   fallbackMessage: string;
   logoUrl: string | null;
+  useCustomIcon: boolean;
+  widgetIconUrl: string | null;
   bannerText: string;
   messageEndpoint: string;
   websocketEndpoint: string | null;
@@ -86,6 +88,8 @@ const DEMO_CONFIGS: Record<string, WidgetConfig> = {
     greeting: "Hello. I can help with orders, returns, and product questions.",
     fallbackMessage: "I do not have indexed support context for this demo bot yet. Upload a document for this bot, then ask again.",
     logoUrl: null,
+    useCustomIcon: false,
+    widgetIconUrl: null,
     bannerText: "Online - responds instantly",
     messageEndpoint: "/api/chat/message",
     websocketEndpoint: null,
@@ -164,6 +168,8 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
       greeting: cleanText(stringValue(themeConfig.greeting, "Hello. I can help with orders, returns, and product questions."), 300),
       fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
       logoUrl: sanitizeUrl(themeConfig.logoUrl ?? null),
+      useCustomIcon: themeConfig.useCustomIcon === true,
+      widgetIconUrl: sanitizeUrl(themeConfig.widgetIconUrl ?? null),
       bannerText: cleanText(stringValue(themeConfig.bannerText, "Online - responds instantly"), 80),
       messageEndpoint: "/api/chat/message",
       websocketEndpoint: null,
@@ -197,6 +203,8 @@ async function getWebChatConfigDocument(
 }
 
 function widgetConfigFromWebChatDocument(botId: string, bot: BotDocument, config: WebChatConfigDocument): WidgetConfig {
+  const themeConfig = parseThemeConfig(bot.theme_config);
+
   return {
     botId,
     tenantId: cleanText(stringValue(bot.tenant_id, ""), 80),
@@ -204,6 +212,8 @@ function widgetConfigFromWebChatDocument(botId: string, bot: BotDocument, config
     greeting: cleanText(stringValue(config.description, "Hello. I can help with orders, returns, and product questions."), 300),
     fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
     logoUrl: sanitizeUrl(stringValue(config.avatar_url, "") || null),
+    useCustomIcon: themeConfig.useCustomIcon === true,
+    widgetIconUrl: sanitizeUrl(themeConfig.widgetIconUrl ?? null),
     bannerText: "Online - responds instantly",
     messageEndpoint: "/api/chat/message",
     websocketEndpoint: null,
@@ -255,6 +265,8 @@ function sanitizeConfig(config: WidgetConfig): WidgetConfig {
     greeting: cleanText(config.greeting, 300),
     fallbackMessage: cleanText(config.fallbackMessage, 300),
     logoUrl: sanitizeUrl(config.logoUrl),
+    useCustomIcon: config.useCustomIcon === true,
+    widgetIconUrl: sanitizeUrl(config.widgetIconUrl),
     bannerText: cleanText(config.bannerText, 80),
     messageEndpoint: sanitizeEndpoint(config.messageEndpoint),
     websocketEndpoint: sanitizeWebSocketEndpoint(config.websocketEndpoint) ?? getPublicServerWebSocketUrl(),

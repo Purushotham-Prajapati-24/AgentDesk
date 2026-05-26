@@ -279,6 +279,7 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
 
 function WidgetPreview({ config }: { config: WebChatConfig }) {
   const fontFamily = fontStack(config.appearance.fontFamily);
+  const showCustomIcon = config.appearance.useCustomIcon && isHttpUrl(config.appearance.widgetIconUrl);
 
   return (
     <section className="border border-[var(--webchat-line)] bg-[var(--webchat-panel)] p-4">
@@ -290,58 +291,74 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
         <Eye aria-hidden="true" className="h-5 w-5 text-[var(--webchat-acid)]" />
       </div>
 
-      <div className="flex min-h-[620px] items-center justify-center bg-black/45 p-3">
-        <div
-          className="flex h-[590px] w-full max-w-[410px] flex-col overflow-hidden border border-black shadow-[18px_18px_0_#000]"
-          style={{
-            background: config.appearance.backgroundColor,
-            color: config.appearance.textColor,
-            fontFamily,
-          }}
-        >
-          <div className="flex items-center gap-3 border-b border-black px-4 py-4" style={{ background: config.appearance.headerColor }}>
-            <div
-              className="flex h-12 w-12 items-center justify-center overflow-hidden border border-black text-lg font-black text-black"
-              style={{ background: config.appearance.accentColor }}
-            >
-              {config.identity.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt="" className="h-full w-full object-cover" src={config.identity.avatarUrl} />
-              ) : (
-                config.identity.botName.charAt(0).toUpperCase()
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-base font-black">{config.identity.botName}</p>
-              <p className="text-xs font-bold opacity-75">{config.deploy.environment} / {config.deploy.versionTag}</p>
-            </div>
-          </div>
-
-          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-            <PreviewBubble color={config.appearance.botBubbleColor} textColor={config.appearance.textColor}>
-              {config.identity.description}
-            </PreviewBubble>
-            <PreviewBubble align="right" color={config.appearance.userBubbleColor} textColor="#000000">
-              I need help with my order.
-            </PreviewBubble>
-            <PreviewBubble color={config.appearance.botBubbleColor} textColor={config.appearance.textColor}>
-              I can answer from verified sources{config.features.humanHandoff ? " and bring in a human operator" : ""}.
-            </PreviewBubble>
-            {config.features.sourceCitations ? (
-              <div className="border border-black/40 bg-black/20 px-3 py-2 font-mono text-xs font-bold">Sources enabled</div>
-            ) : null}
-          </div>
-
-          <div className="border-t border-black p-4">
-            <div className="flex gap-2">
-              <div className="flex min-h-12 flex-1 items-center border border-black/40 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
-                Write your message...
+      <div className="flex min-h-[620px] items-center justify-center bg-black/45 p-6">
+        <div className="relative">
+          <div
+            className="flex h-[590px] w-[410px] max-w-full flex-col overflow-hidden border border-black shadow-[18px_18px_0_#000]"
+            style={{
+              background: config.appearance.backgroundColor,
+              color: config.appearance.textColor,
+              fontFamily,
+            }}
+          >
+            <div className="flex items-center gap-3 border-b border-black px-4 py-4" style={{ background: config.appearance.headerColor }}>
+              <div
+                className="flex h-12 w-12 items-center justify-center overflow-hidden border border-black text-lg font-black text-black"
+                style={{ background: config.appearance.accentColor }}
+              >
+                {config.identity.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img alt="" className="h-full w-full object-cover" src={config.identity.avatarUrl} />
+                ) : (
+                  config.identity.botName.charAt(0).toUpperCase()
+                )}
               </div>
-              <button className="min-h-12 border border-black px-4 text-sm font-black text-black" style={{ background: config.appearance.accentColor }} type="button">
-                Send
-              </button>
+              <div className="min-w-0">
+                <p className="truncate text-base font-black">{config.identity.botName}</p>
+                <p className="text-xs font-bold opacity-75">{config.deploy.environment} / {config.deploy.versionTag}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+              <PreviewBubble color={config.appearance.botBubbleColor} textColor={config.appearance.textColor}>
+                {config.identity.description}
+              </PreviewBubble>
+              <PreviewBubble align="right" color={config.appearance.userBubbleColor} textColor="#000000">
+                I need help with my order.
+              </PreviewBubble>
+              <PreviewBubble color={config.appearance.botBubbleColor} textColor={config.appearance.textColor}>
+                I can answer from verified sources{config.features.humanHandoff ? " and bring in a human operator" : ""}.
+              </PreviewBubble>
+              {config.features.sourceCitations ? (
+                <div className="border border-black/40 bg-black/20 px-3 py-2 font-mono text-xs font-bold">Sources enabled</div>
+              ) : null}
+            </div>
+
+            <div className="border-t border-black p-4">
+              <div className="flex gap-2">
+                <div className="flex min-h-12 flex-1 items-center border border-black/40 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
+                  Write your message...
+                </div>
+                <button className="min-h-12 border border-black px-4 text-sm font-black text-black" style={{ background: config.appearance.accentColor }} type="button">
+                  Send
+                </button>
+              </div>
             </div>
           </div>
+
+          <button
+            aria-label="Launcher preview"
+            className="absolute bottom-[-18px] right-[-18px] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-black text-3xl font-black text-black shadow-[8px_8px_0_#000] z-10"
+            style={{ background: config.appearance.accentColor }}
+            type="button"
+          >
+            {showCustomIcon ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt="" className="h-full w-full object-cover" src={config.appearance.widgetIconUrl} />
+            ) : (
+              "✦"
+            )}
+          </button>
         </div>
       </div>
     </section>
@@ -406,4 +423,13 @@ function fontStack(font: WebChatConfig["appearance"]["fontFamily"]) {
   }
 
   return "Fira Sans, system-ui, sans-serif";
+}
+
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
