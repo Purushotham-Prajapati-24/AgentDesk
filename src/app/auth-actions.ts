@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
 export type AuthUser = {
@@ -34,7 +34,11 @@ export async function loginWithMagicLink(email: string) {
   const { account } = await createAdminClient();
   
   try {
-    const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const headersList = await headers();
+    const host = headersList.get("host") || "localhost:3000";
+    const protocol = headersList.get("x-forwarded-proto") || "http";
+    const origin = `${protocol}://${host}`;
+    
     await account.createMagicURLToken({
       userId: ID.unique(),
       email,
