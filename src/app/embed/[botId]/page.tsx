@@ -9,7 +9,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
   const safeBotId = /^[a-zA-Z0-9_-]{3,80}$/.test(botId) ? botId : "";
 
   return (
-    <main className="h-screen w-screen overflow-hidden bg-background">
+    <main className="h-screen w-screen overflow-hidden">
       {safeBotId ? (
         <script src="/widget.js" data-bot-id={safeBotId} data-mode="inline" async />
       ) : (

@@ -577,7 +577,10 @@
         --ad-font-body: ${theme.fontFamily};
         all: initial;
         color-scheme: dark;
+        display: block;
         font-family: var(--ad-font-body);
+        height: 100%;
+        width: 100%;
       }
 
       * { box-sizing: border-box; }
