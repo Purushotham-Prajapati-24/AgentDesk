@@ -75,3 +75,4 @@ yarn-error.log*
 node_modules
 Docs folder (design artefacts, not shipped code)
 /docs
+index.html
