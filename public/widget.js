@@ -3,7 +3,7 @@
     const STORAGE_VERSION = "v1";
     const DEFAULT_TIMEOUT_MS = 12000;
     const MAX_MESSAGE_LENGTH = 1200;
-    const currentScript = document.currentScript;
+    const currentScript = (document.currentScript || document.querySelector('script[data-bot-id]'));
     const scriptUrl = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.src) ? new URL(currentScript.src, window.location.href) : null;
     const scriptOrigin = (_a = scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin) !== null && _a !== void 0 ? _a : window.location.origin;
     const botId = (_c = (_b = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
