@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get("secret");
 
   if (!userId || !secret) {
-    return redirectToLogin(request, "invalid_magic_link");
+    return redirectToLogin(request, "invalid_magic_link", 303);
   }
 
   return new NextResponse(renderVerificationPage(userId, secret), {
@@ -32,16 +32,16 @@ export async function POST(request: NextRequest) {
   const result = await verifyMagicLink(userId, secret);
   if (!result.success) {
     console.error("Magic link verification failed:", result.error);
-    return redirectToLogin(request, "verification_failed");
+    return redirectToLogin(request, "verification_failed", 303);
   }
 
-  return NextResponse.redirect(new URL("/", request.url));
+  return NextResponse.redirect(new URL("/inbox", request.url), 303);
 }
 
-function redirectToLogin(request: NextRequest, error: string) {
+function redirectToLogin(request: NextRequest, error: string, status = 307) {
   const url = new URL("/login", request.url);
   url.searchParams.set("error", error);
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(url, status);
 }
 
 function stringValue(value: FormDataEntryValue | null) {
