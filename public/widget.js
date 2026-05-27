@@ -937,11 +937,20 @@
             window.clearTimeout(timeout);
         });
     }
-    const elementName = "agentdesk-widget";
-    if (!customElements.get(elementName)) {
-        customElements.define(elementName, AgentDeskWidget);
+    function mountWidget() {
+        if (!document.body) {
+            window.setTimeout(mountWidget, 10);
+            return;
+        }
+        const elementName = "agentdesk-widget";
+        if (!customElements.get(elementName)) {
+            customElements.define(elementName, AgentDeskWidget);
+        }
+        if (!document.body.querySelector(elementName)) {
+            const mount = document.createElement(elementName);
+            mount.setAttribute("data-agentdesk-mode", embedMode);
+            document.body.append(mount);
+        }
     }
-    const mount = document.createElement(elementName);
-    mount.setAttribute("data-agentdesk-mode", embedMode);
-    document.body.append(mount);
+    mountWidget();
 })();
