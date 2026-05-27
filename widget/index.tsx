@@ -559,7 +559,7 @@
         fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       },
     };
-  }
+  }  
 
   function createStyles(theme: WidgetTheme) {
     const style = document.createElement("style");
@@ -579,8 +579,14 @@
         color-scheme: dark;
         display: block;
         font-family: var(--ad-font-body);
-        height: 100%;
-        width: 100%;
+      }
+
+      :host([data-agentdesk-mode="inline"]) {
+        bottom: 0;
+        left: 0;
+        position: fixed;
+        right: 0;
+        top: 0;
       }
 
       * { box-sizing: border-box; }
