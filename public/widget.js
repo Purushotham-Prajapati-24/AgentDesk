@@ -6,8 +6,16 @@
     const currentScript = (document.currentScript || document.querySelector('script[data-bot-id]'));
     const scriptUrl = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.src) ? new URL(currentScript.src, window.location.href) : null;
     const scriptOrigin = (_a = scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin) !== null && _a !== void 0 ? _a : window.location.origin;
-    const botId = (_c = (_b = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
-    const embedMode = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.mode) === "inline" ? "inline" : "launcher";
+    let botId = (_c = (_b = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
+    let embedMode = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.mode) === "inline" ? "inline" : "launcher";
+    if (!botId && window.location.pathname.startsWith("/embed/")) {
+        const segments = window.location.pathname.split("/");
+        const lastSegment = segments[segments.length - 1];
+        if (lastSegment && /^[a-zA-Z0-9_-]{3,80}$/.test(lastSegment)) {
+            botId = lastSegment;
+            embedMode = "inline";
+        }
+    }
     const configUrl = ((_d = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.configUrl) === null || _d === void 0 ? void 0 : _d.trim()) || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
     if (!botId) {
         return;

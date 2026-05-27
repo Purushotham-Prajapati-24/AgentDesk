@@ -40,8 +40,20 @@
   const currentScript = (document.currentScript || document.querySelector('script[data-bot-id]')) as HTMLScriptElement | null;
   const scriptUrl = currentScript?.src ? new URL(currentScript.src, window.location.href) : null;
   const scriptOrigin = scriptUrl?.origin ?? window.location.origin;
-  const botId = currentScript?.dataset.botId?.trim() ?? "";
-  const embedMode = currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
+  
+  let botId = currentScript?.dataset.botId?.trim() ?? "";
+  let embedMode = currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
+
+  // Fallback for Next.js / React 19 script hoisting on the embed page
+  if (!botId && window.location.pathname.startsWith("/embed/")) {
+    const segments = window.location.pathname.split("/");
+    const lastSegment = segments[segments.length - 1];
+    if (lastSegment && /^[a-zA-Z0-9_-]{3,80}$/.test(lastSegment)) {
+      botId = lastSegment;
+      embedMode = "inline";
+    }
+  }
+
   const configUrl = currentScript?.dataset.configUrl?.trim() || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
 
   if (!botId) {
