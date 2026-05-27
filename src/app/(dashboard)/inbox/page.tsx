@@ -87,6 +87,7 @@ export default function InboxPage() {
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [draftRoom, setDraftRoom] = useState<Room>(DEFAULT_ROOM);
   const [socketStatus, setSocketStatus] = useState<"connecting" | "connected" | "disconnected">(WEB_SOCKET_URL ? "connecting" : "disconnected");
+  const [wakingUp, setWakingUp] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<SessionStatus>("active");
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [agentDraft, setAgentDraft] = useState("");
@@ -113,10 +114,26 @@ export default function InboxPage() {
     let disposed = false;
 
     async function connectWhenHealthy() {
-      const healthy = await checkLiveHandoffHealth(wsUrl, abortController.signal);
-      if (disposed) {
-        return;
+      // Render free-tier services spin down after inactivity.
+      // Retry the health check for up to ~40 s before giving up.
+      const MAX_RETRIES = 8;
+      let healthy = false;
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        if (disposed) return;
+        healthy = await checkLiveHandoffHealth(wsUrl, abortController.signal);
+        if (healthy) break;
+        if (attempt === 0) {
+          // First failure — show the waking-up banner, not the hard error.
+          setWakingUp(true);
+          setError(null);
+        }
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 5000));
+        }
       }
+
+      setWakingUp(false);
+      if (disposed) return;
 
       if (!healthy) {
         setSocketStatus("disconnected");
@@ -463,7 +480,13 @@ export default function InboxPage() {
             </Button>
           </div>
 
-          {error ? <div className="border-b border-border bg-destructive px-4 py-3 text-sm font-bold text-white">{error}</div> : null}
+          {wakingUp && !error ? (
+            <div className="border-b border-border bg-amber-500/20 px-4 py-3 text-sm font-bold text-amber-400">
+              ⏳ Waking up the live handoff server (Render cold start) — this takes ~30 s…
+            </div>
+          ) : error ? (
+            <div className="border-b border-border bg-destructive px-4 py-3 text-sm font-bold text-white">{error}</div>
+          ) : null}
 
           <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-secondary/60 px-4 py-5">
             {messages.length === 0 ? (
@@ -576,7 +599,8 @@ function isSafeId(value: string) {
 async function checkLiveHandoffHealth(baseUrl: string, signal: AbortSignal) {
   const controller = new AbortController();
   const abort = () => controller.abort();
-  const timeout = window.setTimeout(abort, 2500);
+  // 8 s per attempt — long enough for Render to start responding.
+  const timeout = window.setTimeout(abort, 8000);
   signal.addEventListener("abort", abort, { once: true });
 
   try {
