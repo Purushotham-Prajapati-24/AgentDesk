@@ -13,7 +13,7 @@ type Candidate = {
 };
 
 export async function retrieveContextChunks(query: string, tenantId: string, botId: string) {
-  const rerankLimit = numberEnv("RAG_RERANK_TOP_K", 8);
+  const rerankLimit = numberEnv("RAG_RERANK_TOP_K", 10);
   const contextLimit = numberEnv("RAG_CONTEXT_TOP_K", 4);
   const minRelevanceScore = floatEnv("RAG_MIN_RELEVANCE_SCORE", DEFAULT_MIN_RELEVANCE_SCORE);
   const embedding = await createEmbedding(query);
