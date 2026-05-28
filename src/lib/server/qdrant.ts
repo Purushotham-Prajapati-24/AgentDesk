@@ -1,5 +1,6 @@
-import type { Chunk } from "@/lib/server/chunking";
-import { EMBEDDING_DIMENSIONS } from "@/lib/server/embeddings";
+import type { Chunk } from "./chunking";
+
+const EMBEDDING_DIMENSIONS = 768;
 
 export type KnowledgePayload = {
   tenant_id: string;
@@ -90,6 +91,14 @@ export async function upsertKnowledgePoints({
     throw new Error("Qdrant configuration is required for document ingestion.");
   }
 
+  if (!hasStrictTenantBotIds(tenantId, botId)) {
+    throw new Error("tenantId and botId are required for document ingestion.");
+  }
+
+  if (isHybridIndexEnabled()) {
+    await ensureHybridCollection();
+  }
+
   const points: Point[] = chunks.map((chunk, index) => {
     const payload: KnowledgePayload = {
       tenant_id: tenantId,
@@ -148,25 +157,16 @@ export async function deleteKnowledgePointsForBot(tenantId: string, botId: strin
 }
 
 export async function denseSearch(vector: number[], tenantId: string, botId: string, limit: number) {
+  if (!hasStrictTenantBotIds(tenantId, botId)) {
+    return [];
+  }
+
   const config = qdrantConfig();
   if (!config) {
     return [];
   }
 
-  const body = isHybridIndexEnabled()
-    ? {
-        query: vector,
-        using: "dense",
-        limit,
-        with_payload: true,
-        filter: tenantBotFilter(tenantId, botId),
-      }
-    : {
-        vector,
-        limit,
-        with_payload: true,
-        filter: tenantBotFilter(tenantId, botId),
-      };
+  const body = denseSearchBody(vector, tenantId, botId, limit, isHybridIndexEnabled());
 
   const path = isHybridIndexEnabled() ? "points/query" : "points/search";
   const response = await fetch(`${config.url}/collections/${activeCollection()}/${path}`, {
@@ -188,6 +188,10 @@ export async function bm25Search(query: string, tenantId: string, botId: string,
     return [];
   }
 
+  if (!hasStrictTenantBotIds(tenantId, botId)) {
+    return [];
+  }
+
   const config = qdrantConfig();
   if (!config) {
     return [];
@@ -196,16 +200,7 @@ export async function bm25Search(query: string, tenantId: string, botId: string,
   const response = await fetch(`${config.url}/collections/${activeCollection()}/points/query`, {
     method: "POST",
     headers: qdrantHeaders(config.apiKey),
-    body: JSON.stringify({
-      query: {
-        text: query,
-        model: "qdrant/bm25",
-      },
-      using: "bm25",
-      limit,
-      with_payload: true,
-      filter: tenantBotFilter(tenantId, botId),
-    }),
+    body: JSON.stringify(bm25SearchBody(query, tenantId, botId, limit)),
   });
 
   if (!response.ok) {
@@ -222,17 +217,17 @@ function qdrantConfig() {
   return url && apiKey ? { url: url.replace(/\/$/, ""), apiKey } : null;
 }
 
-async function ensurePayloadIndex(config: { url: string; apiKey: string }, fieldName: string) {
+async function ensurePayloadIndex(config: { url: string; apiKey: string }, fieldName: keyof typeof payloadIndexSchemas) {
   const response = await fetch(`${config.url}/collections/${v2Collection()}/index`, {
     method: "PUT",
     headers: qdrantHeaders(config.apiKey),
     body: JSON.stringify({
       field_name: fieldName,
-      field_schema: "keyword",
+      field_schema: payloadIndexSchemas[fieldName],
     }),
   });
 
-  if (!response.ok && response.status !== 409) {
+  if (!response.ok && response.status !== 409 && !(response.status === 400 && (await response.text().catch(() => "")).toLowerCase().includes("already"))) {
     throw new Error(`Qdrant payload index setup failed for ${fieldName}.`);
   }
 }
@@ -244,12 +239,53 @@ function qdrantHeaders(apiKey: string) {
   };
 }
 
-function tenantBotFilter(tenantId: string, botId: string) {
+export const payloadIndexSchemas = {
+  tenant_id: { type: "keyword", is_tenant: true },
+  bot_id: "keyword",
+} as const;
+
+export function tenantBotFilter(tenantId: string, botId: string) {
   return {
     must: [
       { key: "tenant_id", match: { value: tenantId } },
       { key: "bot_id", match: { value: botId } },
     ],
+  };
+}
+
+export function hasStrictTenantBotIds(tenantId: string, botId: string) {
+  return typeof tenantId === "string" && tenantId.trim().length > 0 && typeof botId === "string" && botId.trim().length > 0;
+}
+
+export function denseSearchBody(vector: number[], tenantId: string, botId: string, limit: number, hybridIndexEnabled: boolean) {
+  const filter = tenantBotFilter(tenantId, botId);
+
+  return hybridIndexEnabled
+    ? {
+        query: vector,
+        using: "dense",
+        limit,
+        with_payload: true,
+        filter,
+      }
+    : {
+        vector,
+        limit,
+        with_payload: true,
+        filter,
+      };
+}
+
+export function bm25SearchBody(query: string, tenantId: string, botId: string, limit: number) {
+  return {
+    query: {
+      text: query,
+      model: "qdrant/bm25",
+    },
+    using: "bm25",
+    limit,
+    with_payload: true,
+    filter: tenantBotFilter(tenantId, botId),
   };
 }
 

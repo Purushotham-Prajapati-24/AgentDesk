@@ -9,6 +9,7 @@
     "build:widget": "node scripts/build-widget.mjs",
     "qdrant:hybrid": "node --env-file=.env.local scripts/create-qdrant-hybrid.mjs",
     "start": "next start",
+    "test": "node --experimental-strip-types --test test/*.test.mjs",
     "lint": "eslint"
   },
   "dependencies": {
