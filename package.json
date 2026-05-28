@@ -24,6 +24,7 @@
     "socket.io-client": "^4.8.3",
     "unpdf": "^1.6.2",
     "word-extractor": "^1.0.4",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "overrides": {

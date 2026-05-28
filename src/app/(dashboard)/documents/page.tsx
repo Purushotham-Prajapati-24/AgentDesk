@@ -182,7 +182,7 @@ export default function DocumentsPage() {
       <PageHeader
         kicker="Knowledge base"
         title="Drop the facts before the bot talks."
-        description="Upload tenant-scoped source files for parsing and hybrid vector ingestion. Supported formats are PDF, DOC, DOCX, CSV, TXT, and Markdown."
+        description="Upload tenant-scoped source files for parsing and hybrid vector ingestion. Supported formats are PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, and Markdown."
         action={<StatusPill tone="warn">Tenant: {tenant?.$id ?? "Unavailable"}</StatusPill>}
       />
 
@@ -190,7 +190,7 @@ export default function DocumentsPage() {
         <Panel className="h-fit p-5">
           <p className="studio-kicker text-muted-foreground">Accepted payloads</p>
           <div className="mt-5 grid gap-3">
-            {["PDF policies", "DOC manuals", "DOCX manuals", "CSV tables", "TXT notes", "Markdown guides"].map((item) => (
+            {["PDF policies", "DOC manuals", "DOCX manuals", "XLSX spreadsheets", "XLS spreadsheets", "CSV tables", "TXT notes", "Markdown guides"].map((item) => (
               <div className="flex items-center gap-3 border border-border bg-secondary/60 px-3 py-2 font-bold" key={item}>
                 <FileUp aria-hidden="true" className="h-4 w-4 text-primary" />
                 {item}
@@ -228,9 +228,9 @@ export default function DocumentsPage() {
               <UploadCloud aria-hidden="true" className="h-12 w-12 text-foreground" />
               <span className="mt-5 text-2xl font-bold text-foreground">{file ? file.name : "Drop source file"}</span>
               <span className="mt-2 max-w-md text-sm font-bold leading-6 text-muted-foreground">
-                Click or drop a PDF, DOC, DOCX, CSV, TXT, or MD file. The upload API will extract text before vector processing.
+                Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. The upload API will extract text before vector processing.
               </span>
-              <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.csv,.txt,.md" onChange={handleFileChange} />
+              <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md" onChange={handleFileChange} />
             </label>
 
             {uploadState.message ? (

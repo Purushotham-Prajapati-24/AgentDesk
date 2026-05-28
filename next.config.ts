@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["mammoth"],
+  serverExternalPackages: ["mammoth", "xlsx"],
 };
 
 export default nextConfig;

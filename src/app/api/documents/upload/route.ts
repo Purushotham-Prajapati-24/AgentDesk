@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
     const fileType = getFileType(file.name);
     if (!fileType || !SUPPORTED_DOCUMENT_TYPES.has(fileType)) {
-      return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOC, DOCX, CSV, TXT, and MD.", 422);
+      return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, and MD.", 422);
     }
 
     const { users, databases, storage } = await createAdminClient();

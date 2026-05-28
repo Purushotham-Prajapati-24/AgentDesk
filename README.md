@@ -34,7 +34,7 @@
 | 🔐 **Magic-link Auth** | Passwordless login via Appwrite — no OAuth credentials required |
 | 🏢 **Multi-tenant** | Every account gets its own isolated workspace with independent credit ledger |
 | 🤖 **Bot Builder** | Create, configure, and embed AI support bots in minutes with a visual editor |
-| 🧠 **RAG Pipeline** | PDF, DOCX, and TXT docs are chunked, embedded via Gemini, and indexed in Qdrant for grounded answers |
+| 🧠 **RAG Pipeline** | PDF, DOCX, XLSX, and TXT docs are chunked, embedded via Gemini, and indexed in Qdrant for grounded answers |
 | 🪄 **Embeddable Widget** | Single `<script>` tag drops a full branded chat widget anywhere on the web |
 | 📡 **Live Inbox** | Real-time session monitor — human agents can pause the AI and take over mid-conversation |
 | 💳 **Credit Ledger** | Token-based billing with per-tenant credit tracking visible in a Usage dashboard |
@@ -127,7 +127,7 @@ POST /api/chat/message
 ### 2. Document Ingestion Flow
 
 ```
-Admin uploads file (PDF / DOCX / TXT)
+Admin uploads file (PDF / DOCX / XLSX / TXT)
         │
         ▼
    File stored → Appwrite Storage
