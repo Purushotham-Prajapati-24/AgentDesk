@@ -133,7 +133,7 @@ Admin uploads file (PDF / DOCX / TXT)
    File stored → Appwrite Storage
         │
         ▼
-   Text extracted (mammoth / pdf-parse)
+   Text extracted (mammoth / unpdf)
         │
         ▼
    Chunked with overlap

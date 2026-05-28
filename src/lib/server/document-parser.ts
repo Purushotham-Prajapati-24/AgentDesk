@@ -1,5 +1,5 @@
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
+import { extractText } from "unpdf";
 
 export type SupportedDocumentType = "pdf" | "docx" | "doc" | "csv" | "txt" | "md";
 
@@ -47,13 +47,8 @@ export function normalizeText(text: string) {
 }
 
 async function parsePdf(buffer: Buffer) {
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const result = await parser.getText();
-    return normalizeText(result.text);
-  } finally {
-    await parser.destroy();
-  }
+  const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+  return normalizeText(text);
 }
 
 async function parseLegacyDoc(buffer: Buffer) {
