@@ -95,13 +95,13 @@ export default function MonitorUsersPage() {
 
         {error ? <div className="border border-border bg-destructive px-4 py-3 text-sm font-bold text-white">{error}</div> : null}
 
-        <Panel className="overflow-hidden">
+        <Panel className="min-w-0 overflow-hidden">
           <div className="flex flex-col gap-3 border-b border-border bg-card-elevated p-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="studio-kicker text-primary">Customer ledger</p>
               <h2 className="mt-1 text-2xl font-bold">End customers</h2>
             </div>
-            <form className="flex min-w-0 gap-2 lg:w-[420px]" onSubmit={submitSearch}>
+            <form className="flex min-w-0 gap-2 sm:w-full lg:w-[420px]" onSubmit={submitSearch}>
               <input
                 className="min-h-10 min-w-0 flex-1 rounded-md border border-input bg-card px-3 text-sm font-semibold text-foreground placeholder:text-muted-foreground focus:border-primary"
                 placeholder="Search session, bot, status"
@@ -122,7 +122,7 @@ export default function MonitorUsersPage() {
               />
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[980px] border-collapse text-left text-sm">
                 <thead className="bg-card text-xs uppercase text-foreground">
                   <tr>
@@ -180,7 +180,7 @@ export default function MonitorUsersPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between border-t border-border bg-card-elevated p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-card-elevated p-3">
             <Button disabled={cursorStack.length === 0 || loading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
               Prev
             </Button>

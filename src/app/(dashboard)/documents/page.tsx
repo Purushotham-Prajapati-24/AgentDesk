@@ -186,7 +186,7 @@ export default function DocumentsPage() {
         action={<StatusPill tone="warn">Tenant: {tenant?.$id ?? "Unavailable"}</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[360px_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-8">
         <Panel className="h-fit p-5">
           <p className="studio-kicker text-muted-foreground">Accepted payloads</p>
           <div className="mt-5 grid gap-3">
@@ -221,12 +221,12 @@ export default function DocumentsPage() {
             </label>
 
             <label
-              className="mt-5 flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-primary/50 bg-primary/10 px-6 py-10 text-center transition hover:bg-primary/20"
+              className="mt-5 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-primary/50 bg-primary/10 px-4 py-8 text-center transition hover:bg-primary/20 sm:min-h-72 sm:px-6 sm:py-10"
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}
             >
               <UploadCloud aria-hidden="true" className="h-12 w-12 text-foreground" />
-              <span className="mt-5 text-2xl font-bold text-foreground">{file ? file.name : "Drop source file"}</span>
+              <span className="mt-5 max-w-full break-words text-xl font-bold text-foreground sm:text-2xl">{file ? file.name : "Drop source file"}</span>
               <span className="mt-2 max-w-md text-sm font-bold leading-6 text-muted-foreground">
                 Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. The upload API will extract text before vector processing.
               </span>
@@ -239,7 +239,7 @@ export default function DocumentsPage() {
               </p>
             ) : null}
 
-            <Button className="mt-5" loading={uploadState.status === "uploading"} type="submit">
+            <Button className="mt-5 w-full sm:w-auto" loading={uploadState.status === "uploading"} type="submit">
               Upload document
             </Button>
           </form>
@@ -251,7 +251,7 @@ export default function DocumentsPage() {
               onChange={(event) => setSourceUrl(event.target.value)}
               hint="Capture public help center articles, policies, FAQs, or product pages."
             />
-            <Button className="mt-5" disabled={!sourceUrl.trim()} loading={uploadState.status === "uploading"} type="submit" variant="secondary">
+            <Button className="mt-5 w-full sm:w-auto" disabled={!sourceUrl.trim()} loading={uploadState.status === "uploading"} type="submit" variant="secondary">
               Ingest URL
             </Button>
           </form>

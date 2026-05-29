@@ -80,8 +80,8 @@ export default function BillingPage() {
           <MetricTile label="Storage" value={formatBytes(snapshot?.stats.documentStorageBytes ?? 0)} detail="knowledge payload" tone="dark" />
         </section>
 
-        <Panel className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border bg-primary/10 px-4 py-3">
+        <Panel className="min-w-0 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-primary/10 px-4 py-3">
             <div className="flex items-center gap-2">
               <ReceiptText aria-hidden="true" className="h-5 w-5" />
               <h2 className="text-lg font-bold">Transaction history</h2>
@@ -93,7 +93,7 @@ export default function BillingPage() {
               <EmptyState title="No ledger entries yet" description="Credits and usage debits will appear here after billing events are recorded." />
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="w-full overflow-x-auto">
               <table className="w-full min-w-[760px] border-collapse text-left text-sm">
                 <thead className="bg-card-elevated text-xs uppercase text-foreground">
                   <tr>

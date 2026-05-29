@@ -155,9 +155,9 @@ export function WebChatWorkspace() {
               Configure identity, appearance, deployment controls, and customer-facing capabilities while watching the widget contract update in real time.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid gap-3 sm:flex sm:flex-wrap">
             <Button
-              className="rounded-none border-[var(--webchat-line)]"
+              className="w-full rounded-none border-[var(--webchat-line)] sm:w-auto"
               leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
               onClick={resetConfig}
               type="button"
@@ -166,7 +166,7 @@ export function WebChatWorkspace() {
               Reset
             </Button>
             <Button
-              className="rounded-none border-[var(--webchat-acid)] bg-[var(--webchat-acid)] text-black hover:bg-[#d8ff2f]"
+              className="w-full rounded-none border-[var(--webchat-acid)] bg-[var(--webchat-acid)] text-black hover:bg-[#d8ff2f] sm:w-auto"
               disabled={!selectedBotId}
               leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
               loading={saveState === "saving"}
@@ -179,8 +179,8 @@ export function WebChatWorkspace() {
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(420px,0.94fr)_minmax(520px,1.06fr)] lg:px-8">
-        <aside className="grid content-start gap-3">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
+        <aside className="grid min-w-0 content-start gap-3">
           <BotSelector
             bots={bots}
             loading={botLoading}
@@ -203,7 +203,7 @@ export function WebChatWorkspace() {
           ))}
         </aside>
 
-        <main className="grid gap-5">
+        <main className="grid min-w-0 gap-5">
           <WidgetPreview config={config} />
           <section className="grid gap-4 lg:grid-cols-2">
             <CodeBlock label="Script embed" value={snippets.script} />
@@ -291,10 +291,10 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
         <Eye aria-hidden="true" className="h-5 w-5 text-[var(--webchat-acid)]" />
       </div>
 
-      <div className="flex min-h-[620px] items-center justify-center bg-black/45 p-6">
-        <div className="relative">
+      <div className="flex min-h-[520px] items-center justify-center overflow-hidden bg-black/45 p-3 sm:p-6 lg:min-h-[620px]">
+        <div className="relative w-full max-w-[410px]">
           <div
-            className="flex h-[590px] w-[410px] max-w-full flex-col overflow-hidden border border-black shadow-[18px_18px_0_#000]"
+            className="flex h-[min(590px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden border border-black shadow-[8px_8px_0_#000] sm:shadow-[18px_18px_0_#000]"
             style={{
               background: config.appearance.backgroundColor,
               color: config.appearance.textColor,
@@ -348,7 +348,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
           <button
             aria-label="Launcher preview"
-            className="absolute bottom-[-18px] right-[-18px] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-black text-3xl font-black text-black shadow-[8px_8px_0_#000] z-10"
+            className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black text-2xl font-black text-black shadow-[6px_6px_0_#000] sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl sm:shadow-[8px_8px_0_#000]"
             style={{ background: config.appearance.accentColor }}
             type="button"
           >
@@ -378,7 +378,7 @@ function PreviewBubble({
 }) {
   return (
     <div className={cn("flex", align === "right" ? "justify-end" : "justify-start")}>
-      <p className="max-w-[82%] border border-black/35 px-4 py-3 text-sm font-bold leading-6" style={{ background: color, color: textColor }}>
+      <p className="max-w-[92%] break-words border border-black/35 px-4 py-3 text-sm font-bold leading-6 sm:max-w-[82%]" style={{ background: color, color: textColor }}>
         {children}
       </p>
     </div>

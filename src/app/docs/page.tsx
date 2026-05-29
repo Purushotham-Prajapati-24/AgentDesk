@@ -360,12 +360,12 @@ function toggleWidget() {
   const activeSectionData = docSections.find((section) => section.id === activeSection) ?? docSections[0];
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-background text-foreground">
       <a className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-primary-foreground" href="#docs-content">
         Skip to Content
       </a>
-      <header className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-background/85 px-5 py-4 backdrop-blur-md">
-        <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-4 backdrop-blur-md sm:px-5">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Link className="flex items-center gap-2 font-bold text-foreground transition hover:text-primary" href="/">
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             <span>AgentDesk</span>
@@ -381,8 +381,8 @@ function toggleWidget() {
         </Link>
       </header>
 
-      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-5 py-8 md:grid-cols-[280px_1fr]">
-        <aside className="space-y-6">
+      <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 py-6 sm:px-5 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[280px_minmax(0,1fr)] lg:py-8">
+        <aside className="min-w-0 space-y-6">
           <div className="relative">
             <Search aria-hidden="true" className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
             <input
@@ -431,11 +431,11 @@ function toggleWidget() {
           </nav>
         </aside>
 
-        <main className="space-y-10" id="docs-content">
+        <main className="min-w-0 space-y-10" id="docs-content">
           <article className="studio-surface relative overflow-hidden rounded-xl border border-border p-6 sm:p-8">
             <Terminal aria-hidden="true" className="absolute right-4 top-4 h-32 w-32 text-primary opacity-10" />
             <span className="studio-kicker text-primary">{activeSectionData.category}</span>
-            <h1 className="mt-2 text-4xl font-extrabold uppercase tracking-tight text-foreground">{activeSectionData.title}</h1>
+            <h1 className="mt-2 text-3xl font-extrabold uppercase tracking-tight text-foreground sm:text-4xl">{activeSectionData.title}</h1>
             <div className="mt-8 leading-relaxed text-foreground">{activeSectionData.content}</div>
           </article>
 
@@ -455,7 +455,7 @@ function toggleWidget() {
                 <SandboxInput label="Theme token" value={sandboxTheme} onChange={setSandboxTheme} />
                 <div>
                   <label className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Layout mode</label>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2 sm:flex">
                     <ModeButton active={sandboxMode === "launcher"} label="Launcher mode" onClick={() => setSandboxMode("launcher")} />
                     <ModeButton active={sandboxMode === "inline"} label="Inline mode" onClick={() => setSandboxMode("inline")} />
                   </div>
@@ -591,7 +591,7 @@ function SandboxInput({ label, value, onChange }: { label: string; value: string
 function ModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
-      className={`flex-1 rounded-lg border py-2 text-sm font-bold transition ${
+      className={`min-h-10 flex-1 rounded-lg border px-3 py-2 text-sm font-bold transition ${
         active ? "border-accent bg-accent/10 text-accent" : "border-border text-muted-foreground hover:text-foreground"
       }`}
       type="button"

@@ -35,12 +35,12 @@ const commandLinks = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <section className="relative isolate overflow-hidden border-b border-border px-4 py-5 sm:px-6 lg:px-8">
         <DarkVeil />
-        <div className="relative mx-auto grid min-h-[calc(100vh-40px)] max-w-7xl content-between gap-10">
+        <div className="relative mx-auto grid min-h-[calc(100svh-40px)] max-w-7xl content-start gap-10 lg:content-between">
           <nav className="sticky top-4 z-10 flex items-center justify-between gap-4 rounded-xl border border-border bg-background/75 px-3 py-3 backdrop-blur">
-            <Link className="flex items-center gap-3 font-bold" href="/">
+            <Link className="flex min-w-0 items-center gap-3 font-bold" href="/">
               <span className="flex h-10 w-10 items-center justify-center rounded-md border border-primary/50 bg-primary/10 text-primary">
                 <Radio aria-hidden="true" className="h-5 w-5" />
               </span>
@@ -61,28 +61,28 @@ export default function Home() {
           <div className="grid gap-8 pb-8 pt-8 lg:grid-cols-[1fr_430px] lg:items-end">
             <div className="studio-enter">
               <StatusPill tone="hot">Agent orchestration workspace</StatusPill>
-              <h1 className="mt-5 max-w-5xl text-[clamp(3.6rem,10vw,8.5rem)] font-bold leading-[0.9]">
+              <h1 className="mt-5 max-w-5xl text-5xl font-bold leading-[0.94] sm:text-6xl lg:text-7xl xl:text-8xl">
                 <SplitText text="Build support agents with a human switch." />
               </h1>
               <p className="mt-6 max-w-2xl text-lg font-medium leading-8 text-muted-foreground">
                 AgentDesk gives support teams a dark production console for AI agents, knowledge ingestion, live handoff, widget styling,
                 and usage control.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
                 <ClickSpark>
                   <Link href="/inbox">
-                    <Button rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>Open live desk</Button>
+                    <Button className="w-full sm:w-auto" rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>Open live desk</Button>
                   </Link>
                 </ClickSpark>
                 <Link href="/webchat">
-                  <Button variant="secondary" rightIcon={<Workflow aria-hidden="true" className="h-4 w-4" />}>
+                  <Button className="w-full sm:w-auto" variant="secondary" rightIcon={<Workflow aria-hidden="true" className="h-4 w-4" />}>
                     Shape the widget
                   </Button>
                 </Link>
               </div>
             </div>
 
-            <div className="studio-surface rounded-xl p-4">
+            <div className="studio-surface min-w-0 rounded-xl p-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <p className="studio-kicker text-muted-foreground">Routing preview</p>
                 <StatusPill tone="info">Socket online</StatusPill>
@@ -120,7 +120,7 @@ export default function Home() {
       <section id="security" className="mx-auto grid max-w-7xl gap-4 px-4 py-10 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:px-8">
         <div className="studio-surface rounded-xl p-6">
           <ShieldCheck aria-hidden="true" className="h-6 w-6 text-primary" />
-          <h2 className="mt-4 text-3xl font-bold">Operational trust, visible by default.</h2>
+            <h2 className="mt-4 text-2xl font-bold sm:text-3xl">Operational trust, visible by default.</h2>
           <p className="mt-3 max-w-2xl font-medium leading-7 text-muted-foreground">
             Every screen is designed around production support realities: source grounding, tenant isolation, human takeover, and
             auditable usage.
@@ -146,10 +146,10 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 rounded-xl border border-primary/30 bg-primary/10 p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="studio-kicker text-primary">Ready for the desk</p>
-            <h2 className="mt-2 text-3xl font-bold">Start with the live inbox, then tune the agent.</h2>
+            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">Start with the live inbox, then tune the agent.</h2>
           </div>
           <Link href="/login">
-            <Button rightIcon={<Zap aria-hidden="true" className="h-4 w-4" />}>Access workspace</Button>
+            <Button className="w-full sm:w-auto" rightIcon={<Zap aria-hidden="true" className="h-4 w-4" />}>Access workspace</Button>
           </Link>
         </div>
       </section>

@@ -38,30 +38,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
       <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-        <aside className="border-b border-border bg-card/95 backdrop-blur lg:border-b-0 lg:border-r">
-          <div className="sticky top-0 flex flex-col gap-5 p-4 lg:min-h-screen">
-            <Link className="group rounded-lg border border-border bg-card-elevated p-4 transition hover:border-primary/70" href="/">
+        <aside className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur lg:static lg:border-b-0 lg:border-r">
+          <div className="flex min-w-0 flex-col gap-3 p-3 lg:sticky lg:top-0 lg:min-h-screen lg:gap-5 lg:p-4">
+            <Link className="group rounded-lg border border-border bg-card-elevated p-3 transition hover:border-primary/70 lg:p-4" href="/">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-md border border-primary/50 bg-primary/10 text-primary">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-primary/50 bg-primary/10 text-primary lg:h-11 lg:w-11">
                   <Boxes aria-hidden="true" className="h-6 w-6" />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <p className="studio-kicker text-primary">AgentDesk</p>
-                  <p className="text-lg font-bold leading-none text-foreground">Dark Studio</p>
+                  <p className="truncate text-base font-bold leading-none text-foreground lg:text-lg">Dark Studio</p>
                 </div>
               </div>
             </Link>
 
-            <nav aria-label="Workspace navigation" className="grid gap-2">
+            <nav aria-label="Workspace navigation" className="flex min-w-0 gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
                     className={cn(
-                      "flex min-h-11 items-center gap-3 rounded-md border px-3 py-2 text-sm font-semibold transition duration-200 ease-out",
+                      "flex min-h-10 shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition duration-200 ease-out lg:min-h-11 lg:gap-3",
                       active
                         ? "border-primary/60 bg-primary/10 text-primary"
                         : "border-transparent text-muted-foreground hover:border-border hover:bg-secondary hover:text-foreground",
@@ -76,9 +76,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               })}
             </nav>
 
-            <div className="mt-auto flex flex-col gap-4">
+            <div className="flex min-w-0 items-center gap-2 lg:mt-auto lg:flex-col lg:items-stretch lg:gap-4">
               <button
-                className="flex min-h-11 items-center gap-3 rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-muted-foreground transition duration-200 ease-out hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                className="flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-muted-foreground transition duration-200 ease-out hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive lg:min-h-11 lg:gap-3"
                 onClick={() => void logout()}
                 type="button"
               >
@@ -86,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Sign out
               </button>
 
-              <div className="rounded-lg border border-border bg-secondary/60 p-3">
+              <div className="hidden rounded-lg border border-border bg-secondary/60 p-3 sm:block">
                 <p className="studio-kicker text-muted-foreground">Live fabric</p>
                 <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-foreground">
                   <Radio aria-hidden="true" className="h-4 w-4 text-accent" />
@@ -116,12 +116,12 @@ export function PageHeader({
   return (
     <section className="studio-enter border-b border-border bg-card/70 px-4 py-6 backdrop-blur sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="studio-kicker text-primary">{kicker}</p>
-          <h1 className="mt-2 max-w-4xl text-4xl font-bold leading-[1.02] text-foreground sm:text-5xl">{title}</h1>
+          <h1 className="mt-2 max-w-4xl text-3xl font-bold leading-[1.05] text-foreground sm:text-4xl lg:text-5xl">{title}</h1>
           {description ? <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-muted-foreground">{description}</p> : null}
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+        {action ? <div className="min-w-0 shrink-0">{action}</div> : null}
       </div>
     </section>
   );
@@ -194,7 +194,7 @@ export function CodePanel({ title, children }: { title: string; children: React.
         <p className="studio-kicker text-muted-foreground">{title}</p>
         <span className="h-2 w-2 rounded-full bg-accent shadow-[0_0_18px_rgba(34,211,238,0.65)]" />
       </div>
-      <div className="p-4 font-mono text-sm leading-6 text-muted-foreground">{children}</div>
+      <div className="overflow-x-auto p-4 font-mono text-sm leading-6 text-muted-foreground">{children}</div>
     </div>
   );
 }

@@ -366,8 +366,8 @@ export default function InboxPage() {
         action={<ConnectionBadge status={socketStatus} />}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[330px_1fr] lg:px-8">
-        <aside className="grid gap-5">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[330px_minmax(0,1fr)] lg:px-8">
+        <aside className="grid min-w-0 gap-5">
           <Panel className="p-4">
             <form className="grid gap-3" onSubmit={updateRoom}>
               <Input
@@ -461,16 +461,17 @@ export default function InboxPage() {
           </Panel>
         </aside>
 
-        <Panel className="flex min-h-[700px] flex-col overflow-hidden">
+        <Panel className="flex min-h-[520px] min-w-0 flex-col overflow-hidden lg:min-h-[700px]">
           <div className="flex flex-col gap-3 border-b border-border bg-primary/10 px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-foreground">Conversation</h2>
-              <p className="mt-1 font-mono text-xs font-bold text-muted-foreground">
+              <p className="mt-1 break-all font-mono text-xs font-bold text-muted-foreground">
                 {room.tenantId} / {room.sessionId}
               </p>
             </div>
 
             <Button
+              className="w-full sm:w-auto"
               type="button"
               variant={sessionStatus === "paused_by_human" ? "primary" : "danger"}
               onClick={() => void toggleTakeover()}
@@ -563,14 +564,14 @@ function ConnectionBadge({ status }: { status: "connecting" | "connected" | "dis
 
 function messageBubbleClass(sender: Sender) {
   if (sender === "agent") {
-    return "max-w-[82%] rounded-[18px] border border-primary/50 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_36px_rgba(0,0,0,0.28)]";
+    return "max-w-[92%] overflow-hidden rounded-[18px] border border-primary/50 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_36px_rgba(0,0,0,0.28)] break-words sm:max-w-[82%]";
   }
 
   if (sender === "bot") {
-    return "max-w-[82%] rounded-[18px] border border-accent/40 bg-accent/10 px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.22)]";
+    return "max-w-[92%] overflow-hidden rounded-[18px] border border-accent/40 bg-accent/10 px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.22)] break-words sm:max-w-[82%]";
   }
 
-  return "max-w-[82%] rounded-[18px] border border-border bg-card px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.2)]";
+  return "max-w-[92%] overflow-hidden rounded-[18px] border border-border bg-card px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.2)] break-words sm:max-w-[82%]";
 }
 
 function mapSocketMessage(message: SocketEventMessage): ChatMessage {

@@ -18,17 +18,17 @@ export default function MonitorLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen">
       <div className="border-b border-border bg-card/60 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-md border border-accent/40 bg-accent/10 text-accent">
               <Activity aria-hidden="true" className="h-5 w-5" />
             </span>
-            <div>
+            <div className="min-w-0">
               <p className="studio-kicker text-accent">Monitor</p>
               <p className="text-sm font-semibold text-muted-foreground">Conversation operations and customer health</p>
             </div>
           </div>
 
-          <nav aria-label="Monitor navigation" className="flex gap-2 overflow-x-auto">
+          <nav aria-label="Monitor navigation" className="flex max-w-full gap-2 overflow-x-auto pb-1">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const active = pathname === tab.href;

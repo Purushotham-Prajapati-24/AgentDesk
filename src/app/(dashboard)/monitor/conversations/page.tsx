@@ -141,8 +141,8 @@ export default function MonitorConversationsPage() {
 
         {error ? <div className="border border-border bg-destructive px-4 py-3 text-sm font-bold text-white">{error}</div> : null}
 
-        <div className="grid gap-5 xl:grid-cols-[410px_1fr]">
-          <Panel className="overflow-hidden">
+        <div className="grid gap-5 xl:grid-cols-[410px_minmax(0,1fr)]">
+          <Panel className="min-w-0 overflow-hidden">
             <div className="border-b border-border bg-card-elevated p-4">
               <form className="flex gap-2" onSubmit={submitSearch}>
                 <input
@@ -156,7 +156,7 @@ export default function MonitorConversationsPage() {
                 </Button>
               </form>
 
-              <div className="mt-3 flex gap-2 overflow-x-auto">
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                 {statusOptions.map((item) => (
                   <button
                     className={cn(
@@ -175,7 +175,7 @@ export default function MonitorConversationsPage() {
               </div>
             </div>
 
-            <div className="grid max-h-[720px] gap-2 overflow-y-auto p-3">
+            <div className="grid max-h-[520px] gap-2 overflow-y-auto p-3 lg:max-h-[720px]">
               {conversations.length === 0 ? (
                 <EmptyState
                   title={loading ? "Loading conversations" : "No conversations found"}
@@ -200,7 +200,7 @@ export default function MonitorConversationsPage() {
                       <StatusPill tone={statusTone(conversation.status)}>{conversation.status.replaceAll("_", " ")}</StatusPill>
                     </div>
                     <p className="mt-4 line-clamp-2 text-sm font-semibold leading-6 text-muted-foreground">{conversation.lastMessage}</p>
-                    <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                       <span className="font-mono text-xs font-bold text-muted-foreground">{conversation.messageCount} messages</span>
                       <span className="font-mono text-xs font-bold text-muted-foreground">{formatDate(conversation.updatedAt)}</span>
                     </div>
@@ -209,7 +209,7 @@ export default function MonitorConversationsPage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between border-t border-border bg-card-elevated p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-card-elevated p-3">
               <Button disabled={cursorStack.length === 0 || loading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
                 Prev
               </Button>
@@ -220,13 +220,13 @@ export default function MonitorConversationsPage() {
             </div>
           </Panel>
 
-          <Panel className="flex min-h-[760px] flex-col overflow-hidden">
+          <Panel className="flex min-h-[520px] min-w-0 flex-col overflow-hidden lg:min-h-[760px]">
             <div className="border-b border-border bg-primary/10 p-4">
               {selectedConversation ? (
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="studio-kicker text-primary">Transcript</p>
-                    <h2 className="mt-1 text-2xl font-bold">{selectedConversation.sessionToken}</h2>
+                    <h2 className="mt-1 break-all text-2xl font-bold">{selectedConversation.sessionToken}</h2>
                     <p className="mt-1 font-mono text-xs font-bold text-muted-foreground">{selectedConversation.botId || "unassigned bot"}</p>
                   </div>
                   <StatusPill tone={statusTone(selectedConversation.status)}>{selectedConversation.status.replaceAll("_", " ")}</StatusPill>
@@ -280,14 +280,14 @@ function MessageBubble({ message }: { message: MonitorMessage }) {
 
 function messageClass(sender: MonitorMessage["sender"]) {
   if (sender === "agent") {
-    return "max-w-[82%] rounded-lg border border-primary/50 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_36px_rgba(0,0,0,0.28)]";
+    return "max-w-[92%] overflow-hidden break-words rounded-lg border border-primary/50 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_36px_rgba(0,0,0,0.28)] sm:max-w-[82%]";
   }
 
   if (sender === "bot") {
-    return "max-w-[82%] rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.22)]";
+    return "max-w-[92%] overflow-hidden break-words rounded-lg border border-accent/40 bg-accent/10 px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.22)] sm:max-w-[82%]";
   }
 
-  return "max-w-[82%] rounded-lg border border-border bg-card px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.2)]";
+  return "max-w-[92%] overflow-hidden break-words rounded-lg border border-border bg-card px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.2)] sm:max-w-[82%]";
 }
 
 function statusTone(status: MonitorSessionStatus) {
