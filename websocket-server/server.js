@@ -247,13 +247,14 @@ function sanitizeText(value, maxLength) {
 }
 
 function parseCorsOrigins(value) {
-  if (value.trim() === "*") {
-    return "*";
-  }
   const origins = value
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  if (origins.includes("*")) {
+    return "*";
+  }
 
   return origins.length > 0 ? origins : false;
 }
@@ -295,4 +296,3 @@ if (isEntrypoint) {
   server.listen(PORT, () => {
     console.info(`AgentDesk websocket server listening on ${PORT}`);
   });
-}
