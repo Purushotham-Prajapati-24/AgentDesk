@@ -100,8 +100,8 @@ export function WebChatColorField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid grid-cols-[1fr_56px] items-end gap-3">
-      <span>
+    <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] items-end gap-3">
+      <span className="min-w-0">
         <span className="webchat-label">{label}</span>
         <input className="webchat-input font-mono" value={value} onChange={(event) => onChange(event.target.value)} />
       </span>

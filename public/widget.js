@@ -503,11 +503,11 @@
 
       .ad-widget.inline {
         bottom: auto;
-        height: 100vh;
+        height: 100svh;
         inset: 0;
         position: fixed;
         right: auto;
-        width: 100vw;
+        width: 100%;
       }
 
       .ad-chat-pane {
@@ -518,7 +518,7 @@
         color: var(--ad-text-primary);
         display: flex;
         flex-direction: column;
-        height: min(600px, calc(100vh - 112px));
+        height: min(600px, calc(100svh - 112px));
         opacity: 0;
         overflow: hidden;
         pointer-events: none;
@@ -527,7 +527,8 @@
         right: 0;
         transform: translateY(24px) scale(0.96);
         transition: opacity 180ms ease, transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
-        width: min(380px, calc(100vw - 32px));
+        max-width: calc(100svw - 32px);
+        width: min(380px, calc(100svw - 32px));
         backdrop-filter: blur(16px) saturate(180%);
         -webkit-backdrop-filter: blur(16px) saturate(180%);
       }
@@ -535,12 +536,12 @@
       .ad-widget.inline .ad-chat-pane {
         border: 0;
         border-radius: 0;
-        height: 100vh;
+        height: 100svh;
         opacity: 1;
         pointer-events: auto;
         position: static;
         transform: none;
-        width: 100vw;
+        width: 100%;
       }
 
       .ad-chat-pane.active {
@@ -641,7 +642,7 @@
         border-radius: 16px;
         font-size: 14px;
         line-height: 1.5;
-        max-width: 82%;
+        max-width: 88%;
         overflow-wrap: anywhere;
         padding: 11px 13px;
       }
@@ -736,6 +737,7 @@
         border-radius: 14px;
         color: var(--ad-text-primary);
         max-height: 96px;
+        min-width: 0;
         min-height: 42px;
         outline: none;
         padding: 11px 12px;
@@ -821,9 +823,26 @@
         }
 
         .ad-chat-pane {
+          border-radius: 14px;
+          bottom: 88px;
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.34);
+          height: min(620px, calc(100svh - 112px));
+          left: 8px;
+          max-width: none;
+          position: fixed;
+          right: 8px;
+          width: auto;
+        }
+
+        .ad-widget.inline .ad-chat-pane {
           border-radius: 0;
-          height: 100vh;
-          width: 100vw;
+          height: 100svh;
+          inset: 0;
+          width: 100%;
+        }
+
+        .ad-message {
+          max-width: 92%;
         }
 
         .ad-launcher-button {

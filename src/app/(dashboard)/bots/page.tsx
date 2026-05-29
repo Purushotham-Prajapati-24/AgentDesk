@@ -166,7 +166,7 @@ export default function BotsPage() {
         action={<StatusPill tone="warn">{bots.length} configured</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[340px_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:px-8">
         <Panel className="h-fit p-4">
           <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
             <div>
@@ -219,7 +219,7 @@ export default function BotsPage() {
                 <p className="studio-kicker text-muted-foreground">Tenant: {tenant?.$id ?? "Unavailable"}</p>
                 <h2 className="text-3xl font-bold leading-tight">{selectedBot ? "Edit bot" : "Create bot"}</h2>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
                 {selectedBot && (
                   <Button
@@ -276,11 +276,12 @@ export default function BotsPage() {
 
             {status ? <p className="mt-5 border border-border bg-secondary/60 px-3 py-2 text-sm font-bold text-foreground">{status}</p> : null}
 
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
+            <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
+              <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
                 Save bot
               </Button>
               <Button
+                className="w-full sm:w-auto"
                 disabled={!selectedBot}
                 leftIcon={<Trash2 aria-hidden="true" className="h-4 w-4" />}
                 onClick={requestDeleteBot}

@@ -44,7 +44,7 @@ function LoginContent() {
   };
 
   return (
-    <main className="grid min-h-screen bg-background text-foreground lg:grid-cols-[1fr_480px]">
+    <main className="grid min-h-screen overflow-x-hidden bg-background text-foreground lg:grid-cols-[minmax(0,1fr)_480px]">
       <section className="relative flex min-h-[50vh] flex-col justify-between overflow-hidden border-b border-border bg-card p-5 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-8">
         <DarkVeil />
         <Link className="relative inline-flex w-fit items-center gap-2 text-sm font-semibold text-primary" href="/">
@@ -54,7 +54,7 @@ function LoginContent() {
 
         <div className="studio-enter relative">
           <StatusPill tone="hot">Access gate</StatusPill>
-          <h1 className="mt-5 max-w-3xl text-[clamp(3.5rem,10vw,7rem)] font-bold leading-[0.9]">
+          <h1 className="mt-5 max-w-3xl text-5xl font-bold leading-[0.94] sm:text-6xl lg:text-7xl">
             Verify the operator console.
           </h1>
         </div>
@@ -75,7 +75,7 @@ function LoginContent() {
         </div>
       </section>
 
-      <section className="flex items-center p-5 lg:p-8">
+      <section className="flex min-w-0 items-center p-5 lg:p-8">
         <form className="studio-surface w-full rounded-xl p-5 sm:p-6" onSubmit={handleSubmit}>
           <div className="flex items-center gap-3 border-b border-border pb-5">
             <span className="flex h-12 w-12 items-center justify-center rounded-md border border-primary/50 bg-primary/10 text-primary">

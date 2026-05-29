@@ -56,6 +56,8 @@
 
 html {
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
   background: var(--background);
   color: var(--foreground);
@@ -63,6 +65,7 @@ html {
 
 body {
   min-height: 100%;
+  max-width: 100%;
   overflow-x: hidden;
   background:
     radial-gradient(circle at 50% -20%, rgba(245, 158, 11, 0.13), transparent 34rem),
@@ -106,6 +109,7 @@ select,
 button,
 input,
 textarea {
+  max-width: 100%;
   outline: none;
 }
 

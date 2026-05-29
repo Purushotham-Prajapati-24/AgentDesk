@@ -101,7 +101,7 @@ export default function WidgetCustomizerPage() {
         action={<StatusPill tone="hot">Live preview</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[380px_1fr] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[380px_minmax(0,1fr)] lg:px-8">
         <Panel className="p-5">
           <form className="space-y-5" onSubmit={saveTheme}>
             <section className="border-b border-border pb-4">
@@ -182,12 +182,12 @@ export default function WidgetCustomizerPage() {
           </form>
         </Panel>
 
-        <section className="studio-surface relative min-h-[720px] rounded-xl p-5 text-foreground">
-          <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-2 font-mono text-xs font-bold text-primary">
+        <section className="studio-surface relative min-w-0 rounded-xl p-4 text-foreground sm:p-5">
+          <div className="flex w-fit items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-2 font-mono text-xs font-bold text-primary">
             <Paintbrush aria-hidden="true" className="h-4 w-4" />
             WIDGET ARTIFACT
           </div>
-          <div className="flex min-h-[680px] items-center justify-center pt-14">
+          <div className="flex min-h-[520px] items-center justify-center overflow-hidden py-6 lg:min-h-[680px]">
             <WidgetPreview config={config} />
           </div>
           <div className="grid gap-3 border-t border-border pt-5 lg:grid-cols-2">
@@ -218,8 +218,8 @@ function TextField({ label, value, disabled = false, onChange }: { label: string
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className="grid grid-cols-[1fr_56px] items-end gap-3">
-      <span>
+    <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] items-end gap-3">
+      <span className="min-w-0">
         <span className="studio-kicker mb-2 block text-muted-foreground">{label}</span>
         <input
           className="min-h-11 w-full border border-border bg-card px-3 font-mono text-sm font-bold focus:bg-secondary/60"
@@ -251,9 +251,9 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
   const showCustomIcon = config.useCustomIcon && isHttpUrl(config.widgetIconUrl);
 
   return (
-    <div className="relative">
+    <div className="relative w-full max-w-[390px]">
       <div
-        className="flex h-[620px] w-full max-w-[390px] flex-col overflow-hidden rounded-2xl border border-border shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
+        className="flex h-[min(620px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-border shadow-[0_18px_48px_rgba(0,0,0,0.38)] sm:shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
         style={{
           background: config.backgroundColor,
           color: config.textColor,
@@ -284,7 +284,7 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
 
         <div className="border-t border-black/30 p-4">
           <div className="flex gap-2">
-            <div className="flex min-h-11 flex-1 items-center rounded-md border border-white/10 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
+            <div className="flex min-h-11 min-w-0 flex-1 items-center rounded-md border border-white/10 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
               Write your message here...
             </div>
             <button className="min-h-11 rounded-md border border-white/20 px-4 text-sm font-bold text-white" style={{ background: config.accentColor }} type="button">
@@ -296,7 +296,7 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
 
       <button
         aria-label="Launcher preview"
-        className="absolute bottom-[-18px] right-[-18px] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-0 text-3xl font-black text-white shadow-[0_16px_42px_rgba(0,0,0,0.4)] z-10"
+        className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-0 text-2xl font-black text-white shadow-[0_12px_30px_rgba(0,0,0,0.36)] sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl sm:shadow-[0_16px_42px_rgba(0,0,0,0.4)]"
         style={{ background: config.accentColor }}
         type="button"
       >
@@ -324,7 +324,7 @@ function PreviewBubble({
 }) {
   return (
     <div className={`flex ${align === "right" ? "justify-end" : "justify-start"}`}>
-      <p className="max-w-[78%] rounded-[18px] border border-white/10 px-4 py-3 text-sm font-bold leading-6" style={{ background: color, color: textColor }}>
+      <p className="max-w-[92%] break-words rounded-[18px] border border-white/10 px-4 py-3 text-sm font-bold leading-6 sm:max-w-[78%]" style={{ background: color, color: textColor }}>
         {children}
       </p>
     </div>

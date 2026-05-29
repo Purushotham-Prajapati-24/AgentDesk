@@ -74,7 +74,7 @@ export default function MonitorAnalyticsPage() {
         ) : null}
 
         {snapshot ? (
-          <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
             <div className="grid gap-5">
               <Panel className="p-5">
                 <div className="mb-5 flex items-center justify-between gap-3">
@@ -122,7 +122,7 @@ export default function MonitorAnalyticsPage() {
                   <div className="grid gap-3">
                     {snapshot.topBots.map((bot) => (
                       <div className="rounded-lg border border-border bg-secondary/50 p-3" key={bot.botId}>
-                        <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center justify-between gap-3">
                           <p className="truncate font-mono text-sm font-bold text-foreground">{bot.botId}</p>
                           <StatusPill tone="dark">{bot.conversations} conv</StatusPill>
                         </div>
@@ -144,7 +144,7 @@ export default function MonitorAnalyticsPage() {
                   <div className="grid gap-3">
                     {snapshot.attentionConversations.map((conversation) => (
                       <article className="rounded-lg border border-border bg-card p-3" key={conversation.id}>
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate font-bold text-foreground">{conversation.sessionToken}</p>
                             <p className="mt-1 truncate font-mono text-xs font-bold text-muted-foreground">{conversation.botId || "unassigned bot"}</p>
