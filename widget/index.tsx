@@ -37,7 +37,11 @@
   const DEFAULT_TIMEOUT_MS = 12000;
   const MAX_MESSAGE_LENGTH = 1200;
 
-  const currentScript = (document.currentScript || document.querySelector('script[data-bot-id]')) as HTMLScriptElement | null;
+  const currentScript = (
+    document.currentScript || 
+    document.querySelector('script[data-bot-id]') || 
+    document.querySelector('script[src*="widget.js"]')
+  ) as HTMLScriptElement | null;
   const scriptUrl = currentScript?.src ? new URL(currentScript.src, window.location.href) : null;
   const scriptOrigin = scriptUrl?.origin ?? window.location.origin;
   
