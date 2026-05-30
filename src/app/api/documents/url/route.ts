@@ -52,11 +52,8 @@ export async function POST(request: Request) {
           file_type: "url",
           storage_path: pageUrl,
           file_size: 0,
-          attempts: 0,
           status: "queued",
-          last_error: "",
           created: new Date().toISOString(),
-          updated: new Date().toISOString(),
         });
         createdDocuments.push({ document_id: document.$id, url: pageUrl });
       }
@@ -74,11 +71,8 @@ export async function POST(request: Request) {
       file_type: "url",
       storage_path: url,
       file_size: 0,
-      attempts: 0,
       status: "queued",
-      last_error: "",
       created: new Date().toISOString(),
-      updated: new Date().toISOString(),
     });
 
     return Response.json({ success: true, data: { document_id: document.$id, url, status: "queued" } }, { status: 201 });

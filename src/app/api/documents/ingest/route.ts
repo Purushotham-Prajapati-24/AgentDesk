@@ -127,7 +127,7 @@ async function claimDocument(
 
   if (claimed && (document.status === "queued" || document.status === "crawling")) {
     try {
-      await databases.updateDocument(databaseId(), documentsCollectionId(), document.$id, {
+      await updateDocumentCompat(databases, document.$id, {
         status: "crawling",
         updated: new Date().toISOString(),
       });
@@ -163,7 +163,7 @@ async function crawlQueuedDocument(
       throw new Error("No readable text could be extracted from this URL.");
     }
 
-    await databases.updateDocument(databaseId(), documentsCollectionId(), document.$id, {
+    await updateDocumentCompat(databases, document.$id, {
       parsed_text: markdown,
       file_size: markdown.length,
       status: "processing",
@@ -207,7 +207,7 @@ async function processDocument(
     fileName: stringValue(document.file_name, "document"),
   });
 
-  await databases.updateDocument(databaseId(), documentsCollectionId(), document.$id, {
+  await updateDocumentCompat(databases, document.$id, {
     status: "processed",
     last_error: "",
     updated: new Date().toISOString(),
@@ -221,12 +221,33 @@ async function markDocumentFailed(
   document: DocumentFile,
   errorMessage = "Document ingestion failed.",
 ) {
-  await databases.updateDocument(databaseId(), documentsCollectionId(), document.$id, {
+  await updateDocumentCompat(databases, document.$id, {
     attempts: numberValue(document.attempts, 0) + 1,
     status: "failed",
     last_error: errorMessage.slice(0, 1000),
     updated: new Date().toISOString(),
   });
+}
+
+async function updateDocumentCompat(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  documentId: string,
+  data: Record<string, unknown>,
+) {
+  const remaining = { ...data };
+
+  while (true) {
+    try {
+      return await databases.updateDocument(databaseId(), documentsCollectionId(), documentId, remaining);
+    } catch (error) {
+      const unknownAttribute = getUnknownAttribute(error);
+      if (!unknownAttribute || !(unknownAttribute in remaining)) {
+        throw error;
+      }
+
+      delete remaining[unknownAttribute];
+    }
+  }
 }
 
 async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
@@ -271,4 +292,12 @@ function jsonError(code: string, message: string, status: number) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Document ingestion failed.";
+}
+
+function getUnknownAttribute(error: unknown) {
+  if (!(error instanceof Error)) {
+    return null;
+  }
+
+  return error.message.match(/Unknown attribute: "([^"]+)"/)?.[1] ?? null;
 }
