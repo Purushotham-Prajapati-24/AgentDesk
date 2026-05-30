@@ -77,3 +77,13 @@ Docs folder (design artefacts, not shipped code)
 /docs
 index.html
 verification-screenshots
+# Added by code-review-graph
+.code-review-graph/
+
+.gemini
+.opencode.json
+.mcp.json 
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+QODER.md

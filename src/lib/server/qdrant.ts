@@ -1,4 +1,5 @@
 import type { Chunk } from "./chunking";
+import { createHash } from "node:crypto";
 
 const EMBEDDING_DIMENSIONS = 768;
 
@@ -110,7 +111,7 @@ export async function upsertKnowledgePoints({
     };
 
     return {
-      id: crypto.randomUUID(),
+      id: knowledgePointId(fileId, chunk.chunkIndex),
       vector: isHybridIndexEnabled()
         ? {
             dense: embeddings[index],
@@ -133,6 +134,11 @@ export async function upsertKnowledgePoints({
   if (!response.ok) {
     throw new Error("Qdrant upsert failed.");
   }
+}
+
+export function knowledgePointId(fileId: string, chunkIndex: number) {
+  const hash = createHash("sha256").update(`${fileId}:${chunkIndex}`).digest("hex");
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-${variantNibble(hash[16])}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
 
 export async function deleteKnowledgePointsForBot(tenantId: string, botId: string) {
@@ -291,4 +297,9 @@ export function bm25SearchBody(query: string, tenantId: string, botId: string, l
 
 function baseCollection() {
   return process.env.QDRANT_COLLECTION ?? "agent_knowledge_base";
+}
+
+function variantNibble(value: string) {
+  const nibble = Number.parseInt(value, 16);
+  return ((nibble & 0x3) | 0x8).toString(16);
 }

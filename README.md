@@ -41,6 +41,8 @@
 | ⚡ **Streaming Responses** | Server-Sent Events (SSE) stream bot replies token-by-token for instant feedback |
 | 📄 **Docs Portal** | Public-facing documentation site — no login required |
 
+See [`docs/Features.md`](docs/Features.md) for the maintained feature catalog.
+
 ---
 
 ## 🏗️ Architecture
@@ -431,6 +433,7 @@ Returns the public bot configuration consumed by the widget.
 | `npm run build` | Build widget then Next.js production bundle |
 | `npm run build:widget` | Compile `widget/index.tsx` → `public/widget.js` |
 | `npm run qdrant:hybrid` | Create Qdrant hybrid collection (dense + sparse vectors) |
+| `npm run setup:ingestion` | Create Appwrite ingestion metadata and lock schema |
 | `npm run lint` | Run ESLint |
 
 ---

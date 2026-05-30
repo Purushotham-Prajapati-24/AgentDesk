@@ -10,9 +10,12 @@ type UploadMetadata = {
   file_type: string;
   storage_path: string;
   file_size: number;
+  attempts: number;
   status: "processing";
+  last_error: string;
   parsed_text: string;
   created: string;
+  updated: string;
 };
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -59,9 +62,12 @@ export async function POST(request: Request) {
       file_type: fileType,
       storage_path: storedFile.$id,
       file_size: file.size,
+      attempts: 0,
       status: "processing",
+      last_error: "",
       parsed_text: parsedText.slice(0, 500000),
       created: new Date().toISOString(),
+      updated: new Date().toISOString(),
     };
 
     const document = await databases.createDocument(databaseId(), documentsCollectionId(), ID.unique(), metadata);

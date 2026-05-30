@@ -19,6 +19,23 @@ type BotOption = {
   name: string;
 };
 
+type IngestResult = {
+  chunks?: number;
+  status?: string;
+};
+
+type IngestResponseBody = {
+  success: boolean;
+  error?: { message: string };
+  data?: {
+    processed?: IngestResult[];
+    claimed?: number;
+    remaining?: number;
+  };
+};
+
+const FAN_OUT_CONCURRENCY = 3;
+
 export default function DocumentsPage() {
   const { tenant } = useTenant();
   const { user } = useAuth();
@@ -89,26 +106,27 @@ export default function DocumentsPage() {
     setUploadState({ status: "processing", message: `Document uploaded. Starting vector processing for ${body.data?.document_id ?? "the file"}...` });
     setFile(null);
 
-    const ingestResponse = await fetch("/api/documents/ingest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: tenant.$id,
-        bot_id: botId,
-        user_id: user?.$id,
-        limit: 10,
-      }),
-    });
-    const ingestBody = (await ingestResponse.json()) as { success: boolean; error?: { message: string }; data?: { processed?: Array<{ chunks?: number }> } };
-
-    if (!ingestResponse.ok || !ingestBody.success) {
-      setUploadState({ status: "error", message: ingestBody.error?.message ?? "Upload succeeded, but vector processing failed." });
+    let result;
+    try {
+      result = await runIngestionWorkers({
+        tenantId: tenant.$id,
+        botId,
+        userId: user?.$id || "",
+        queuedCount: 1,
+        concurrency: 1,
+        onProgress: ({ processedCount, chunkCount }) => {
+          setUploadState({ status: "processing", message: `Vector processing in progress: ${processedCount} document(s), ${chunkCount} chunk(s).` });
+        },
+      });
+    } catch (error) {
+      setUploadState({ status: "error", message: error instanceof Error ? error.message : "Upload succeeded, but vector processing failed." });
       return;
     }
 
-    const processedCount = ingestBody.data?.processed?.length ?? 0;
-    const chunkCount = ingestBody.data?.processed?.reduce((total, item) => total + (item.chunks ?? 0), 0) ?? 0;
-    setUploadState({ status: "success", message: `Vector processing complete for ${processedCount} document(s), ${chunkCount} chunk(s).` });
+    setUploadState({
+      status: result.failedCount > 0 ? "error" : "success",
+      message: `Vector processing complete for ${result.processedCount} document(s), ${result.chunkCount} chunk(s). Failed: ${result.failedCount}.`,
+    });
   }
 
   async function ingestUrl(event: FormEvent<HTMLFormElement>) {
@@ -124,7 +142,7 @@ export default function DocumentsPage() {
       return;
     }
 
-    setUploadState({ status: "uploading", message: "Fetching URL and extracting readable text..." });
+    setUploadState({ status: "uploading", message: "Queueing URL ingestion..." });
     const response = await fetch("/api/documents/url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -135,35 +153,47 @@ export default function DocumentsPage() {
         url: sourceUrl,
       }),
     });
-    const body = (await response.json()) as { success: boolean; error?: { message: string }; data?: { document_id: string } };
+    const body = (await response.json()) as {
+      success: boolean;
+      error?: { message: string };
+      data?: { document_id?: string; count?: number; sitemap?: boolean };
+    };
 
     if (!response.ok || !body.success) {
       setUploadState({ status: "error", message: body.error?.message ?? "URL ingestion failed." });
       return;
     }
 
-    setUploadState({ status: "processing", message: `URL captured. Starting vector processing for ${body.data?.document_id ?? "the page"}...` });
-    const ingestResponse = await fetch("/api/documents/ingest", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: tenant.$id,
-        bot_id: botId,
-        user_id: user?.$id,
-        limit: 10,
-      }),
+    const queuedCount = body.data?.count ?? 1;
+    setUploadState({
+      status: "processing",
+      message: `Queued ${queuedCount} source${queuedCount === 1 ? "" : "s"}. Starting vector processing...`,
     });
-    const ingestBody = (await ingestResponse.json()) as { success: boolean; error?: { message: string }; data?: { processed?: Array<{ chunks?: number }> } };
-
-    if (!ingestResponse.ok || !ingestBody.success) {
-      setUploadState({ status: "error", message: ingestBody.error?.message ?? "URL captured, but vector processing failed." });
+    let result;
+    try {
+      result = await runIngestionWorkers({
+        tenantId: tenant.$id,
+        botId,
+        userId: user?.$id || "",
+        queuedCount,
+        concurrency: body.data?.sitemap ? FAN_OUT_CONCURRENCY : 1,
+        onProgress: ({ processedCount, chunkCount, failedCount }) => {
+          setUploadState({
+            status: "processing",
+            message: `Vector processing in progress: ${processedCount}/${queuedCount} source(s), ${chunkCount} chunk(s), ${failedCount} failed.`,
+          });
+        },
+      });
+    } catch (error) {
+      setUploadState({ status: "error", message: error instanceof Error ? error.message : "URL captured, but vector processing failed." });
       return;
     }
 
     setSourceUrl("");
-    const processedCount = ingestBody.data?.processed?.length ?? 0;
-    const chunkCount = ingestBody.data?.processed?.reduce((total, item) => total + (item.chunks ?? 0), 0) ?? 0;
-    setUploadState({ status: "success", message: `Vector processing complete for ${processedCount} source(s), ${chunkCount} chunk(s).` });
+    setUploadState({
+      status: result.failedCount > 0 ? "error" : "success",
+      message: `Vector processing complete for ${result.processedCount} queued source(s), ${result.chunkCount} chunk(s). Failed: ${result.failedCount}.`,
+    });
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -239,7 +269,7 @@ export default function DocumentsPage() {
               </p>
             ) : null}
 
-            <Button className="mt-5 w-full sm:w-auto" loading={uploadState.status === "uploading"} type="submit">
+            <Button className="mt-5 w-full sm:w-auto" disabled={uploadState.status === "processing"} loading={uploadState.status === "uploading"} type="submit">
               Upload document
             </Button>
           </form>
@@ -249,9 +279,15 @@ export default function DocumentsPage() {
               label="Source URL"
               value={sourceUrl}
               onChange={(event) => setSourceUrl(event.target.value)}
-              hint="Capture public help center articles, policies, FAQs, or product pages."
+              hint="Capture public help center articles, policies, FAQs, product pages, or sitemap.xml files."
             />
-            <Button className="mt-5 w-full sm:w-auto" disabled={!sourceUrl.trim()} loading={uploadState.status === "uploading"} type="submit" variant="secondary">
+            <Button
+              className="mt-5 w-full sm:w-auto"
+              disabled={!sourceUrl.trim() || uploadState.status === "processing"}
+              loading={uploadState.status === "uploading"}
+              type="submit"
+              variant="secondary"
+            >
               Ingest URL
             </Button>
           </form>
@@ -259,6 +295,64 @@ export default function DocumentsPage() {
       </div>
     </div>
   );
+}
+
+async function runIngestionWorkers({
+  tenantId,
+  botId,
+  userId,
+  queuedCount,
+  concurrency,
+  onProgress,
+}: {
+  tenantId: string;
+  botId: string;
+  userId: string;
+  queuedCount: number;
+  concurrency: number;
+  onProgress: (progress: { processedCount: number; chunkCount: number; failedCount: number }) => void;
+}) {
+  const workerCount = Math.max(1, Math.min(concurrency, queuedCount || 1));
+  const totals = { processedCount: 0, chunkCount: 0, failedCount: 0 };
+
+  async function runWorker(workerIndex: number) {
+    const workerId = `dashboard-${Date.now().toString(36)}-${workerIndex}-${crypto.randomUUID()}`;
+
+    while (true) {
+      const response = await fetch("/api/documents/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          bot_id: botId,
+          user_id: userId,
+          limit: 1,
+          worker_id: workerId,
+        }),
+      });
+      const body = (await response.json()) as IngestResponseBody;
+
+      if (!response.ok || !body.success) {
+        throw new Error(body.error?.message ?? "Vector processing failed.");
+      }
+
+      const processed = body.data?.processed ?? [];
+      totals.processedCount += processed.length;
+      totals.chunkCount += processed.reduce((total, item) => total + (item.chunks ?? 0), 0);
+      totals.failedCount += processed.filter((item) => item.status === "failed").length;
+
+      if (processed.length > 0) {
+        onProgress(totals);
+      }
+
+      if ((body.data?.claimed ?? 0) === 0 || (body.data?.remaining ?? 0) === 0) {
+        break;
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, (_, index) => runWorker(index)));
+  return totals;
 }
 
 function uploadMessageClass(status: UploadState["status"]) {
