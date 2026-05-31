@@ -358,7 +358,7 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="cockpit-lane min-h-screen">
       <PageHeader
         kicker="Live operations"
         title="Inbox with the kill switch in reach."
@@ -366,7 +366,7 @@ export default function InboxPage() {
         action={<ConnectionBadge status={socketStatus} />}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[330px_minmax(0,1fr)] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[330px_minmax(0,1fr)_300px] lg:px-8">
         <aside className="grid min-w-0 gap-5">
           <Panel className="p-4">
             <form className="grid gap-3" onSubmit={updateRoom}>
@@ -388,13 +388,13 @@ export default function InboxPage() {
 
           <Panel className="p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-bold">Conversation history</h2>
+              <h2 className="text-lg font-semibold text-white">Conversation history</h2>
               <StatusPill tone="dark">{historyLoading ? "..." : history.length}</StatusPill>
             </div>
 
             <form className="mb-4 flex gap-2" onSubmit={searchHistory}>
               <input
-                className="min-h-10 min-w-0 flex-1 border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
+                className="min-h-10 min-w-0 flex-1 border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
                 placeholder="Search session, bot, status"
                 value={historySearchInput}
                 onChange={(event) => setHistorySearchInput(event.target.value)}
@@ -411,7 +411,7 @@ export default function InboxPage() {
                 history.map((conversation) => (
                   <button
                     className={`transition hover:-translate-y-0.5 w-full border p-4 text-left ${
-                      selectedConversationId === conversation.id ? "border-primary/70 bg-primary/10" : "border-border bg-secondary/60"
+                      selectedConversationId === conversation.id ? "border-[#0099ff] bg-[#0099ff]/10" : "border-[#262626] bg-[#141414]"
                     }`}
                     key={conversation.id}
                     onClick={() => void selectConversation(conversation)}
@@ -462,7 +462,7 @@ export default function InboxPage() {
         </aside>
 
         <Panel className="flex min-h-[520px] min-w-0 flex-col overflow-hidden lg:min-h-[700px]">
-          <div className="flex flex-col gap-3 border-b border-border bg-primary/10 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 border-b border-[#262626] bg-[#141414] px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-foreground">Conversation</h2>
               <p className="mt-1 break-all font-mono text-xs font-bold text-muted-foreground">
@@ -473,11 +473,11 @@ export default function InboxPage() {
             <Button
               className="w-full sm:w-auto"
               type="button"
-              variant={sessionStatus === "paused_by_human" ? "primary" : "danger"}
+              variant={sessionStatus === "paused_by_human" ? "secondary" : "danger"}
               onClick={() => void toggleTakeover()}
               disabled={socketStatus !== "connected"}
             >
-              {sessionStatus === "paused_by_human" ? "Resume AI" : "Pause AI / Take Over"}
+              {sessionStatus === "paused_by_human" ? "Resume AI" : "Take Over (Mute AI)"}
             </Button>
           </div>
 
@@ -489,7 +489,7 @@ export default function InboxPage() {
             <div className="border-b border-border bg-destructive px-4 py-3 text-sm font-bold text-white">{error}</div>
           ) : null}
 
-          <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-secondary/60 px-4 py-5">
+          <div ref={feedRef} className="flex-1 space-y-4 overflow-y-auto bg-[#090909] px-4 py-5">
             {messages.length === 0 ? (
               <EmptyState title="Waiting for live messages" description="Connect a tenant-scoped session to watch support traffic in real time." />
             ) : (
@@ -497,10 +497,10 @@ export default function InboxPage() {
             )}
           </div>
 
-          <form className="border-t border-border bg-card p-4" onSubmit={(event) => void sendAgentMessage(event)}>
+          <form className="border-t border-[#262626] bg-[#141414] p-4" onSubmit={(event) => void sendAgentMessage(event)}>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
-                className="min-h-12 flex-1 border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60 disabled:cursor-not-allowed disabled:bg-secondary/60"
+                className="min-h-12 flex-1 border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414] disabled:cursor-not-allowed disabled:bg-[#1c1c1c]"
                 disabled={sessionStatus !== "paused_by_human" || socketStatus !== "connected"}
                 maxLength={4000}
                 placeholder={sessionStatus === "paused_by_human" ? "Reply as the human agent..." : "Pause AI to unlock manual replies"}
@@ -517,6 +517,26 @@ export default function InboxPage() {
             </div>
           </form>
         </Panel>
+
+        <aside className="grid content-start gap-5">
+          <Panel className="p-4">
+            <p className="studio-kicker text-[#0099ff]">Customer context</p>
+            <div className="mt-4 grid gap-3 text-sm">
+              <div className="border border-[#262626] bg-[#090909] p-3">
+                <p className="text-[#999999]">Tenant</p>
+                <p className="mt-1 break-all font-mono text-white">{room.tenantId}</p>
+              </div>
+              <div className="border border-[#262626] bg-[#090909] p-3">
+                <p className="text-[#999999]">Session</p>
+                <p className="mt-1 break-all font-mono text-white">{room.sessionId}</p>
+              </div>
+              <div className="border border-[#262626] bg-[#090909] p-3">
+                <p className="text-[#999999]">RAG signal</p>
+                <p className="mt-1 font-semibold text-white">{messages.some((message) => message.shouldCallRag) ? "Source lookup requested" : "No source flag yet"}</p>
+              </div>
+            </div>
+          </Panel>
+        </aside>
       </div>
     </div>
   );
@@ -564,14 +584,14 @@ function ConnectionBadge({ status }: { status: "connecting" | "connected" | "dis
 
 function messageBubbleClass(sender: Sender) {
   if (sender === "agent") {
-    return "max-w-[92%] overflow-hidden rounded-[18px] border border-primary/50 bg-primary px-4 py-3 text-primary-foreground shadow-[0_18px_36px_rgba(0,0,0,0.28)] break-words sm:max-w-[82%]";
+    return "max-w-[92%] overflow-hidden rounded-[14px] border border-[#0099ff]/50 bg-[#0099ff] px-4 py-3 text-white break-words sm:max-w-[82%]";
   }
 
   if (sender === "bot") {
-    return "max-w-[92%] overflow-hidden rounded-[18px] border border-accent/40 bg-accent/10 px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.22)] break-words sm:max-w-[82%]";
+    return "max-w-[92%] overflow-hidden rounded-[14px] border border-[#1456f0]/40 bg-[#1456f0]/10 px-4 py-3 text-white break-words sm:max-w-[82%]";
   }
 
-  return "max-w-[92%] overflow-hidden rounded-[18px] border border-border bg-card px-4 py-3 text-foreground shadow-[0_18px_36px_rgba(0,0,0,0.2)] break-words sm:max-w-[82%]";
+  return "max-w-[92%] overflow-hidden rounded-[14px] border border-[#262626] bg-[#141414] px-4 py-3 text-white break-words sm:max-w-[82%]";
 }
 
 function mapSocketMessage(message: SocketEventMessage): ChatMessage {

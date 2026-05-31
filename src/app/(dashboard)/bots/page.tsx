@@ -158,67 +158,62 @@ export default function BotsPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="cockpit-lane min-h-screen">
       <PageHeader
         kicker="Bot studio"
-        title="Write the behavior before the support line opens."
-        description="Create tenant-scoped support agents, set their instruction spine, and define the fallback message customers hear when knowledge is missing."
+        title="Support agents as operational artifacts."
+        description="Create tenant-scoped agents, set their instruction spine, and keep fallback behavior explicit before customer traffic arrives."
         action={<StatusPill tone="warn">{bots.length} configured</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:px-8">
-        <Panel className="h-fit p-4">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-            <div>
-              <p className="studio-kicker text-muted-foreground">Roster</p>
-              <h2 className="text-2xl font-bold">Bots</h2>
-            </div>
-            <Button
-              leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
-              onClick={() => {
-                setSelectedId(null);
-                setForm(EMPTY_FORM);
-                setStatus("");
-              }}
-              size="sm"
-              type="button"
-              variant="secondary"
-            >
-              New
-            </Button>
-          </div>
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,1.05fr)_420px] lg:px-8">
+        <section className="grid content-start gap-4 md:grid-cols-2">
+          <button
+            className="min-h-[260px] rounded-2xl border border-[#262626] bg-[#141414] p-7 text-left transition hover:-translate-y-1 hover:border-white/50"
+            onClick={() => {
+              setSelectedId(null);
+              setForm(EMPTY_FORM);
+              setStatus("");
+            }}
+            type="button"
+          >
+            <Plus aria-hidden="true" className="h-6 w-6 text-[#0099ff]" />
+            <h2 className="mt-24 text-4xl font-semibold tracking-[-0.05em] text-white">New support bot</h2>
+            <p className="mt-3 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
+          </button>
 
-          <div className="mt-4 grid gap-2">
-            {bots.length === 0 ? (
+          {bots.length === 0 ? (
+            <Panel className="min-h-[260px] p-7">
               <EmptyState title="No bots configured" description="Create a support agent for this tenant to begin training behavior." />
-            ) : (
-              bots.map((bot) => (
-                <button
-                  className={`group w-full border-2 p-3 text-left text-sm transition hover:-translate-y-0.5 ${
-                    bot.$id === selectedId ? "border-border bg-primary/10" : "border-border bg-card hover:bg-secondary/60"
-                  }`}
-                  key={bot.$id}
-                  onClick={() => selectBot(bot)}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2 font-bold text-foreground">
-                    <BotIcon aria-hidden="true" className="h-4 w-4 text-primary" />
-                    {bot.name}
-                  </span>
-                  <span className="mt-2 block truncate font-mono text-xs font-bold text-muted-foreground">{bot.$id}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </Panel>
+            </Panel>
+          ) : (
+            bots.map((bot, index) => (
+              <button
+                className={`min-h-[260px] overflow-hidden rounded-2xl p-7 text-left text-white transition hover:-translate-y-1 ${
+                  bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
+                } ${botCardClass(index)}`}
+                key={bot.$id}
+                onClick={() => selectBot(bot)}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
+                  <BotIcon aria-hidden="true" className="h-6 w-6" />
+                </div>
+                <h2 className="mt-24 break-words text-4xl font-semibold tracking-[-0.05em]">{bot.name}</h2>
+                <p className="mt-3 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+              </button>
+            ))
+          )}
+        </section>
 
-        <Panel className="p-5">
+        <Panel className="h-fit p-5">
           <form onSubmit={saveBot}>
-            <section className="mb-5 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="studio-kicker text-muted-foreground">Tenant: {tenant?.$id ?? "Unavailable"}</p>
-                <h2 className="text-3xl font-bold leading-tight">{selectedBot ? "Edit bot" : "Create bot"}</h2>
-              </div>
+            <section className="mb-5 flex flex-col gap-3 border-b border-[#262626] pb-4">
+            <div>
+                <p className="studio-kicker text-[#0099ff]">Tenant: {tenant?.$id ?? "Unavailable"}</p>
+                <h2 className="mt-1 text-3xl font-semibold leading-tight tracking-[-0.04em] text-white">{selectedBot ? "Edit bot" : "Create bot"}</h2>
+            </div>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
                 {selectedBot && (
@@ -241,9 +236,9 @@ export default function BotsPage() {
 
             <div className="grid gap-4">
               <label className="block">
-                <span className="studio-kicker mb-2 block text-muted-foreground">Bot name</span>
+                <span className="studio-kicker mb-2 block text-[#999999]">Bot name</span>
                 <input
-                  className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
+                  className="min-h-11 w-full border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
                   maxLength={80}
                   required
                   value={form.name}
@@ -252,9 +247,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-muted-foreground">System prompt</span>
+                <span className="studio-kicker mb-2 block text-[#999999]">System prompt</span>
                 <textarea
-                  className="min-h-60 w-full border border-border bg-card px-3 py-3 font-mono text-sm leading-6 focus:bg-secondary/60"
+                  className="min-h-60 w-full border border-[#262626] bg-[#090909] px-3 py-3 font-mono text-sm leading-6 text-white focus:border-[#0099ff] focus:bg-[#141414]"
                   maxLength={4000}
                   required
                   value={form.system_prompt}
@@ -263,9 +258,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-muted-foreground">Fallback message</span>
+                <span className="studio-kicker mb-2 block text-[#999999]">Fallback message</span>
                 <textarea
-                  className="min-h-28 w-full border border-border bg-card px-3 py-3 text-sm font-bold leading-6 focus:bg-secondary/60"
+                  className="min-h-28 w-full border border-[#262626] bg-[#090909] px-3 py-3 text-sm font-semibold leading-6 text-white focus:border-[#0099ff] focus:bg-[#141414]"
                   maxLength={500}
                   required
                   value={form.fallback_message}
@@ -274,7 +269,7 @@ export default function BotsPage() {
               </label>
             </div>
 
-            {status ? <p className="mt-5 border border-border bg-secondary/60 px-3 py-2 text-sm font-bold text-foreground">{status}</p> : null}
+            {status ? <p className="mt-5 border border-[#262626] bg-[#141414] px-3 py-2 text-sm font-semibold text-white">{status}</p> : null}
 
             <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
               <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
@@ -351,5 +346,16 @@ function botToForm(bot: Bot): BotForm {
     system_prompt: bot.system_prompt,
     fallback_message: bot.fallback_message,
   };
+}
+
+function botCardClass(index: number) {
+  const cards = [
+    "bg-[linear-gradient(135deg,#ff5530,#f59e0b)]",
+    "bg-[linear-gradient(135deg,#1456f0,#22c5a5)]",
+    "bg-[linear-gradient(135deg,#1c1c1c,#0099ff)]",
+    "bg-[linear-gradient(135deg,#0f766e,#22c55e)]",
+  ];
+
+  return cards[index % cards.length];
 }
 

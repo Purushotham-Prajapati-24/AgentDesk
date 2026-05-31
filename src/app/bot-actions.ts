@@ -238,12 +238,12 @@ function mapBotDocument(document: BotDocument) {
 function defaultThemeConfig() {
   return {
     theme: {
-      headerHsl: "224 20% 18%",
-      backgroundHsl: "224 25% 12%",
-      textHsl: "210 40% 98%",
-      userBubbleHsl: "250 85% 60%",
-      botBubbleHsl: "224 20% 18%",
-      accentHsl: "250 85% 60%",
+      headerHsl: "0 0% 11%",
+      backgroundHsl: "43 38% 95%",
+      textHsl: "0 0% 11%",
+      userBubbleHsl: "224 88% 51%",
+      botBubbleHsl: "40 50% 98%",
+      accentHsl: "204 100% 50%",
     },
   };
 }

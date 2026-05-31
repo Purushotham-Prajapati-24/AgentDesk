@@ -70,13 +70,13 @@ const BOT_ID_PATTERN = /^[a-zA-Z0-9_-]{3,80}$/;
 const HSL_PATTERN = /^\d{1,3}\s+\d{1,3}%\s+\d{1,3}%$/;
 
 const DEFAULT_THEME: WidgetTheme = {
-  headerHsl: "224 20% 18%",
-  backgroundHsl: "224 25% 12%",
-  textHsl: "210 40% 98%",
-  mutedTextHsl: "215 20% 75%",
-  userBubbleHsl: "250 85% 60%",
-  botBubbleHsl: "224 20% 18%",
-  accentHsl: "250 85% 60%",
+  headerHsl: "0 0% 11%",
+  backgroundHsl: "43 38% 95%",
+  textHsl: "0 0% 11%",
+  mutedTextHsl: "60 1% 37%",
+  userBubbleHsl: "224 88% 51%",
+  botBubbleHsl: "40 50% 98%",
+  accentHsl: "204 100% 50%",
   fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
 };
 

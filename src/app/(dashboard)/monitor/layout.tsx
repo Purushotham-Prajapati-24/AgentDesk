@@ -15,16 +15,16 @@ export default function MonitorLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen">
-      <div className="border-b border-border bg-card/60 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+    <div className="cockpit-lane min-h-screen">
+      <div className="border-b border-[#262626] bg-[#090909] px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-md border border-accent/40 bg-accent/10 text-accent">
+            <span className="flex h-10 w-10 items-center justify-center border border-[#0099ff]/40 bg-[#0099ff]/10 text-[#0099ff]">
               <Activity aria-hidden="true" className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="studio-kicker text-accent">Monitor</p>
-              <p className="text-sm font-semibold text-muted-foreground">Conversation operations and customer health</p>
+              <p className="studio-kicker text-[#0099ff]">Monitor</p>
+              <p className="text-sm font-medium text-[#999999]">Conversation operations and customer health</p>
             </div>
           </div>
 
@@ -35,10 +35,10 @@ export default function MonitorLayout({ children }: { children: React.ReactNode 
               return (
                 <Link
                   className={cn(
-                    "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition",
+                    "inline-flex min-h-10 shrink-0 items-center gap-2 border px-3 py-2 text-sm font-semibold transition",
                     active
-                      ? "border-primary/60 bg-primary/10 text-primary"
-                      : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                      ? "border-white bg-white text-[#090909]"
+                      : "border-[#262626] bg-[#141414] text-[#999999] hover:border-[#0099ff]/50 hover:text-white",
                   )}
                   href={tab.href}
                   key={tab.href}

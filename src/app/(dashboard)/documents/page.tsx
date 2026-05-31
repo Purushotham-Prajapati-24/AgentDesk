@@ -208,7 +208,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="cockpit-lane min-h-screen">
       <PageHeader
         kicker="Knowledge base"
         title="Drop the facts before the bot talks."
@@ -218,11 +218,11 @@ export default function DocumentsPage() {
 
       <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-8">
         <Panel className="h-fit p-5">
-          <p className="studio-kicker text-muted-foreground">Accepted payloads</p>
+          <p className="studio-kicker text-[#0099ff]">Accepted payloads</p>
           <div className="mt-5 grid gap-3">
             {["PDF policies", "DOC manuals", "DOCX manuals", "XLSX spreadsheets", "XLS spreadsheets", "CSV tables", "TXT notes", "Markdown guides"].map((item) => (
-              <div className="flex items-center gap-3 border border-border bg-secondary/60 px-3 py-2 font-bold" key={item}>
-                <FileUp aria-hidden="true" className="h-4 w-4 text-primary" />
+              <div className="flex items-center gap-3 border border-[#262626] bg-[#090909] px-3 py-2 font-semibold text-white" key={item}>
+                <FileUp aria-hidden="true" className="h-4 w-4 text-[#ff5530]" />
                 {item}
               </div>
             ))}
@@ -232,9 +232,9 @@ export default function DocumentsPage() {
         <Panel className="p-5">
           <form onSubmit={uploadDocument}>
             <label className="block">
-              <span className="studio-kicker mb-2 block text-muted-foreground">Bot</span>
+              <span className="studio-kicker mb-2 block text-[#999999]">Bot</span>
               <select
-                className="min-h-11 w-full rounded-md border border-input bg-card-elevated px-3 py-2 text-sm font-bold text-foreground focus:border-primary focus:bg-card"
+                className="min-h-11 w-full border border-[#262626] bg-[#090909] px-3 py-2 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
                 value={botId}
                 onChange={(event) => setBotId(event.target.value)}
               >
@@ -245,19 +245,19 @@ export default function DocumentsPage() {
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-xs font-medium leading-5 text-muted-foreground">
+              <p className="mt-2 text-xs font-medium leading-5 text-[#999999]">
                 Documents are indexed for this exact bot ID. The widget must use the same bot.
               </p>
             </label>
 
             <label
-              className="mt-5 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-primary/50 bg-primary/10 px-4 py-8 text-center transition hover:bg-primary/20 sm:min-h-72 sm:px-6 sm:py-10"
+              className="mt-5 flex min-h-56 cursor-pointer flex-col items-center justify-center border-2 border-dashed border-[#263039] bg-[#141414] px-4 py-8 text-center transition hover:border-[#0099ff] sm:min-h-72 sm:px-6 sm:py-10"
               onDragOver={(event) => event.preventDefault()}
               onDrop={handleDrop}
             >
-              <UploadCloud aria-hidden="true" className="h-12 w-12 text-foreground" />
-              <span className="mt-5 max-w-full break-words text-xl font-bold text-foreground sm:text-2xl">{file ? file.name : "Drop source file"}</span>
-              <span className="mt-2 max-w-md text-sm font-bold leading-6 text-muted-foreground">
+              <UploadCloud aria-hidden="true" className="h-12 w-12 text-[#0099ff]" />
+              <span className="mt-5 max-w-full break-words text-xl font-semibold text-white sm:text-2xl">{file ? file.name : "Drop source file"}</span>
+              <span className="mt-2 max-w-md text-sm font-medium leading-6 text-[#999999]">
                 Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. The upload API will extract text before vector processing.
               </span>
               <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md" onChange={handleFileChange} />
@@ -274,7 +274,7 @@ export default function DocumentsPage() {
             </Button>
           </form>
 
-          <form className="mt-6 border-t border-border pt-5" onSubmit={ingestUrl}>
+            <form className="mt-6 border-t border-[#262626] pt-5" onSubmit={ingestUrl}>
             <Input
               label="Source URL"
               value={sourceUrl}
@@ -357,13 +357,13 @@ async function runIngestionWorkers({
 
 function uploadMessageClass(status: UploadState["status"]) {
   if (status === "success") {
-    return "mt-5 border border-border bg-primary/10 px-3 py-2 text-sm font-bold text-foreground";
+    return "mt-5 border border-[#22c55e]/40 bg-[#22c55e]/10 px-3 py-2 text-sm font-semibold text-[#22c55e]";
   }
 
   if (status === "error") {
-    return "mt-5 border border-border bg-destructive px-3 py-2 text-sm font-bold text-white";
+    return "mt-5 border border-[#ff5530]/40 bg-[#ff5530]/10 px-3 py-2 text-sm font-semibold text-[#ff5530]";
   }
 
-  return "mt-5 border border-border bg-secondary/60 px-3 py-2 text-sm font-bold text-foreground";
+  return "mt-5 border border-[#1456f0]/40 bg-[#1456f0]/10 px-3 py-2 text-sm font-semibold text-[#9bb7ff]";
 }
 
