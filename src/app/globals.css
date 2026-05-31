@@ -116,7 +116,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-editorial: var(--font-eb-garamond), Georgia, serif;
+  --font-editorial: var(--font-plus-jakarta-sans), var(--font-sans), sans-serif;
   --font-cream: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-fira-code), ui-monospace, SFMono-Regular, Consolas, monospace;
 }
@@ -221,10 +221,11 @@ textarea {
 }
 
 .editorial-display {
-  font-family: var(--font-eb-garamond), Georgia, serif;
-  font-weight: 400;
-  letter-spacing: -0.045em;
-  line-height: 0.96;
+  font-family: var(--font-plus-jakarta-sans), var(--font-sans), sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  word-spacing: 0.12em;
+  line-height: 1.1;
 }
 
 .lovable-shadow {

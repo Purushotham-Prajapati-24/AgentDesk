@@ -17,6 +17,7 @@
     "@mozilla/readability": "^0.6.0",
     "@qdrant/js-client-rest": "^1.18.0",
     "appwrite": "^25.2.0",
+    "framer-motion": "^12.40.0",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",

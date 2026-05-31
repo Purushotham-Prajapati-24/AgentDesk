@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Bot, CreditCard, FileText, Inbox, MessageSquare, Radio, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { HeroGeometric } from "@/components/ui/shape-landing-hero";
 
 const showcaseCards = [
   {
@@ -32,12 +33,8 @@ const platformLinks = [
 export default function Home() {
   return (
     <main className="cream-lane min-h-screen overflow-hidden">
-      <section className="relative isolate min-h-[96svh] overflow-hidden px-4 pb-10 pt-5 sm:px-6 lg:px-8">
-        <span className="pastel-bloom left-[6%] top-24 h-52 w-52 bg-[#b8f2d2]" />
-        <span className="pastel-bloom right-[10%] top-32 h-64 w-64 bg-[#b8dcff] [animation-delay:2s]" />
-        <span className="pastel-bloom bottom-20 left-[40%] h-44 w-44 bg-[#ffd8c2] [animation-delay:5s]" />
-
-        <nav className="relative z-10 mx-auto flex max-w-7xl items-center justify-between border-b border-[#eceae4] py-4">
+      <section className="relative isolate h-screen flex flex-col justify-start gap-2 sm:gap-4 lg:gap-8 overflow-hidden px-4 pb-6 pt-2 sm:px-6 lg:px-8">
+        <nav className="relative z-10 mx-auto flex w-full max-w-7xl lg:max-w-[95vw] items-center justify-between border-b border-[#eceae4] py-4">
           <Link className="flex items-center gap-3 font-semibold text-[#1c1c1c]" href="/">
             <span className="grid h-10 w-10 place-items-center rounded-full bg-[#1c1c1c] text-[#fcfbf8]">
               <Radio aria-hidden="true" className="h-5 w-5" />
@@ -59,50 +56,52 @@ export default function Home() {
           </div>
         </nav>
 
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-12 pt-20 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-end lg:pt-28">
-          <div className="studio-enter">
-            <p className="font-mono text-xs font-semibold uppercase text-[#ff5530]">AI support with an operator grip</p>
-            <h1 className="editorial-display mt-5 max-w-5xl text-[4.8rem] text-[#1c1c1c] sm:text-[6.8rem] lg:text-[8rem]">
-              Support agents that know when to stop.
-            </h1>
-            <p className="mt-7 max-w-2xl font-[var(--font-inter)] text-lg leading-8 tracking-[0.01em] text-[#5f5f5d]">
-              AgentDesk gives teams a composed customer surface, verified knowledge retrieval, and a precise human takeover path when judgment matters.
-            </p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link href="/login">
-                <Button className="w-full rounded-full px-6 sm:w-auto" size="lg" rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+        <HeroGeometric
+          actions={
+            <div className="flex flex-row gap-2 w-full sm:w-auto">
+              <Link href="/login" className="flex-1 sm:flex-initial">
+                <Button className="w-full rounded-full px-3 sm:px-6 text-xs sm:text-sm h-10 sm:h-12" rightIcon={<ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />}>
                   Open workspace
                 </Button>
               </Link>
-              <Link href="/docs">
-                <Button className="w-full rounded-full border-[#1c1c1c]/20 text-[#1c1c1c] sm:w-auto" size="lg" variant="outline">
+              <Link href="/docs" className="flex-1 sm:flex-initial">
+                <Button className="w-full rounded-full border-[#1c1c1c]/20 text-[#1c1c1c] px-3 sm:px-6 text-xs sm:text-sm h-10 sm:h-12" variant="outline">
                   Read docs
                 </Button>
               </Link>
             </div>
-          </div>
-
-          <div className="grid gap-4">
-            {showcaseCards.map((card, index) => {
-              const Icon = card.icon;
-              return (
-                <Link
-                  className={`${card.className} studio-enter group min-h-[260px] overflow-hidden rounded-3xl p-8 text-white transition hover:-translate-y-1`}
-                  href={card.href}
-                  key={card.title}
-                  style={{ animationDelay: `${index * 90}ms` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-mono text-xs font-semibold uppercase text-white/80">{card.eyebrow}</p>
-                    <Icon aria-hidden="true" className="h-6 w-6" />
-                  </div>
-                  <h2 className="mt-16 text-4xl font-semibold tracking-[-0.04em]">{card.title}</h2>
-                  <p className="mt-4 max-w-sm text-sm font-medium leading-6 text-white/82">{card.description}</p>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+          }
+          description="AgentDesk gives teams a composed customer surface, verified knowledge retrieval, and a precise human takeover path when judgment matters."
+          sideContent={
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-1 w-full">
+              {showcaseCards.map((card, index) => {
+                const Icon = card.icon;
+                return (
+                  <Link
+                    className={`${card.className} studio-enter group min-h-[140px] sm:min-h-[160px] overflow-hidden rounded-2xl p-4 sm:p-6 text-white shadow-[0_16px_48px_rgba(28,28,28,0.12)] transition hover:-translate-y-1`}
+                    href={card.href}
+                    key={card.title}
+                    style={{ animationDelay: `${index * 90}ms` }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-mono text-[9px] sm:text-[10px] font-semibold uppercase text-white/80 tracking-wider">{card.eyebrow}</p>
+                      <Icon aria-hidden="true" className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+                    </div>
+                    <h2 className="mt-3 sm:mt-6 text-lg sm:text-2xl font-semibold tracking-[-0.03em]">{card.title}</h2>
+                    <p className="mt-1 sm:mt-1.5 max-w-sm text-[10px] sm:text-xs font-normal leading-normal sm:leading-relaxed text-white/80">{card.description}</p>
+                  </Link>
+                );
+              })}
+            </div>
+          }
+          title={
+            <>
+              Support Agent<br />
+              that knows when to<br />
+              <span className="bg-gradient-to-r from-[#ff5530] to-[#f59e0b] bg-clip-text text-transparent">Stop.</span>
+            </>
+          }
+        />
       </section>
 
       <section id="modules" className="border-y border-[#eceae4] bg-[#fcfbf8] px-4 py-14 sm:px-6 lg:px-8">

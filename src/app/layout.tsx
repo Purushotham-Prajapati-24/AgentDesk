@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, EB_Garamond, Fira_Code, Inter } from "next/font/google";
+import { DM_Sans, Plus_Jakarta_Sans, Fira_Code, Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 
@@ -15,11 +15,10 @@ const dmSans = DM_Sans({
   variable: "--font-dm-sans",
 });
 
-const ebGaramond = EB_Garamond({
+const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-eb-garamond",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-plus-jakarta-sans",
 });
 
 const firaCode = Fira_Code({
@@ -39,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${dmSans.variable} ${ebGaramond.variable} ${firaCode.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} ${dmSans.variable} ${plusJakartaSans.variable} ${firaCode.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
       </body>
