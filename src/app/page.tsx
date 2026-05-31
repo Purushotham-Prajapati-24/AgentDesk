@@ -33,7 +33,7 @@ const platformLinks = [
 export default function Home() {
   return (
     <main className="cream-lane min-h-screen overflow-hidden">
-      <section className="relative isolate h-screen flex flex-col justify-start gap-2 sm:gap-4 lg:gap-8 overflow-hidden px-4 pb-6 pt-2 sm:px-6 lg:px-8">
+      <section className="relative isolate h-screen flex flex-col justify-start gap-2 sm:gap-4 overflow-hidden px-4 pb-6 pt-2 sm:px-6 lg:px-8">
         <nav className="relative z-10 mx-auto flex w-full max-w-7xl lg:max-w-[95vw] items-center justify-between border-b border-[#eceae4] py-4">
           <Link className="flex items-center gap-3 font-semibold text-[#1c1c1c]" href="/">
             <span className="grid h-10 w-10 place-items-center rounded-full bg-[#1c1c1c] text-[#fcfbf8]">
@@ -49,7 +49,7 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <ThemeToggle compact />
             <Link href="/login">
-              <Button size="sm" rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
+              <Button className="bg-gradient-to-r from-[#22c55e] to-[#4ade80] border-transparent text-white hover:from-[#16a34a] hover:to-[#22c55e] hover:border-transparent hover:text-white hover:shadow-md hover:shadow-[#22c55e]/20" size="sm" rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
                 Enter
               </Button>
             </Link>
@@ -65,7 +65,7 @@ export default function Home() {
                 </Button>
               </Link>
               <Link href="/docs" className="flex-1 sm:flex-initial">
-                <Button className="w-full rounded-full border-[#1c1c1c]/20 text-[#1c1c1c] px-3 sm:px-6 text-xs sm:text-sm h-10 sm:h-12" variant="outline">
+                <Button className="w-full rounded-full bg-gradient-to-r from-[#1456f0] to-[#0099ff] border-transparent text-white px-3 sm:px-6 text-xs sm:text-sm h-10 sm:h-12 hover:from-[#114cd6] hover:to-[#0086e6] hover:border-transparent hover:text-white hover:shadow-md hover:shadow-[#1456f0]/20" variant="outline">
                   Read docs
                 </Button>
               </Link>

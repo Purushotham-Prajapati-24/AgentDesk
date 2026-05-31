@@ -165,7 +165,7 @@ export function HeroGeometric({ badge, title, description, actions, sideContent 
         ) : null}
 
         <motion.div animate="visible" custom={1} initial="hidden" variants={fadeUpVariants}>
-          <h1 className="editorial-display mt-2 max-w-5xl text-5xl sm:text-7xl md:text-[5.5rem] lg:text-[6rem] xl:text-[7rem] text-[#1c1c1c]">
+          <h1 className="editorial-display mt-2 max-w-5xl text-5xl sm:text-6xl md:text-7xl lg:text-[5.4rem] xl:text-[6rem] text-[#1c1c1c]">
             {title}
           </h1>
         </motion.div>
@@ -173,7 +173,7 @@ export function HeroGeometric({ badge, title, description, actions, sideContent 
         {description ? (
           <motion.p
             animate="visible"
-            className="mt-3 max-w-2xl font-[var(--font-inter)] text-base sm:text-lg lg:text-xl leading-relaxed tracking-[0.01em] text-[#5f5f5d]"
+            className="mt-3 max-w-2xl font-[var(--font-inter)] text-base sm:text-lg lg:text-lg leading-relaxed tracking-[0.01em] text-[#5f5f5d]"
             custom={2}
             initial="hidden"
             variants={fadeUpVariants}
@@ -183,7 +183,7 @@ export function HeroGeometric({ badge, title, description, actions, sideContent 
         ) : null}
 
         {actions ? (
-          <motion.div animate="visible" className="mt-4 flex flex-col gap-3 sm:flex-row" custom={3} initial="hidden" variants={fadeUpVariants}>
+          <motion.div animate="visible" className="mt-4 lg:mt-10 flex flex-col gap-3 sm:flex-row" custom={3} initial="hidden" variants={fadeUpVariants}>
             {actions}
           </motion.div>
         ) : null}
