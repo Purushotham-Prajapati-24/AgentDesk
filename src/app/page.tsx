@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Bot, CreditCard, FileText, Inbox, MessageSquare, Radio, ShieldCheck, Sparkles, Workflow } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeroGeometric } from "@/components/ui/shape-landing-hero";
+import { MagneticText } from "@/components/ui/morphing-cursor";
 
 const showcaseCards = [
   {
@@ -154,7 +155,14 @@ export default function Home() {
             <>
               Support Agent<br />
               that knows when to<br />
-              <span className="bg-gradient-to-r from-[#ff5530] to-[#f59e0b] bg-clip-text text-transparent">Stop.</span>
+              <MagneticText
+                className="align-baseline bg-gradient-to-r from-[#ff5530] to-[#f59e0b] bg-clip-text text-transparent"
+                cursorClassName="bg-gradient-to-r from-[#ff5530] to-[#f59e0b] text-[#ff5530]"
+                hoverText="Hands off."
+                hoverTextClassName="text-[var(--marketing-bg)]"
+                text="Stop."
+                textClassName="bg-gradient-to-r from-[#ff5530] to-[#f59e0b] bg-clip-text text-transparent"
+              />
             </>
           }
         />
