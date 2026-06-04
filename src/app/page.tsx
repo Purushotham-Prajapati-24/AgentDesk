@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, Bot, CreditCard, FileText, Inbox, MessageSquare, Radio, ShieldCheck, Sparkles, Workflow } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeroGeometric } from "@/components/ui/shape-landing-hero";
 
@@ -24,34 +23,83 @@ const showcaseCards = [
 ];
 
 const platformLinks = [
-  ["Agent Studio", "Shape instructions, fallbacks, and tenant-scoped bot behavior.", "/bots", Bot],
-  ["WebChat", "Style the customer-facing widget and copy production embed snippets.", "/webchat", MessageSquare],
-  ["Monitor", "Track session pressure, active customers, and handoff volume.", "/monitor", Workflow],
-  ["Billing", "Read credits, usage volume, storage, and transaction history.", "/billing", CreditCard],
+  {
+    title: "Agent Studio",
+    eyebrow: "Build",
+    description: "Create tenant-scoped agents with instructions, fallback rules, and tool boundaries before they answer customers.",
+    href: "/bots",
+    icon: Bot,
+  },
+  {
+    title: "WebChat",
+    eyebrow: "Launch",
+    description: "Tune the widget identity, launcher, theme, and production embed without touching app code.",
+    href: "/webchat",
+    icon: MessageSquare,
+  },
+  {
+    title: "Monitor",
+    eyebrow: "Supervise",
+    description: "Track active sessions, escalation pressure, paused automations, and handoff outcomes in real time.",
+    href: "/monitor",
+    icon: Workflow,
+  },
+  {
+    title: "Billing",
+    eyebrow: "Control",
+    description: "Review credits, message volume, storage, and transaction history before costs surprise the team.",
+    href: "/billing",
+    icon: CreditCard,
+  },
+] as const;
+
+const proofPoints = [
+  {
+    number: "01",
+    title: "Tenant isolation",
+    description: "Prompts, documents, widget settings, and conversations stay scoped to the selected workspace.",
+  },
+  {
+    number: "02",
+    title: "Verified retrieval",
+    description: "Uploaded policies, manuals, and help docs are searched before the assistant replies.",
+  },
+  {
+    number: "03",
+    title: "Human takeover",
+    description: "Operators pause automation, respond over the live socket, and keep the transcript intact.",
+  },
 ] as const;
 
 export default function Home() {
   return (
     <main className="cream-lane min-h-screen overflow-hidden">
-      <section className="relative isolate h-screen flex flex-col justify-start gap-2 sm:gap-4 overflow-hidden px-4 pb-6 pt-2 sm:px-6 lg:px-8">
-        <nav className="relative z-10 mx-auto flex w-full max-w-7xl lg:max-w-[95vw] items-center justify-between border-b border-[#eceae4] py-4">
-          <Link className="flex items-center gap-3 font-semibold text-[#1c1c1c]" href="/">
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-[#1c1c1c] text-[#fcfbf8]">
+      <section className="marketing-dark-band relative isolate flex h-screen flex-col justify-start gap-2 overflow-hidden bg-[var(--marketing-bg)] px-4 pb-6 pt-2 text-[var(--marketing-ink)] sm:gap-4 sm:px-6 lg:px-8">
+        <nav className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between border-b border-[var(--marketing-border)] py-4 lg:max-w-[95vw]">
+          <Link className="flex items-center gap-3 font-semibold text-[var(--marketing-ink)]" href="/">
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--marketing-inverse)] text-[var(--marketing-on-inverse)]">
               <Radio aria-hidden="true" className="h-5 w-5" />
             </span>
             AgentDesk
           </Link>
-          <div className="hidden items-center gap-7 text-sm font-medium text-[#5f5f5d] md:flex">
+          <div className="hidden items-center gap-7 text-sm font-medium text-[var(--marketing-muted)] md:flex">
             <a href="#modules">Modules</a>
             <a href="#proof">Proof</a>
             <Link href="/docs">Docs</Link>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeToggle compact />
-            <Link href="/login">
-              <Button className="bg-gradient-to-r from-[#22c55e] to-[#4ade80] border-transparent text-white hover:from-[#16a34a] hover:to-[#22c55e] hover:border-transparent hover:text-white hover:shadow-md hover:shadow-[#22c55e]/20" size="sm" rightIcon={<ArrowRight aria-hidden="true" className="h-4 w-4" />}>
-                Enter
-              </Button>
+            <ThemeToggle compact variant="cockpit" />
+            <Link
+              className="marketing-cta inline-flex min-h-9 items-center justify-center gap-2 rounded-full border px-4 text-xs font-semibold transition hover:-translate-y-0.5 active:scale-[0.98]"
+              href="/login"
+              style={{
+                backgroundColor: "var(--marketing-inverse)",
+                borderColor: "var(--marketing-inverse)",
+                color: "var(--marketing-on-inverse)",
+              }}
+            >
+              <span>Enter</span>
+              <ArrowRight aria-hidden="true" className="h-4 w-4" />
             </Link>
           </div>
         </nav>
@@ -60,14 +108,22 @@ export default function Home() {
           actions={
             <div className="flex flex-row gap-2 w-full sm:w-auto">
               <Link href="/login" className="flex-1 sm:flex-initial">
-                <Button className="w-full rounded-full px-3 sm:px-6 text-xs sm:text-sm h-10 sm:h-12" rightIcon={<ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />}>
-                  Open workspace
-                </Button>
+                <span
+                  className="marketing-cta inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border px-3 text-xs font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm"
+                  style={{
+                    backgroundColor: "var(--marketing-inverse)",
+                    borderColor: "var(--marketing-inverse)",
+                    color: "var(--marketing-on-inverse)",
+                  }}
+                >
+                  <span>Open workspace</span>
+                  <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+                </span>
               </Link>
               <Link href="/docs" className="flex-1 sm:flex-initial">
-                <Button className="w-full rounded-full bg-gradient-to-r from-[#1456f0] to-[#0099ff] border-transparent text-white px-3 sm:px-6 text-xs sm:text-sm h-10 sm:h-12 hover:from-[#114cd6] hover:to-[#0086e6] hover:border-transparent hover:text-white hover:shadow-md hover:shadow-[#1456f0]/20" variant="outline">
+                <span className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[var(--marketing-border)] bg-[var(--marketing-chip)]/80 px-3 text-xs font-semibold text-[var(--marketing-ink)] backdrop-blur transition hover:-translate-y-0.5 hover:border-[#0099ff] hover:bg-[#0099ff]/15 active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm">
                   Read docs
-                </Button>
+                </span>
               </Link>
             </div>
           }
@@ -78,7 +134,7 @@ export default function Home() {
                 const Icon = card.icon;
                 return (
                   <Link
-                    className={`${card.className} studio-enter group min-h-[140px] sm:min-h-[160px] overflow-hidden rounded-2xl p-4 sm:p-6 text-white shadow-[0_16px_48px_rgba(28,28,28,0.12)] transition hover:-translate-y-1`}
+                    className={`${card.className} studio-enter group min-h-[140px] overflow-hidden rounded-2xl p-4 text-white shadow-[0_16px_48px_rgba(28,28,28,0.12)] ring-1 ring-white/15 transition hover:-translate-y-1 sm:min-h-[160px] sm:p-6`}
                     href={card.href}
                     key={card.title}
                     style={{ animationDelay: `${index * 90}ms` }}
@@ -104,57 +160,92 @@ export default function Home() {
         />
       </section>
 
-      <section id="modules" className="border-y border-[#eceae4] bg-[#fcfbf8] px-4 py-14 sm:px-6 lg:px-8">
+      <section id="modules" className="marketing-dark-band border-y border-[var(--marketing-border)] bg-[var(--marketing-bg)] px-4 py-16 text-[var(--marketing-ink)] sm:px-6 lg:px-8 lg:py-20">
         <div className="mx-auto max-w-7xl">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <h2 className="editorial-display max-w-3xl text-6xl text-[#1c1c1c]">Every surface has a job.</h2>
-            <p className="max-w-md text-sm font-medium leading-6 text-[#5f5f5d]">
-              The dashboard stays dense and technical. Customer and entry pages stay warm, readable, and deliberately restrained.
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="font-mono text-xs font-semibold uppercase text-[#ff5530]">AI support workspace</p>
+              <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.04em] text-[var(--marketing-ink)] sm:text-5xl lg:text-6xl">
+                Build, launch, and supervise one support agent.
+              </h2>
+            </div>
+            <p className="max-w-md text-base font-medium leading-7 text-[var(--marketing-muted)]">
+              AgentDesk keeps knowledge, widget styling, live conversations, and spend controls in one workspace so automation never drifts from your service policy.
             </p>
           </div>
-          <div className="mt-10 grid gap-3 md:grid-cols-4">
-            {platformLinks.map(([title, description, href, Icon]) => (
-              <Link className="group min-h-56 border border-[#eceae4] bg-[#f7f4ed] p-5 transition hover:border-[#5f5f5d]" href={href} key={title}>
-                <Icon aria-hidden="true" className="h-5 w-5 text-[#1456f0]" />
-                <h3 className="mt-12 text-2xl font-semibold tracking-[-0.03em] text-[#1c1c1c]">{title}</h3>
-                <p className="mt-3 text-sm font-medium leading-6 text-[#5f5f5d]">{description}</p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {platformLinks.map(({ title, eyebrow, description, href, icon: Icon }) => (
+              <Link
+                className="marketing-dark-surface group flex min-h-72 flex-col rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-6 text-[var(--marketing-ink)] transition hover:-translate-y-1 hover:border-[var(--marketing-ink)] hover:bg-[var(--marketing-bg)] hover:shadow-[0_16px_40px_rgba(10,10,10,0.08)]"
+                href={href}
+                key={title}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full border border-[var(--marketing-chip-border)] bg-[var(--marketing-chip)] px-3 py-1 text-xs font-semibold text-[var(--marketing-muted)]">{eyebrow}</span>
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--marketing-inverse)] text-[var(--marketing-on-inverse)] transition group-hover:bg-[#ff5530] group-hover:text-white">
+                    <Icon aria-hidden="true" className="h-4 w-4" />
+                  </span>
+                </div>
+                <div className="mt-auto pt-12">
+                  <h3 className="text-2xl font-semibold tracking-[-0.03em] text-[var(--marketing-ink)]">{title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-[var(--marketing-muted)]">{description}</p>
+                </div>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="proof" className="px-4 py-14 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="bg-[#1c1c1c] p-8 text-[#fcfbf8]">
-            <ShieldCheck aria-hidden="true" className="h-6 w-6 text-[#22c55e]" />
-            <h2 className="mt-16 max-w-xl text-5xl font-semibold leading-none tracking-[-0.04em]">Source-grounded until a person takes over.</h2>
+      <section id="proof" className="marketing-dark-band bg-[var(--marketing-surface)] px-4 py-16 text-[var(--marketing-ink)] sm:px-6 lg:px-8 lg:py-20">
+        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="relative overflow-hidden rounded-[2rem] bg-[var(--marketing-inverse)] p-8 text-[var(--marketing-on-inverse)] sm:p-10">
+            <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,#ff5530_0%,rgba(255,85,48,0.42)_34%,rgba(255,85,48,0)_70%)]" />
+            <div className="absolute -bottom-20 left-8 h-60 w-60 rounded-full bg-[radial-gradient(circle,#1456f0_0%,rgba(20,86,240,0.32)_35%,rgba(20,86,240,0)_72%)]" />
+            <div className="relative">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--marketing-on-inverse)] text-[var(--marketing-inverse)]">
+                <ShieldCheck aria-hidden="true" className="h-5 w-5" />
+              </span>
+              <h2 className="mt-16 max-w-xl text-4xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-5xl">
+                Ground every answer. Escalate with full context.
+              </h2>
+              <p className="mt-6 max-w-lg text-base leading-7 opacity-70">
+                The bot starts from your documents, stays scoped to the selected tenant, and hands the thread to a human operator when confidence or policy requires it.
+              </p>
+            </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
-            {[
-              ["01", "Tenant-scoped bots"],
-              ["02", "Document-grounded replies"],
-              ["03", "Socket-backed handoff"],
-            ].map(([number, label]) => (
-              <div className="border border-[#eceae4] bg-[#fcfbf8] p-6" key={number}>
-                <p className="font-mono text-3xl text-[#ff5530]">{number}</p>
-                <p className="mt-20 text-lg font-semibold text-[#1c1c1c]">{label}</p>
+            {proofPoints.map(({ number, title, description }) => (
+              <div className="marketing-dark-surface flex min-h-80 flex-col rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-bg)] p-6" key={number}>
+                <p className="font-mono text-4xl font-semibold text-[#ff5530]">{number}</p>
+                <div className="mt-auto pt-16">
+                  <h3 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-[var(--marketing-ink)]">{title}</h3>
+                  <p className="mt-4 text-sm leading-6 text-[var(--marketing-muted)]">{description}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="px-4 pb-10 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 border-t border-[#eceae4] py-8 md:flex-row md:items-center md:justify-between">
+      <section className="marketing-dark-band bg-[var(--marketing-bg)] px-4 py-12 text-[var(--marketing-ink)] sm:px-6 lg:px-8">
+        <div className="marketing-dark-surface mx-auto flex max-w-7xl flex-col gap-6 rounded-[2rem] border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-6 md:flex-row md:items-center md:justify-between md:p-8">
           <div>
             <p className="font-mono text-xs font-semibold uppercase text-[#1456f0]">Ready for production support</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-[#1c1c1c]">Start in the inbox, tune from the evidence.</h2>
+            <h2 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.03em] text-[var(--marketing-ink)]">
+              Open the workspace and tune from real conversations.
+            </h2>
           </div>
-          <Link href="/login">
-            <Button className="rounded-full" rightIcon={<Sparkles aria-hidden="true" className="h-4 w-4" />}>
-              Access AgentDesk
-            </Button>
+          <Link
+            className="marketing-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-6 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98]"
+            href="/login"
+            style={{
+              backgroundColor: "var(--marketing-inverse)",
+              borderColor: "var(--marketing-inverse)",
+              color: "var(--marketing-on-inverse)",
+            }}
+          >
+            <span>Open AgentDesk</span>
+            <Sparkles aria-hidden="true" className="h-4 w-4" />
           </Link>
         </div>
       </section>

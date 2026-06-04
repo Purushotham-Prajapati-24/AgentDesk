@@ -154,7 +154,7 @@ export function HeroGeometric({ badge, title, description, actions, sideContent 
         {badge ? (
           <motion.div
             animate="visible"
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--cream-border)] bg-[var(--cream-card)]/55 px-3 py-1.5 text-[#ff5530] shadow-[0_12px_40px_rgba(28,28,28,0.06)] backdrop-blur-md"
+            className="inline-flex items-center gap-2 rounded-full border border-[var(--marketing-chip-border)] bg-[var(--marketing-chip)]/70 px-3 py-1.5 text-[#ff5530] shadow-[0_12px_40px_rgba(28,28,28,0.06)] backdrop-blur-md"
             custom={0}
             initial="hidden"
             variants={fadeUpVariants}
@@ -165,7 +165,7 @@ export function HeroGeometric({ badge, title, description, actions, sideContent 
         ) : null}
 
         <motion.div animate="visible" custom={1} initial="hidden" variants={fadeUpVariants}>
-          <h1 className="editorial-display mt-2 max-w-5xl text-5xl sm:text-6xl md:text-7xl lg:text-[5.4rem] xl:text-[6rem] text-[#1c1c1c]">
+          <h1 className="editorial-display mt-2 max-w-5xl text-5xl text-[var(--marketing-ink)] sm:text-6xl md:text-7xl lg:text-[5.4rem] xl:text-[6rem]">
             {title}
           </h1>
         </motion.div>
@@ -173,7 +173,7 @@ export function HeroGeometric({ badge, title, description, actions, sideContent 
         {description ? (
           <motion.p
             animate="visible"
-            className="mt-3 max-w-2xl font-[var(--font-inter)] text-base sm:text-lg lg:text-lg leading-relaxed tracking-[0.01em] text-[#5f5f5d]"
+            className="mt-3 max-w-2xl font-[var(--font-inter)] text-base leading-relaxed tracking-[0.01em] text-[var(--marketing-muted)] sm:text-lg lg:text-lg"
             custom={2}
             initial="hidden"
             variants={fadeUpVariants}

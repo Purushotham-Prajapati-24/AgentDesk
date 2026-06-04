@@ -44,6 +44,15 @@
   --cream-muted: #5f5f5d;
   --cream-accent: #1456f0;
   --cream-coral: #ff5530;
+  --marketing-bg: #ffffff;
+  --marketing-surface: #f7f8fa;
+  --marketing-border: #e5e7eb;
+  --marketing-ink: #0a0a0a;
+  --marketing-muted: #45515e;
+  --marketing-chip: #ffffff;
+  --marketing-chip-border: #d9dee5;
+  --marketing-inverse: #0a0a0a;
+  --marketing-on-inverse: #ffffff;
   --ui-bg: #090909;
   --ui-panel: #141414;
   --ui-panel-2: #1c1c1c;
@@ -64,6 +73,15 @@
   --cream-muted: #c6bca9;
   --cream-accent: #6aa8ff;
   --cream-coral: #ff7a55;
+  --marketing-bg: #070a12;
+  --marketing-surface: #0d1320;
+  --marketing-border: #243044;
+  --marketing-ink: #f7fbff;
+  --marketing-muted: #a7b4c8;
+  --marketing-chip: #121a29;
+  --marketing-chip-border: #2d3a52;
+  --marketing-inverse: #f7fbff;
+  --marketing-on-inverse: #07111f;
   --parchment: var(--cream-bg);
   --parchment-card: var(--cream-card);
   --parchment-border: var(--cream-border);
@@ -214,6 +232,11 @@ textarea {
   font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
+.marketing-lane {
+  background: var(--marketing-bg);
+  color: var(--marketing-ink);
+}
+
 .cockpit-lane {
   background: var(--ui-bg);
   color: var(--ui-text);
@@ -243,6 +266,47 @@ textarea {
   opacity: 0.6;
   transform: translateZ(0);
   animation: bloom-drift 16s ease-in-out infinite alternate;
+}
+
+.marketing-cta {
+  border-color: var(--marketing-inverse) !important;
+  background: var(--marketing-inverse) !important;
+  color: var(--marketing-on-inverse) !important;
+}
+
+.marketing-cta:hover {
+  border-color: var(--cream-coral) !important;
+  background: var(--cream-coral) !important;
+  color: #ffffff !important;
+}
+
+.marketing-input {
+  border-color: var(--marketing-border) !important;
+  background: var(--marketing-bg) !important;
+  color: var(--marketing-ink) !important;
+}
+
+.marketing-input::placeholder {
+  color: var(--marketing-muted) !important;
+}
+
+.marketing-input:focus {
+  border-color: var(--sky) !important;
+  background: var(--marketing-chip) !important;
+}
+
+[data-theme="dark"] .marketing-dark-band {
+  background:
+    radial-gradient(circle at 20% 8%, rgba(20, 86, 240, 0.22), transparent 34rem),
+    radial-gradient(circle at 82% 26%, rgba(34, 197, 165, 0.14), transparent 28rem),
+    linear-gradient(180deg, var(--marketing-bg), #090e18 56%, var(--marketing-bg));
+}
+
+[data-theme="dark"] .marketing-dark-surface {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
+    var(--marketing-surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 [data-theme="dark"] .cream-lane [class~="bg-[#f7f4ed]"],

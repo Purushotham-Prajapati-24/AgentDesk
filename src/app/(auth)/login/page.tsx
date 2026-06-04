@@ -5,7 +5,6 @@ import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, Radio, ShieldCheck } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
 import { loginWithMagicLink } from "@/app/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -43,50 +42,50 @@ function LoginContent() {
   };
 
   return (
-    <main className="cream-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
-      <section className="relative flex min-h-[52vh] flex-col justify-between overflow-hidden border-b border-[#eceae4] p-5 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-8">
+    <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
+      <section className="marketing-dark-band relative flex min-h-[52vh] flex-col justify-between overflow-hidden border-b border-[var(--marketing-border)] p-5 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-8">
         <span className="pastel-bloom left-10 top-24 h-56 w-56 bg-[#b8f2d2]" />
         <span className="pastel-bloom bottom-24 right-16 h-64 w-64 bg-[#ffd8c2] [animation-delay:3s]" />
         <div className="relative flex items-center justify-between gap-3">
-          <Link className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#1c1c1c]" href="/">
+          <Link className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[var(--marketing-ink)] transition hover:text-[#ff5530]" href="/">
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             Back to AgentDesk
           </Link>
-          <ThemeToggle compact />
+          <ThemeToggle compact variant="cockpit" />
         </div>
 
         <div className="relative max-w-4xl">
           <p className="font-mono text-xs font-semibold uppercase text-[#ff5530]">Access gate</p>
-          <h1 className="editorial-display mt-5 text-[4.4rem] text-[#1c1c1c] sm:text-[6.2rem] lg:text-[7rem]">
+          <h1 className="editorial-display mt-5 text-[4.4rem] text-[var(--marketing-ink)] sm:text-[6.2rem] lg:text-[7rem]">
             Verify the operator console.
           </h1>
         </div>
 
         <div className="relative grid gap-3 sm:grid-cols-3">
           {["Email token", "Tenant context", "Live desk"].map((item, index) => (
-            <div className="border border-[#eceae4] bg-[#fcfbf8] p-4" key={item}>
+            <div className="marketing-dark-surface rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-4" key={item}>
               <p className="font-mono text-2xl text-[#1456f0]">0{index + 1}</p>
-              <p className="mt-8 text-sm font-semibold text-[#1c1c1c]">{item}</p>
+              <p className="mt-8 text-sm font-semibold text-[var(--marketing-ink)]">{item}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="flex min-w-0 items-center p-5 lg:p-8">
-        <form className="w-full border border-[#eceae4] bg-[#fcfbf8] p-5 sm:p-6" onSubmit={handleSubmit}>
-          <div className="flex items-center gap-3 border-b border-[#eceae4] pb-5">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#1c1c1c] text-[#fcfbf8]">
+      <section className="marketing-dark-band flex min-w-0 items-center p-5 lg:p-8">
+        <form className="marketing-dark-surface w-full rounded-[2rem] border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-5 shadow-[0_24px_80px_rgba(7,10,18,0.08)] sm:p-6" onSubmit={handleSubmit}>
+          <div className="flex items-center gap-3 border-b border-[var(--marketing-border)] pb-5">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--marketing-inverse)] text-[var(--marketing-on-inverse)]">
               <Radio aria-hidden="true" className="h-5 w-5" />
             </span>
             <div>
-              <p className="font-mono text-xs font-semibold uppercase text-[#5f5f5d]">AgentDesk</p>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#1c1c1c]">Magic link sign in</h2>
+              <p className="font-mono text-xs font-semibold uppercase text-[var(--marketing-muted)]">AgentDesk</p>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[var(--marketing-ink)]">Magic link sign in</h2>
             </div>
           </div>
 
           <div className="mt-6">
             <Input
-              className="border-[#eceae4] bg-[#f7f4ed] text-[#1c1c1c] placeholder:text-[#5f5f5d] focus:border-[#0099ff] focus:bg-[#fcfbf8]"
+              className="marketing-input rounded-xl"
               id="email-address"
               name="email"
               type="email"
@@ -111,10 +110,20 @@ function LoginContent() {
             </div>
           ) : null}
 
-          <Button className="mt-6 w-full" loading={loading} leftIcon={<Mail aria-hidden="true" className="h-4 w-4" />} type="submit">
-            Send magic link
-          </Button>
-          <div className="mt-5 grid gap-2 text-xs font-medium leading-5 text-[#5f5f5d]">
+          <button
+            className="marketing-cta mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-5 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+            disabled={loading}
+            style={{
+              backgroundColor: "var(--marketing-inverse)",
+              borderColor: "var(--marketing-inverse)",
+              color: "var(--marketing-on-inverse)",
+            }}
+            type="submit"
+          >
+            <Mail aria-hidden="true" className="h-4 w-4" />
+            <span>{loading ? "Sending magic link..." : "Send magic link"}</span>
+          </button>
+          <div className="mt-5 grid gap-2 text-xs font-medium leading-5 text-[var(--marketing-muted)]">
             <span className="inline-flex items-center gap-2">
               <ShieldCheck aria-hidden="true" className="h-4 w-4 text-[#1456f0]" />
               One-time Appwrite session verification
