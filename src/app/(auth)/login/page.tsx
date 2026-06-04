@@ -47,7 +47,7 @@ function LoginContent() {
   return (
     <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
       <section className="relative min-h-[42vh] overflow-hidden border-b border-[var(--marketing-border)] bg-[#070a12] lg:min-h-screen lg:border-b-0 lg:border-r">
-        <InteractiveRobotSpline scene={ROBOT_SCENE_URL} className="absolute inset-0 h-full w-full" />
+        <InteractiveRobotSpline scene={ROBOT_SCENE_URL} className="absolute inset-0 h-full w-full scale-120" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(20,86,240,0.16),transparent_34rem),linear-gradient(180deg,rgba(7,10,18,0.08),rgba(7,10,18,0.42))]" />
 
         <div className="relative z-10 flex items-start justify-between gap-3 p-5 lg:p-8">
