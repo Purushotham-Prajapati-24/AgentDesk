@@ -7,6 +7,9 @@ import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { loginWithMagicLink } from "@/app/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { InteractiveRobotSpline } from "@/components/ui/interactive-3d-robot";
+
+const ROBOT_SCENE_URL = "https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode";
 
 export default function LoginPage() {
   return (
@@ -43,31 +46,21 @@ function LoginContent() {
 
   return (
     <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
-      <section className="marketing-dark-band relative flex min-h-[52vh] flex-col justify-between overflow-hidden border-b border-[var(--marketing-border)] p-5 lg:min-h-screen lg:border-b-0 lg:border-r lg:p-8">
-        <span className="pastel-bloom left-10 top-24 h-56 w-56 bg-[#b8f2d2]" />
-        <span className="pastel-bloom bottom-24 right-16 h-64 w-64 bg-[#ffd8c2] [animation-delay:3s]" />
-        <div className="relative flex items-center justify-between gap-3">
-          <Link className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[var(--marketing-ink)] transition hover:text-[#ff5530]" href="/">
-            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-            Back to AgentDesk
+      <section className="relative min-h-[42vh] overflow-hidden border-b border-[var(--marketing-border)] bg-[#070a12] lg:min-h-screen lg:border-b-0 lg:border-r">
+        <InteractiveRobotSpline scene={ROBOT_SCENE_URL} className="absolute inset-0 h-full w-full" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(20,86,240,0.16),transparent_34rem),linear-gradient(180deg,rgba(7,10,18,0.08),rgba(7,10,18,0.42))]" />
+
+        <div className="relative z-10 flex items-start justify-between gap-3 p-5 lg:p-8">
+          <Link
+            aria-label="Back to AgentDesk"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/30 text-white shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur-md transition hover:bg-black/45"
+            href="/"
+          >
+            <ArrowLeft aria-hidden="true" className="h-5 w-5" />
           </Link>
-          <ThemeToggle compact variant="cockpit" />
-        </div>
-
-        <div className="relative max-w-4xl">
-          <p className="font-mono text-xs font-semibold uppercase text-[#ff5530]">Access gate</p>
-          <h1 className="editorial-display mt-5 text-[4.4rem] text-[var(--marketing-ink)] sm:text-[6.2rem] lg:text-[7rem]">
-            Verify the operator console.
-          </h1>
-        </div>
-
-        <div className="relative grid gap-3 sm:grid-cols-3">
-          {["Email token", "Tenant context", "Live desk"].map((item, index) => (
-            <div className="marketing-dark-surface rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-4" key={item}>
-              <p className="font-mono text-2xl text-[#1456f0]">0{index + 1}</p>
-              <p className="mt-8 text-sm font-semibold text-[var(--marketing-ink)]">{item}</p>
-            </div>
-          ))}
+          <div className="rounded-full bg-black/25 p-1 backdrop-blur-md">
+            <ThemeToggle compact variant="cockpit" />
+          </div>
         </div>
       </section>
 
