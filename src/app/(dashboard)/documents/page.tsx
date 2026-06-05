@@ -1,13 +1,12 @@
 "use client";
 
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from "react";
-import { FileUp, UploadCloud } from "lucide-react";
+import { CheckCircle2, Database, FileArchive, FileSpreadsheet, FileText, FileUp, Globe2, Layers3, Link2, UploadCloud } from "lucide-react";
 import { listBots } from "@/app/bot-actions";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
 
 type UploadState = {
   status: "idle" | "uploading" | "processing" | "success" | "error";
@@ -35,6 +34,22 @@ type IngestResponseBody = {
 };
 
 const FAN_OUT_CONCURRENCY = 3;
+const acceptedPayloads = [
+  { label: "PDF policies", icon: FileText },
+  { label: "DOC manuals", icon: FileArchive },
+  { label: "DOCX playbooks", icon: FileArchive },
+  { label: "XLSX sheets", icon: FileSpreadsheet },
+  { label: "XLS tables", icon: FileSpreadsheet },
+  { label: "CSV datasets", icon: Database },
+  { label: "TXT notes", icon: FileText },
+  { label: "Markdown guides", icon: FileText },
+];
+
+const workflowSteps = [
+  { label: "Extract", detail: "Read files and public URLs into tenant-scoped source records." },
+  { label: "Chunk", detail: "Break content into searchable passages for retrieval." },
+  { label: "Index", detail: "Process vectors for the selected agent before it answers." },
+];
 
 export default function DocumentsPage() {
   const { tenant } = useTenant();
@@ -79,7 +94,7 @@ export default function DocumentsPage() {
     }
 
     if (!botId) {
-      setUploadState({ status: "error", message: "Bot ID is required." });
+      setUploadState({ status: "error", message: "Agent ID is required." });
       return;
     }
 
@@ -138,7 +153,7 @@ export default function DocumentsPage() {
     }
 
     if (!botId) {
-      setUploadState({ status: "error", message: "Bot ID is required." });
+      setUploadState({ status: "error", message: "Agent ID is required." });
       return;
     }
 
@@ -208,90 +223,181 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="cockpit-lane min-h-screen">
-      <PageHeader
-        kicker="Knowledge base"
-        title="Drop the facts before the bot talks."
-        description="Upload tenant-scoped source files for parsing and hybrid vector ingestion. Supported formats are PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, and Markdown."
-        action={<StatusPill tone="warn">Tenant: {tenant?.$id ?? "Unavailable"}</StatusPill>}
-      />
+    <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
+      <section className="px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-8">
+            <div className="min-w-0">
+              <p className="inline-flex rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-1 font-mono text-xs font-semibold uppercase text-[var(--ui-blue)]">
+                Knowledge intake
+              </p>
+              <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ui-text)] sm:text-5xl lg:text-6xl">
+                Turn trusted files and URLs into agent-ready answers.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
+                Upload documents or capture public pages, then process them into searchable knowledge for the selected agent and tenant workspace.
+              </p>
+            </div>
 
-      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-8">
-        <Panel className="h-fit p-5">
-          <p className="studio-kicker text-[#0099ff]">Accepted payloads</p>
-          <div className="mt-5 grid gap-3">
-            {["PDF policies", "DOC manuals", "DOCX manuals", "XLSX spreadsheets", "XLS spreadsheets", "CSV tables", "TXT notes", "Markdown guides"].map((item) => (
-              <div className="flex items-center gap-3 border border-[#262626] bg-[#090909] px-3 py-2 font-semibold text-white" key={item}>
-                <FileUp aria-hidden="true" className="h-4 w-4 text-[#ff5530]" />
-                {item}
+            <div className="grid content-between gap-5 rounded-3xl bg-[linear-gradient(135deg,#dbeafe_0%,#7dd3fc_48%,#0099ff_100%)] p-5 text-[#082f49]">
+              <div>
+                <p className="font-mono text-xs font-semibold uppercase opacity-70">Tenant workspace</p>
+                <p className="mt-3 break-all font-mono text-2xl font-semibold tracking-[-0.04em]">{tenant?.$id ?? "Unavailable"}</p>
+                <p className="mt-3 text-sm font-medium leading-6 opacity-70">Every source is stored and indexed against this workspace.</p>
               </div>
-            ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-white/75 px-3 py-2 text-xs font-semibold text-[#082f49]">{bots.length} agents found</span>
+                <span className="rounded-full border border-[#082f49]/15 bg-white/25 px-3 py-2 text-xs font-semibold text-[#075985]">Hybrid retrieval ready</span>
+              </div>
+            </div>
           </div>
-        </Panel>
+        </div>
+      </section>
 
-        <Panel className="p-5">
-          <form onSubmit={uploadDocument}>
-            <label className="block">
-              <span className="studio-kicker mb-2 block text-[#999999]">Bot</span>
-              <select
-                className="min-h-11 w-full border border-[#262626] bg-[#090909] px-3 py-2 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
-                value={botId}
-                onChange={(event) => setBotId(event.target.value)}
-              >
-                <option value="">{bots.length === 0 ? "Create a bot before uploading knowledge" : "Select a bot"}</option>
-                {bots.map((bot) => (
-                  <option key={bot.$id} value={bot.$id}>
-                    {bot.name} / {bot.$id}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs font-medium leading-5 text-[#999999]">
-                Documents are indexed for this exact bot ID. The widget must use the same bot.
-              </p>
-            </label>
-
-            <label
-              className="mt-5 flex min-h-56 cursor-pointer flex-col items-center justify-center border-2 border-dashed border-[#263039] bg-[#141414] px-4 py-8 text-center transition hover:border-[#0099ff] sm:min-h-72 sm:px-6 sm:py-10"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={handleDrop}
-            >
-              <UploadCloud aria-hidden="true" className="h-12 w-12 text-[#0099ff]" />
-              <span className="mt-5 max-w-full break-words text-xl font-semibold text-white sm:text-2xl">{file ? file.name : "Drop source file"}</span>
-              <span className="mt-2 max-w-md text-sm font-medium leading-6 text-[#999999]">
-                Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. The upload API will extract text before vector processing.
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-8">
+        <aside className="grid h-fit gap-5">
+          <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--ui-text)] text-[var(--ui-bg)]">
+                <FileUp aria-hidden="true" className="h-5 w-5" />
               </span>
-              <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md" onChange={handleFileChange} />
-            </label>
+              <div>
+                <p className="font-mono text-xs font-semibold uppercase text-[var(--ui-muted)]">Accepted payloads</p>
+                <h2 className="text-lg font-semibold text-[var(--ui-text)]">Source formats</h2>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {acceptedPayloads.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3" key={item.label}>
+                    <Icon aria-hidden="true" className="h-4 w-4 text-[#ff5530]" />
+                    <p className="mt-3 text-sm font-semibold leading-5 text-[var(--ui-text)]">{item.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
-            {uploadState.message ? (
-              <p className={uploadMessageClass(uploadState.status)} role="status">
-                {uploadState.message}
-              </p>
-            ) : null}
+          <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+            <p className="font-mono text-xs font-semibold uppercase text-[var(--ui-muted)]">Processing flow</p>
+            <div className="mt-5 grid gap-3">
+              {workflowSteps.map((step, index) => (
+                <div className="flex gap-3 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3" key={step.label}>
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ui-panel-2)] font-mono text-xs font-semibold text-[var(--ui-blue)]">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--ui-text)]">{step.label}</p>
+                    <p className="mt-1 text-xs font-medium leading-5 text-[var(--ui-muted)]">{step.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </aside>
 
-            <Button className="mt-5 w-full sm:w-auto" disabled={uploadState.status === "processing"} loading={uploadState.status === "uploading"} type="submit">
-              Upload document
-            </Button>
-          </form>
+        <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+          <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--ui-text)] text-[var(--ui-bg)]">
+                  <Layers3 aria-hidden="true" className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Add knowledge</h2>
+                  <p className="text-sm font-medium text-[var(--ui-muted)]">Choose an agent, upload a file, or ingest a public source.</p>
+                </div>
+              </div>
+              <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">
+                {uploadState.status}
+              </span>
+            </div>
+          </div>
 
-            <form className="mt-6 border-t border-[#262626] pt-5" onSubmit={ingestUrl}>
-            <Input
-              label="Source URL"
-              value={sourceUrl}
-              onChange={(event) => setSourceUrl(event.target.value)}
-              hint="Capture public help center articles, policies, FAQs, product pages, or sitemap.xml files."
-            />
-            <Button
-              className="mt-5 w-full sm:w-auto"
-              disabled={!sourceUrl.trim() || uploadState.status === "processing"}
-              loading={uploadState.status === "uploading"}
-              type="submit"
-              variant="secondary"
-            >
-              Ingest URL
-            </Button>
-          </form>
-        </Panel>
+          <div className="p-5">
+            <form onSubmit={uploadDocument}>
+              <label className="block">
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Agent</span>
+                <select
+                  className="min-h-11 w-full rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-2 text-sm font-semibold text-[var(--ui-text)] outline-none transition focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]"
+                  value={botId}
+                  onChange={(event) => setBotId(event.target.value)}
+                >
+                  <option value="">{bots.length === 0 ? "Create an agent before uploading knowledge" : "Select an agent"}</option>
+                  {bots.map((bot) => (
+                    <option key={bot.$id} value={bot.$id}>
+                      {bot.name} / {bot.$id}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs font-medium leading-5 text-[var(--ui-muted)]">
+                  Sources are indexed for this exact agent ID. The widget must use the same agent.
+                </p>
+              </label>
+
+              <label
+                className="mt-5 flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-8 text-center transition hover:border-[var(--ui-blue)] hover:bg-[var(--ui-panel-2)] sm:min-h-72 sm:px-6 sm:py-10"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={handleDrop}
+              >
+                <span className="grid h-16 w-16 place-items-center rounded-full bg-[var(--ui-panel)] text-[var(--ui-blue)]">
+                  <UploadCloud aria-hidden="true" className="h-8 w-8" />
+                </span>
+                <span className="mt-5 max-w-full break-words text-xl font-semibold text-[var(--ui-text)] sm:text-2xl">{file ? file.name : "Drop source file"}</span>
+                <span className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--ui-muted)]">
+                  Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. Text extraction starts before vector processing.
+                </span>
+                <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md" onChange={handleFileChange} />
+              </label>
+
+              {uploadState.message ? (
+                <p className={uploadMessageClass(uploadState.status)} role="status">
+                  {uploadState.status === "success" ? <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" /> : null}
+                  {uploadState.message}
+                </p>
+              ) : null}
+
+              <Button
+                className="mt-5 w-full rounded-full sm:w-auto"
+                disabled={uploadState.status === "processing"}
+                leftIcon={<UploadCloud aria-hidden="true" className="h-4 w-4" />}
+                loading={uploadState.status === "uploading"}
+                type="submit"
+              >
+                Upload document
+              </Button>
+            </form>
+
+            <form className="mt-6 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4 sm:p-5" onSubmit={ingestUrl}>
+              <div className="mb-4 flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--ui-panel)] text-[var(--ui-blue)]">
+                  <Globe2 aria-hidden="true" className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--ui-text)]">Ingest public URL</h3>
+                  <p className="text-sm font-medium text-[var(--ui-muted)]">Use this for help centers, FAQs, policies, product pages, or sitemap.xml files.</p>
+                </div>
+              </div>
+              <Input
+                label="Source URL"
+                value={sourceUrl}
+                onChange={(event) => setSourceUrl(event.target.value)}
+                hint="The URL will be queued, extracted, and processed into the selected agent knowledge base."
+              />
+              <Button
+                className="mt-5 w-full rounded-full sm:w-auto"
+                disabled={!sourceUrl.trim() || uploadState.status === "processing"}
+                leftIcon={<Link2 aria-hidden="true" className="h-4 w-4" />}
+                loading={uploadState.status === "uploading"}
+                type="submit"
+                variant="secondary"
+              >
+                Ingest URL
+              </Button>
+            </form>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -357,13 +463,13 @@ async function runIngestionWorkers({
 
 function uploadMessageClass(status: UploadState["status"]) {
   if (status === "success") {
-    return "mt-5 border border-[#22c55e]/40 bg-[#22c55e]/10 px-3 py-2 text-sm font-semibold text-[#22c55e]";
+    return "mt-5 flex items-start gap-2 rounded-2xl border border-[#22c55e]/40 bg-[#22c55e]/10 px-3 py-2 text-sm font-semibold text-[#16a34a]";
   }
 
   if (status === "error") {
-    return "mt-5 border border-[#ff5530]/40 bg-[#ff5530]/10 px-3 py-2 text-sm font-semibold text-[#ff5530]";
+    return "mt-5 flex items-start gap-2 rounded-2xl border border-[#ff5530]/40 bg-[#ff5530]/10 px-3 py-2 text-sm font-semibold text-[#ff5530]";
   }
 
-  return "mt-5 border border-[#1456f0]/40 bg-[#1456f0]/10 px-3 py-2 text-sm font-semibold text-[#9bb7ff]";
+  return "mt-5 flex items-start gap-2 rounded-2xl border border-[var(--ui-blue)]/40 bg-[var(--ui-blue)]/10 px-3 py-2 text-sm font-semibold text-[var(--ui-blue)]";
 }
 

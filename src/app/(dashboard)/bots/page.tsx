@@ -7,6 +7,7 @@ import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState, Panel, StatusPill } from "@/components/ui/Signal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Bot = {
   $id: string;
@@ -35,6 +36,7 @@ export default function BotsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<BotForm>(EMPTY_FORM);
   const [status, setStatus] = useState("");
+  const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Bot | null>(null);
@@ -45,15 +47,19 @@ export default function BotsPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
+      setIsAgentsLoading(false);
       return;
     }
 
     let isActive = true;
+    setIsAgentsLoading(true);
+    setStatus("");
     listBots(tenant.$id).then((response) => {
       if (!isActive) {
         return;
       }
 
+      setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
         const firstBot = response.bots[0] ?? null;
@@ -154,7 +160,7 @@ export default function BotsPage() {
   }
 
   if (tenantLoading) {
-    return <main className="p-6 font-bold text-muted-foreground">Loading workspace...</main>;
+    return <BotsPageSkeleton />;
   }
 
   return (
@@ -163,45 +169,54 @@ export default function BotsPage() {
 
       <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
         <section className="grid content-start gap-3 md:grid-cols-2">
-          <button
-            className="min-h-[160px] rounded-2xl border border-[#262626] bg-[#141414] p-4 text-left transition hover:-translate-y-1 hover:border-white/50"
-            onClick={() => {
-              setSelectedId(null);
-              setForm(EMPTY_FORM);
-              setStatus("");
-            }}
-            type="button"
-          >
-            <Plus aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
-            <h2 className="mt-10 text-2xl font-semibold tracking-[-0.03em] text-white">New agent</h2>
-            <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
-          </button>
-
-          {bots.length === 0 ? (
-            <Panel className="min-h-[160px] p-4">
-              <EmptyState title="No agents configured" description="Create a support agent for this tenant to begin training behavior." />
-            </Panel>
+          {isAgentsLoading ? (
+            <AgentGridSkeleton />
           ) : (
-            bots.map((bot, index) => (
+            <>
               <button
-                className={`min-h-[160px] overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
-                  bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
-                } ${botCardClass(index)}`}
-                key={bot.$id}
-                onClick={() => selectBot(bot)}
+                className="min-h-[160px] rounded-2xl border border-[#262626] bg-[#141414] p-4 text-left transition hover:-translate-y-1 hover:border-white/50"
+                onClick={() => {
+                  setSelectedId(null);
+                  setForm(EMPTY_FORM);
+                  setStatus("");
+                }}
                 type="button"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
-                  <BotIcon aria-hidden="true" className="h-6 w-6" />
-                </div>
-                <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
-                <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                <Plus aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
+                <h2 className="mt-10 text-2xl font-semibold tracking-[-0.03em] text-white">New agent</h2>
+                <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
               </button>
-            ))
+
+              {bots.length === 0 ? (
+                <Panel className="min-h-[160px] p-4">
+                  <EmptyState title="No agents configured" description="Create a support agent for this tenant to begin training behavior." />
+                </Panel>
+              ) : (
+                bots.map((bot, index) => (
+                  <button
+                    className={`min-h-[160px] overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
+                      bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
+                    } ${botCardClass(index)}`}
+                    key={bot.$id}
+                    onClick={() => selectBot(bot)}
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
+                      <BotIcon aria-hidden="true" className="h-6 w-6" />
+                    </div>
+                    <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
+                    <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                  </button>
+                ))
+              )}
+            </>
           )}
         </section>
 
+        {isAgentsLoading ? (
+          <AgentFormSkeleton />
+        ) : (
         <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
           <form onSubmit={saveBot}>
             <section className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
@@ -285,6 +300,7 @@ export default function BotsPage() {
             </div>
           </form>
         </Panel>
+        )}
       </div>
 
       <Dialog open={Boolean(deleteTarget)}>
@@ -333,6 +349,121 @@ export default function BotsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function BotsPageSkeleton() {
+  return (
+    <div className="cockpit-lane min-h-screen">
+      <BotsHeaderSkeleton />
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
+        <section className="grid content-start gap-3 md:grid-cols-2">
+          <AgentGridSkeleton />
+        </section>
+        <AgentFormSkeleton />
+      </div>
+    </div>
+  );
+}
+
+function BotsHeaderSkeleton() {
+  return (
+    <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-8">
+            <div className="min-w-0">
+              <Skeleton className="h-7 w-44 rounded-full bg-[var(--ui-bg)]" />
+              <div className="mt-4 grid max-w-4xl gap-3">
+                <Skeleton className="h-10 w-full max-w-3xl bg-[var(--ui-panel-2)] sm:h-12" />
+                <Skeleton className="h-10 w-4/5 max-w-2xl bg-[var(--ui-panel-2)] sm:h-12" />
+              </div>
+              <div className="mt-4 grid max-w-2xl gap-2">
+                <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
+                <Skeleton className="h-4 w-11/12 bg-[var(--ui-panel-2)]" />
+                <Skeleton className="h-4 w-2/3 bg-[var(--ui-panel-2)]" />
+              </div>
+            </div>
+
+            <div className="grid content-start gap-3 rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-36 bg-[var(--ui-panel-2)]" />
+                <Skeleton className="h-7 w-12 rounded-full bg-[var(--ui-panel-2)]" />
+              </div>
+              <div className="grid gap-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div className="flex min-h-11 items-center gap-3 rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3" key={index}>
+                    <Skeleton className="h-6 w-6 rounded-full bg-[var(--ui-bg)]" />
+                    <Skeleton className="h-4 flex-1 bg-[var(--ui-bg)]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AgentGridSkeleton() {
+  return (
+    <>
+      <AgentCardSkeleton />
+      <AgentCardSkeleton />
+      <AgentCardSkeleton />
+      <AgentCardSkeleton />
+    </>
+  );
+}
+
+function AgentCardSkeleton() {
+  return (
+    <div className="min-h-[160px] overflow-hidden rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-6 w-20 rounded-full bg-[var(--ui-bg)]" />
+        <Skeleton className="h-6 w-6 rounded-full bg-[var(--ui-bg)]" />
+      </div>
+      <Skeleton className="mt-10 h-7 w-3/4 bg-[var(--ui-bg)]" />
+      <Skeleton className="mt-3 h-4 w-2/3 bg-[var(--ui-bg)]" />
+    </div>
+  );
+}
+
+function AgentFormSkeleton() {
+  return (
+    <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+      <div className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+        <div className="min-w-0 flex-1">
+          <Skeleton className="h-4 w-40 bg-[var(--ui-bg)]" />
+          <Skeleton className="mt-2 h-9 w-40 bg-[var(--ui-bg)]" />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-7 w-24 rounded-full bg-[var(--ui-bg)] sm:w-36" />
+          <Skeleton className="h-9 w-9 rounded-md bg-[var(--ui-bg)]" />
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        <SkeletonField className="h-11" labelWidth="w-24" />
+        <SkeletonField className="h-60" labelWidth="w-28" />
+        <SkeletonField className="h-28" labelWidth="w-36" />
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Skeleton className="h-11 w-28 rounded-md bg-[var(--ui-bg)]" />
+        <Skeleton className="h-11 w-24 rounded-md bg-[var(--ui-bg)]" />
+      </div>
+    </Panel>
+  );
+}
+
+function SkeletonField({ className, labelWidth }: { className: string; labelWidth: string }) {
+  return (
+    <div>
+      <Skeleton className={`mb-2 h-4 ${labelWidth} bg-[var(--ui-bg)]`} />
+      <Skeleton className={`w-full rounded-lg bg-[var(--ui-bg)] ${className}`} />
     </div>
   );
 }
