@@ -46,21 +46,25 @@ function LoginContent() {
 
   return (
     <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
-      <section className="relative min-h-[42vh] overflow-hidden border-b border-[var(--marketing-border)] bg-[#070a12] lg:min-h-screen lg:border-b-0 lg:border-r">
-        <InteractiveRobotSpline scene={ROBOT_SCENE_URL} className="absolute inset-0 h-full w-full scale-120" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(20,86,240,0.16),transparent_34rem),linear-gradient(180deg,rgba(7,10,18,0.08),rgba(7,10,18,0.42))]" />
+      <section className="login-robot-panel relative min-h-[48vh] overflow-hidden border-b border-[var(--marketing-border)] lg:min-h-screen lg:border-b-0 lg:border-r">
+        <InteractiveRobotSpline scene={ROBOT_SCENE_URL} className="login-robot-scene absolute inset-0 h-full w-full scale-120" />
+        <div className="login-robot-tone pointer-events-none absolute inset-0" />
 
-        <div className="relative z-10 flex items-start justify-between gap-3 p-5 lg:p-8">
+        <div className="relative z-20 flex items-start justify-between gap-3 p-5 lg:p-8">
           <Link
             aria-label="Back to AgentDesk"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/30 text-white shadow-[0_16px_40px_rgba(0,0,0,0.22)] backdrop-blur-md transition hover:bg-black/45"
+            className="login-robot-control inline-flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md transition"
             href="/"
           >
             <ArrowLeft aria-hidden="true" className="h-5 w-5" />
           </Link>
-          <div className="rounded-full bg-black/25 p-1 backdrop-blur-md">
+          <div className="login-robot-toggle rounded-full p-1 backdrop-blur-md">
             <ThemeToggle compact variant="cockpit" />
           </div>
+        </div>
+
+        <div className="login-robot-copy pointer-events-none absolute inset-x-5 bottom-5 z-20 mx-auto max-w-[46rem] px-5 py-4 text-center text-white sm:px-8 sm:py-5 lg:inset-x-8 lg:bottom-8">
+          <h1 className="">Resolve every support queue with context</h1>
         </div>
       </section>
 

@@ -275,8 +275,8 @@ textarea {
 }
 
 .marketing-cta:hover {
-  border-color: var(--cream-coral) !important;
-  background: var(--cream-coral) !important;
+  border-color: rgba(255, 122, 69, 0.5) !important;
+  background: #ff4276 !important;
   color: #ffffff !important;
 }
 
@@ -295,6 +295,110 @@ textarea {
   background: var(--marketing-chip) !important;
 }
 
+.login-robot-panel {
+  --login-robot-control-bg: rgba(255, 255, 255, 0.72);
+  --login-robot-control-hover: rgba(255, 255, 255, 0.9);
+  --login-robot-control-fg: #101418;
+  --login-robot-control-border: rgba(16, 20, 24, 0.12);
+  --login-robot-control-shadow: 0 18px 48px rgba(131, 58, 180, 0.16);
+  background:
+    radial-gradient(circle at 20% 78%, rgba(221, 42, 123, 0.18), transparent 28rem),
+    radial-gradient(circle at 82% 16%, rgba(81, 91, 212, 0.16), transparent 26rem),
+    linear-gradient(135deg, #fbfcff 0%, #f7f2ff 46%, #fff0f8 100%);
+}
+
+.login-robot-scene {
+  filter: brightness(1.16) contrast(0.88) saturate(0.92);
+  transform-origin: center;
+}
+
+.login-robot-tone {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.34), transparent 30rem),
+    radial-gradient(circle at 26% 88%, rgba(244, 114, 182, 0.26), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 244, 250, 0.34) 58%, rgba(255, 255, 255, 0.58));
+}
+
+.robot-fallback {
+  background: #070a12;
+}
+
+.robot-fallback-glow {
+  background:
+    radial-gradient(circle at 48% 28%, rgba(20, 86, 240, 0.34), transparent 24rem),
+    radial-gradient(circle at 70% 60%, rgba(34, 197, 165, 0.18), transparent 22rem);
+}
+
+.robot-fallback-core {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 80px rgba(20, 86, 240, 0.28);
+}
+
+.login-robot-panel .robot-fallback {
+  background: transparent;
+}
+
+[data-theme="light"] .login-robot-panel .robot-fallback-glow {
+  background:
+    radial-gradient(circle at 48% 28%, rgba(81, 91, 212, 0.18), transparent 24rem),
+    radial-gradient(circle at 64% 72%, rgba(221, 42, 123, 0.18), transparent 22rem);
+}
+
+[data-theme="light"] .login-robot-panel .robot-fallback-core {
+  border-color: rgba(131, 58, 180, 0.2);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 0 70px rgba(221, 42, 123, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.52);
+}
+
+.login-robot-control,
+.login-robot-toggle {
+  border: 1px solid var(--login-robot-control-border);
+  background: var(--login-robot-control-bg);
+  color: var(--login-robot-control-fg);
+  box-shadow: var(--login-robot-control-shadow);
+}
+
+.login-robot-control:hover {
+  background: var(--login-robot-control-hover);
+}
+
+.login-robot-copy {
+  isolation: isolate;
+  border-radius: 999px;
+  background:
+    linear-gradient(100deg, #5b22ff 0%, #bb12ff 26%, #f500b8 52%, #ff4276 76%, #ff7a45 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 18px 48px rgba(221, 42, 123, 0.28);
+  transform: translateX(clamp(-0.5rem, -2.5rem, -4rem));
+}
+
+.login-robot-copy::before {
+  position: absolute;
+  top:2rem;
+  inset: 38% -1.4rem -0.85rem 1.4rem;
+  z-index: -1;
+  border-radius: 999px;
+  background:
+    linear-gradient(100deg, rgba(91, 34, 255, 0.52) 0%, rgba(187, 18, 255, 0.5) 28%, rgba(245, 0, 184, 0.48) 52%, rgba(255, 66, 118, 0.52) 74%, rgba(255, 122, 69, 0.5) 100%);
+  content: "";
+  filter: blur(2px);
+  transform:translateX(clamp(-1.5rem, -2vw, -3rem));
+}
+
+.login-robot-copy h1 {
+  position: relative;
+  font-family: var(--font-plus-jakarta-sans), var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.2rem, 2.1vw, 2.05rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.08;
+  text-shadow: 0 2px 16px rgba(64, 0, 98, 0.22);
+}
+
 [data-theme="dark"] .marketing-dark-band {
   background:
     radial-gradient(circle at 20% 8%, rgba(20, 86, 240, 0.22), transparent 34rem),
@@ -307,6 +411,28 @@ textarea {
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)),
     var(--marketing-surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="dark"] .login-robot-panel {
+  --login-robot-control-bg: rgba(0, 0, 0, 0.32);
+  --login-robot-control-hover: rgba(0, 0, 0, 0.48);
+  --login-robot-control-fg: #ffffff;
+  --login-robot-control-border: rgba(255, 255, 255, 0.08);
+  --login-robot-control-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(20, 86, 240, 0.16), transparent 34rem),
+    radial-gradient(circle at 24% 86%, rgba(131, 58, 180, 0.26), transparent 28rem),
+    linear-gradient(180deg, #070a12 0%, #091022 58%, #04070d 100%);
+}
+
+[data-theme="dark"] .login-robot-scene {
+  filter: brightness(0.96) contrast(1.02) saturate(1.08);
+}
+
+[data-theme="dark"] .login-robot-tone {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(20, 86, 240, 0.16), transparent 34rem),
+    linear-gradient(180deg, rgba(7, 10, 18, 0.08), rgba(7, 10, 18, 0.46));
 }
 
 [data-theme="dark"] .cream-lane [class~="bg-[#f7f4ed]"],
