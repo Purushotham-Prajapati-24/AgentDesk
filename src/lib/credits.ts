@@ -1,7 +1,7 @@
 "use server";
 
 import { Query, type Models } from "node-appwrite";
-import { createSessionClient } from "@/lib/server/appwrite";
+import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
 
 export type LedgerTransaction = {
   id: string;
@@ -46,26 +46,22 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
   | { success: false; error: string }
 > {
   try {
-    const { account, databases } = await createSessionClient();
+    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
     await assertTenantAccess(account, tenantId);
     const activeSessionWindowMinutes = numberEnv(
       "BILLING_ACTIVE_SESSION_WINDOW_MINUTES",
       DEFAULT_ACTIVE_SESSION_WINDOW_MINUTES,
     );
 
-    const [tenantCredits, ledger, activeSessionCount, messages, files] = await Promise.all([
+    const [tenantCredits, ledgerDocuments, activeSessionCount, messageCount, fileDocuments] = await Promise.all([
       getTenantCredits(databases, tenantId),
-      databases.listDocuments(databaseId(), ledgerCollectionId(), [
-        Query.equal("tenant_id", tenantId),
-        Query.orderDesc("created"),
-        Query.limit(PAGE_LIMIT),
-      ]),
+      listAllTenantDocuments<LedgerDocument>(databases, ledgerCollectionId(), tenantId, [Query.orderDesc("created")]),
       countOpenRecentSessions(databases, tenantId, activeSessionWindowMinutes),
-      databases.listDocuments(databaseId(), messagesCollectionId(), [Query.equal("tenant_id", tenantId), Query.limit(1)]),
-      databases.listDocuments(databaseId(), documentsCollectionId(), [Query.equal("tenant_id", tenantId), Query.limit(PAGE_LIMIT)]),
+      countTenantDocuments(databases, messagesCollectionId(), tenantId),
+      listAllTenantDocuments<FileDocument>(databases, documentsCollectionId(), tenantId),
     ]);
 
-    const transactions = ledger.documents.map((document) => mapLedgerDocument(document as LedgerDocument));
+    const transactions = ledgerDocuments.map(mapLedgerDocument);
 
     return {
       success: true,
@@ -75,16 +71,55 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
         stats: {
           activeSessions: activeSessionCount,
           activeSessionWindowMinutes,
-          totalMessages: messages.total,
-          documentStorageBytes: files.documents.reduce(
-            (total, document) => total + numberValue((document as FileDocument).file_size),
-            0,
-          ),
+          totalMessages: messageCount,
+          documentStorageBytes: fileDocuments.reduce((total, document) => total + numberValue(document.file_size), 0),
         },
       },
     };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load billing data." };
+  }
+}
+
+async function countTenantDocuments(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  collectionId: string,
+  tenantId: string,
+) {
+  const response = await databases.listDocuments(databaseId(), collectionId, [
+    Query.equal("tenant_id", tenantId),
+    Query.limit(1),
+  ]);
+
+  return response.total;
+}
+
+async function listAllTenantDocuments<T extends Models.Document>(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  collectionId: string,
+  tenantId: string,
+  extraQueries: string[] = [],
+) {
+  const documents: T[] = [];
+  let cursor: string | null = null;
+
+  while (true) {
+    const response: Models.DocumentList<Models.Document> = await databases.listDocuments(databaseId(), collectionId, [
+      Query.equal("tenant_id", tenantId),
+      ...extraQueries,
+      Query.limit(PAGE_LIMIT),
+      ...(cursor ? [Query.cursorAfter(cursor)] : []),
+    ]);
+    documents.push(...(response.documents as T[]));
+
+    if (response.documents.length < PAGE_LIMIT) {
+      return documents;
+    }
+
+    cursor = response.documents.at(-1)?.$id ?? null;
+    if (!cursor) {
+      return documents;
+    }
   }
 }
 
@@ -172,7 +207,7 @@ function messagesCollectionId() {
 }
 
 function documentsCollectionId() {
-  return process.env.APPWRITE_DOCUMENT_FILES_COLLECTION_ID ?? "document_files";
+  return process.env.APPWRITE_DOCUMENT_FILES_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DOCUMENTS_COLLECTION_ID ?? "document_files";
 }
 
 function numberValue(value: unknown) {

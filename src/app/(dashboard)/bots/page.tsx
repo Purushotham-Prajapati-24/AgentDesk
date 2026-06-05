@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
 import { createBot, deleteBot, listBots, updateBot } from "@/app/bot-actions";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
@@ -371,31 +371,26 @@ function BotsHeaderSkeleton() {
   return (
     <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-8">
+        <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
+          <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
             <div className="min-w-0">
-              <Skeleton className="h-7 w-44 rounded-full bg-[var(--ui-bg)]" />
-              <div className="mt-4 grid max-w-4xl gap-3">
-                <Skeleton className="h-10 w-full max-w-3xl bg-[var(--ui-panel-2)] sm:h-12" />
-                <Skeleton className="h-10 w-4/5 max-w-2xl bg-[var(--ui-panel-2)] sm:h-12" />
-              </div>
-              <div className="mt-4 grid max-w-2xl gap-2">
-                <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
-                <Skeleton className="h-4 w-11/12 bg-[var(--ui-panel-2)]" />
-                <Skeleton className="h-4 w-2/3 bg-[var(--ui-panel-2)]" />
+              <Skeleton className="h-7 w-44 rounded-full bg-white/45 dark:bg-white/20" />
+              <div className="mt-3 grid max-w-4xl gap-3">
+                <Skeleton className="h-10 w-full max-w-3xl bg-white/50 dark:bg-white/20 sm:h-12" />
+                <Skeleton className="h-10 w-4/5 max-w-2xl bg-white/45 dark:bg-white/15 sm:h-12" />
               </div>
             </div>
 
-            <div className="grid content-start gap-3 rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4">
+            <div className="grid content-start gap-3 rounded-3xl border border-white/35 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
               <div className="flex items-center justify-between gap-3">
-                <Skeleton className="h-4 w-36 bg-[var(--ui-panel-2)]" />
-                <Skeleton className="h-7 w-12 rounded-full bg-[var(--ui-panel-2)]" />
+                <Skeleton className="h-4 w-36 bg-white/50 dark:bg-white/20" />
+                <Skeleton className="h-7 w-12 rounded-full bg-white/45 dark:bg-white/15" />
               </div>
               <div className="grid gap-2">
                 {Array.from({ length: 3 }).map((_, index) => (
-                  <div className="flex min-h-11 items-center gap-3 rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3" key={index}>
-                    <Skeleton className="h-6 w-6 rounded-full bg-[var(--ui-bg)]" />
-                    <Skeleton className="h-4 flex-1 bg-[var(--ui-bg)]" />
+                  <div className="flex min-h-10 items-center gap-3 rounded-full border border-white/35 bg-white/30 px-3 dark:bg-black/15" key={index}>
+                    <Skeleton className="h-6 w-6 rounded-full bg-white/50 dark:bg-white/20" />
+                    <Skeleton className="h-4 flex-1 bg-white/45 dark:bg-white/15" />
                   </div>
                 ))}
               </div>
@@ -478,30 +473,27 @@ function BotsHeader({ botCount }: { botCount: number }) {
   return (
     <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-8">
+        <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
+          <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
             <div className="min-w-0">
-              <p className="inline-flex rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-1 studio-kicker text-[#0099ff]">
+              <p className="inline-flex rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
                 Support agent setup
               </p>
-              <h1 className="mt-4 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-[var(--ui-text)] sm:text-4xl lg:text-5xl">
+              <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
                 Create customer support agents for this workspace.
               </h1>
-              <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)] sm:text-lg">
-                Use this page to create, edit, and delete tenant-specific support agents. Each agent stores the instructions it should follow and the fallback message it should use when it cannot answer with confidence.
-              </p>
             </div>
 
-            <div className="grid content-start gap-3 rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4">
+            <div className="grid content-start gap-3 rounded-3xl border border-white/35 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
               <div className="flex items-center justify-between gap-3">
-                <span className="studio-kicker text-[var(--ui-muted)]">Configured agents</span>
+                <span className="studio-kicker opacity-70">Agent flow</span>
                 <StatusPill tone="warn">{botCount}</StatusPill>
               </div>
               <div className="grid gap-2">
                 {steps.map((step, index) => (
-                  <div className="flex min-h-11 items-center gap-3 rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 text-sm font-semibold text-[var(--ui-text)]" key={step}>
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0099ff]/10 font-mono text-xs text-[#0099ff]">
-                      {index + 1}
+                  <div className="flex min-h-10 items-center gap-3 rounded-full border border-white/35 bg-white/30 px-3 text-sm font-semibold text-current dark:bg-black/15" key={step}>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#312e81]/10 text-[#312e81] dark:bg-white/15 dark:text-[#ccfbf1]">
+                      <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
                     </span>
                     <span>{step}</span>
                   </div>

@@ -51,13 +51,13 @@ export default function MonitorAnalyticsPage() {
   return (
     <div className="min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
-        <section className="grid gap-5 rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
+        <section className="grid gap-5 rounded-[2rem] border border-[#06b6d4]/30 bg-[linear-gradient(135deg,#ecfeff_0%,#cffafe_42%,#ff5530_100%)] p-5 text-[#083344] shadow-[0_24px_70px_rgba(6,182,212,0.14)] dark:bg-[linear-gradient(135deg,#061a20_0%,#155e75_46%,#7c2d12_100%)] dark:text-[#ecfeff] lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
           <div className="min-w-0">
-            <p className="studio-kicker text-[var(--ui-blue)]">Monitor / Analytics</p>
-            <h2 className="mt-3 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ui-text)] sm:text-5xl">
+            <p className="studio-kicker text-[#0e7490] dark:text-[#a5f3fc]">Monitor / Analytics</p>
+            <h2 className="mt-3 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl">
               Operational signals for the support desk.
             </h2>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
+            <p className="mt-4 max-w-2xl text-base font-medium leading-7 opacity-75">
               Measure conversation volume, handoff pressure, automation activity, customer demand, and usage health from tenant data.
             </p>
           </div>
@@ -102,22 +102,24 @@ export default function MonitorAnalyticsPage() {
               </div>
             </section>
 
-            <div className="grid min-w-0 gap-5 lg:grid-cols-2 2xl:grid-cols-4">
-              <section className="min-w-0 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
-                <div className="mb-5 flex items-center gap-2">
-                  <Radio aria-hidden="true" className="h-5 w-5 text-[var(--ui-blue)]" />
-                  <h3 className="text-xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Session status</h3>
-                </div>
-                <DistributionList items={snapshot.statusDistribution.map((item) => ({ label: item.label.replaceAll("_", " "), value: item.value }))} />
-              </section>
+            <div className="grid min-w-0 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid min-w-0 content-start gap-5">
+                <section className="min-w-0 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+                  <div className="mb-5 flex items-center gap-2">
+                    <Radio aria-hidden="true" className="h-5 w-5 text-[var(--ui-blue)]" />
+                    <h3 className="text-xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Session status</h3>
+                  </div>
+                  <DistributionList items={snapshot.statusDistribution.map((item) => ({ label: item.label.replaceAll("_", " "), value: item.value }))} />
+                </section>
 
-              <section className="min-w-0 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
-                <div className="mb-5 flex items-center gap-2">
-                  <MessageSquare aria-hidden="true" className="h-5 w-5 text-[var(--ui-blue)]" />
-                  <h3 className="text-xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Sender mix</h3>
-                </div>
-                <DistributionList items={snapshot.senderMix.map((item) => ({ label: item.label === "bot" ? "automation" : item.label, value: item.value }))} />
-              </section>
+                <section className="min-w-0 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+                  <div className="mb-5 flex items-center gap-2">
+                    <MessageSquare aria-hidden="true" className="h-5 w-5 text-[var(--ui-blue)]" />
+                    <h3 className="text-xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Sender mix</h3>
+                  </div>
+                  <DistributionList items={snapshot.senderMix.map((item) => ({ label: item.label === "bot" ? "automation" : item.label, value: item.value }))} />
+                </section>
+              </div>
 
               <section className="min-w-0 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4 sm:p-5">
                 <div className="mb-5 flex items-center gap-2">
@@ -183,9 +185,11 @@ function MonitorAnalyticsPageSkeleton() {
         <AnalyticsMetricGridSkeleton />
         <div className="grid min-w-0 gap-5">
           <AnalyticsChartSkeleton />
-          <div className="grid min-w-0 gap-5 lg:grid-cols-2 2xl:grid-cols-4">
-            <DistributionPanelSkeleton />
-            <DistributionPanelSkeleton />
+          <div className="grid min-w-0 gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="grid min-w-0 content-start gap-5">
+              <DistributionPanelSkeleton />
+              <DistributionPanelSkeleton />
+            </div>
             <SideCardSkeleton />
             <SideCardSkeleton />
           </div>
@@ -197,14 +201,14 @@ function MonitorAnalyticsPageSkeleton() {
 
 function AnalyticsHeroSkeleton() {
   return (
-    <section className="grid gap-5 rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
+    <section className="grid gap-5 rounded-[2rem] border border-[#06b6d4]/30 bg-[linear-gradient(135deg,#ecfeff_0%,#cffafe_42%,#ff5530_100%)] p-5 text-[#083344] shadow-[0_24px_70px_rgba(6,182,212,0.14)] dark:bg-[linear-gradient(135deg,#061a20_0%,#155e75_46%,#7c2d12_100%)] dark:text-[#ecfeff] lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
       <div className="min-w-0">
-        <Skeleton className="h-3 w-40 bg-[var(--ui-panel-2)]" />
-        <Skeleton className="mt-4 h-10 w-full max-w-2xl bg-[var(--ui-panel-2)] sm:h-12" />
-        <Skeleton className="mt-3 h-10 w-full max-w-xl bg-[var(--ui-panel-2)] sm:h-12" />
+        <Skeleton className="h-3 w-40 bg-white/45 dark:bg-white/20" />
+        <Skeleton className="mt-4 h-10 w-full max-w-2xl bg-white/50 dark:bg-white/20 sm:h-12" />
+        <Skeleton className="mt-3 h-10 w-full max-w-xl bg-white/45 dark:bg-white/15 sm:h-12" />
         <div className="mt-5 grid max-w-2xl gap-2">
-          <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
-          <Skeleton className="h-4 w-5/6 bg-[var(--ui-panel-2)]" />
+          <Skeleton className="h-4 w-full bg-white/40 dark:bg-white/15" />
+          <Skeleton className="h-4 w-5/6 bg-white/40 dark:bg-white/15" />
         </div>
       </div>
       <div className="grid min-w-0 content-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#fff7ed_0%,#fdba74_48%,#ff5530_100%)] p-5">

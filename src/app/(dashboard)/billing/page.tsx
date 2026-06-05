@@ -71,29 +71,26 @@ export default function BillingPage() {
 
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
-      <section className="px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-8">
+      <section className="px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#22c55e]/30 bg-[linear-gradient(135deg,#f0fdf4_0%,#bbf7d0_48%,#22c55e_100%)] text-[#052e16] shadow-[0_24px_70px_rgba(34,197,94,0.16)] dark:bg-[linear-gradient(135deg,#031b12_0%,#14532d_48%,#22c55e_100%)] dark:text-[#ecfdf5]">
+          <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-4">
             <div className="min-w-0">
-              <p className="inline-flex rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-1 font-mono text-xs font-semibold uppercase text-[var(--ui-blue)]">
+              <p className="inline-flex rounded-full border border-[#166534]/20 bg-white/55 px-3 py-1 font-mono text-xs font-semibold uppercase text-[#166534] dark:border-white/20 dark:bg-black/20 dark:text-[#bbf7d0]">
                 Usage and billing
               </p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ui-text)] sm:text-5xl lg:text-6xl">
+              <h1 className="mt-2 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl">
                 Keep credits, usage, and customer traffic in one clear ledger.
               </h1>
-              <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
-                Monitor available balance, conversation volume, active sessions, and knowledge storage for the selected workspace.
-              </p>
             </div>
 
             {isBillingLoading ? (
               <BalanceCardSkeleton />
             ) : (
-            <div className="grid content-between gap-5 rounded-3xl bg-[linear-gradient(135deg,#dcfce7_0%,#86efac_48%,#22c55e_100%)] p-5 text-[#052e16]">
+            <div className="grid content-between gap-3 rounded-3xl bg-[linear-gradient(135deg,#dcfce7_0%,#86efac_48%,#22c55e_100%)] p-3 text-[#052e16]">
               <div>
                 <p className="font-mono text-xs font-semibold uppercase opacity-60">Current balance</p>
-                <p className="mt-3 font-mono text-5xl font-semibold tracking-[-0.04em]">{formatAmount(balance)}</p>
-                <p className="mt-3 text-sm font-medium leading-6 opacity-60">Available credits for live chat, ingestion, and indexed knowledge workflows.</p>
+                <p className="mt-1 font-mono text-4xl font-semibold tracking-[-0.04em]">{formatAmount(balance)}</p>
+                <p className="mt-2 text-sm font-medium leading-5 opacity-60">Credits for live chat, ingestion, and indexed knowledge.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-white/75 px-3 py-2 text-xs font-semibold text-[#052e16]">Tenant: {tenant?.$id ?? "Unavailable"}</span>
@@ -163,9 +160,9 @@ export default function BillingPage() {
                 <EmptyState title="No ledger entries yet" description="Credits and usage debits will appear here after billing events are recorded." />
               </div>
             ) : (
-              <div className="w-full overflow-x-auto">
+              <div className="max-h-[520px] w-full overflow-auto [scrollbar-color:#22c55e_var(--ui-panel-2)] [scrollbar-width:thin]">
                 <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-                  <thead className="bg-[var(--ui-panel)] text-xs uppercase text-[var(--ui-muted)]">
+                  <thead className="sticky top-0 z-10 bg-[var(--ui-panel)] text-xs uppercase text-[var(--ui-muted)] shadow-[0_1px_0_var(--ui-border)]">
                     <tr>
                       <th className="px-5 py-3">Date</th>
                       <th className="px-5 py-3">Type</th>
@@ -201,18 +198,14 @@ export default function BillingPage() {
 function BillingPageSkeleton() {
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
-      <section className="px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-8">
+      <section className="px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#22c55e]/30 bg-[linear-gradient(135deg,#f0fdf4_0%,#bbf7d0_48%,#22c55e_100%)] text-[#052e16] shadow-[0_24px_70px_rgba(34,197,94,0.16)] dark:bg-[linear-gradient(135deg,#031b12_0%,#14532d_48%,#22c55e_100%)] dark:text-[#ecfdf5]">
+          <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-4">
             <div className="min-w-0">
-              <Skeleton className="h-7 w-40 rounded-full bg-[var(--ui-bg)]" />
-              <div className="mt-4 grid max-w-4xl gap-3">
-                <Skeleton className="h-12 w-full max-w-3xl bg-[var(--ui-panel-2)] sm:h-14" />
-                <Skeleton className="h-12 w-4/5 max-w-2xl bg-[var(--ui-panel-2)] sm:h-14" />
-              </div>
-              <div className="mt-4 grid max-w-2xl gap-2">
-                <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
-                <Skeleton className="h-4 w-10/12 bg-[var(--ui-panel-2)]" />
+              <Skeleton className="h-7 w-40 rounded-full bg-white/45 dark:bg-white/20" />
+              <div className="mt-2 grid max-w-4xl gap-3">
+                <Skeleton className="h-12 w-full max-w-3xl bg-white/50 dark:bg-white/20 sm:h-14" />
+                <Skeleton className="h-12 w-4/5 max-w-2xl bg-white/45 dark:bg-white/15 sm:h-14" />
               </div>
             </div>
             <BalanceCardSkeleton />
@@ -233,18 +226,18 @@ function BillingPageSkeleton() {
 
 function BalanceCardSkeleton() {
   return (
-    <div className="grid content-between gap-5 rounded-3xl bg-[linear-gradient(135deg,#dcfce7_0%,#86efac_48%,#22c55e_100%)] p-5">
+    <div className="grid content-between gap-3 rounded-3xl bg-[linear-gradient(135deg,#dcfce7_0%,#86efac_48%,#22c55e_100%)] p-3">
       <div>
         <Skeleton className="h-4 w-32 bg-white/40" />
-        <Skeleton className="mt-4 h-12 w-40 bg-white/50" />
-        <div className="mt-4 grid gap-2">
+        <Skeleton className="mt-2 h-10 w-36 bg-white/50" />
+        <div className="mt-2 grid gap-2">
           <Skeleton className="h-4 w-full bg-white/35" />
           <Skeleton className="h-4 w-3/4 bg-white/35" />
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Skeleton className="h-8 w-40 rounded-full bg-white/45" />
-        <Skeleton className="h-8 w-28 rounded-full bg-white/35" />
+        <Skeleton className="h-7 w-36 rounded-full bg-white/45" />
+        <Skeleton className="h-7 w-24 rounded-full bg-white/35" />
       </div>
     </div>
   );
@@ -308,9 +301,9 @@ function TransactionTableSkeleton() {
         </div>
         <Skeleton className="h-7 w-20 rounded-full bg-[var(--ui-bg)]" />
       </div>
-      <div className="w-full overflow-x-auto">
+      <div className="max-h-[520px] w-full overflow-auto [scrollbar-color:#22c55e_var(--ui-panel-2)] [scrollbar-width:thin]">
         <div className="min-w-[760px]">
-          <div className="grid grid-cols-[1fr_0.8fr_1.6fr_0.8fr] gap-4 px-5 py-3">
+          <div className="sticky top-0 z-10 grid grid-cols-[1fr_0.8fr_1.6fr_0.8fr] gap-4 bg-[var(--ui-panel)] px-5 py-3 shadow-[0_1px_0_var(--ui-border)]">
             {Array.from({ length: 4 }).map((_, index) => (
               <Skeleton className="h-4 bg-[var(--ui-bg)]" key={index} />
             ))}

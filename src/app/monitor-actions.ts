@@ -1,7 +1,7 @@
 "use server";
 
 import { Query, type Models } from "node-appwrite";
-import { createSessionClient } from "@/lib/server/appwrite";
+import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
 
 export type MonitorSessionStatus = "active" | "paused_by_human" | "closed";
 export type MonitorSender = "customer" | "bot" | "agent" | "unknown";
@@ -37,6 +37,7 @@ export type MonitorUser = {
   paused: number;
   closed: number;
   botIds: string[];
+  agents: Array<{ id: string; name: string }>;
   lastMessage: string;
   lastStatus: MonitorSessionStatus;
 };
@@ -86,6 +87,11 @@ type LedgerDocument = Models.Document & {
   amount?: unknown;
 };
 
+type BotDocument = Models.Document & {
+  tenant_id?: unknown;
+  name?: unknown;
+};
+
 const PAGE_LIMIT = 12;
 const ANALYTICS_LIMIT = 100;
 const MESSAGE_LIMIT = 120;
@@ -105,7 +111,7 @@ export async function getMonitorConversationList({
   | { success: false; error: string }
 > {
   try {
-    const { account, databases } = await createSessionClient();
+    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
     await assertTenantAccess(account, tenantId);
 
     const sessions = await fetchSessions(databases, tenantId, {
@@ -132,7 +138,7 @@ export async function getMonitorConversationMessages({
   sessionId: string;
 }): Promise<{ success: true; data: { messages: MonitorMessage[] } } | { success: false; error: string }> {
   try {
-    const { account, databases } = await createSessionClient();
+    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
     await assertTenantAccess(account, tenantId);
     await assertSessionTenant(databases, tenantId, sessionId);
 
@@ -164,7 +170,7 @@ export async function getMonitorUsers({
   cursor?: string | null;
 }): Promise<{ success: true; data: { users: MonitorUser[]; nextCursor: string | null } } | { success: false; error: string }> {
   try {
-    const { account, databases } = await createSessionClient();
+    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
     await assertTenantAccess(account, tenantId);
 
     const sessions = await fetchSessions(databases, tenantId, {
@@ -176,6 +182,11 @@ export async function getMonitorUsers({
     const visibleSessions = sessions.documents.slice(0, PAGE_LIMIT) as SessionDocument[];
     const nextCursor = sessions.documents.length > PAGE_LIMIT ? visibleSessions.at(-1)?.$id ?? null : null;
     const conversations = await Promise.all(visibleSessions.map((session) => summarizeSession(databases, session, tenantId)));
+    const botNames = await getBotNames(
+      databases,
+      tenantId,
+      Array.from(new Set(conversations.map((conversation) => conversation.botId).filter(Boolean))),
+    );
     const users = conversations.map((conversation) => ({
       id: conversation.sessionToken,
       sessionToken: conversation.sessionToken,
@@ -187,6 +198,7 @@ export async function getMonitorUsers({
       paused: conversation.status === "paused_by_human" ? 1 : 0,
       closed: conversation.status === "closed" ? 1 : 0,
       botIds: conversation.botId ? [conversation.botId] : [],
+      agents: conversation.botId ? [{ id: conversation.botId, name: botNames.get(conversation.botId) ?? "Unnamed agent" }] : [],
       lastMessage: conversation.lastMessage,
       lastStatus: conversation.status,
     }));
@@ -201,7 +213,7 @@ export async function getMonitorAnalyticsSnapshot(
   tenantId: string,
 ): Promise<{ success: true; data: MonitorAnalyticsSnapshot } | { success: false; error: string }> {
   try {
-    const { account, databases } = await createSessionClient();
+    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
     await assertTenantAccess(account, tenantId);
 
     const [sessions, messages, files, ledger, activeSessions, pausedSessions, closedSessions, customerMessages, botMessages, agentMessages] = await Promise.all([
@@ -398,6 +410,33 @@ async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessi
   }
 }
 
+async function getBotNames(
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
+  tenantId: string,
+  botIds: string[],
+) {
+  const entries = await Promise.all(
+    botIds.map(async (botId) => {
+      if (!isSafeId(botId)) {
+        return null;
+      }
+
+      try {
+        const bot = (await databases.getDocument(databaseId(), botsCollectionId(), botId)) as BotDocument;
+        if (bot.tenant_id !== tenantId) {
+          return null;
+        }
+
+        return [botId, stringValue(bot.name, "Unnamed agent")] as const;
+      } catch {
+        return [botId, "Unnamed agent"] as const;
+      }
+    }),
+  );
+
+  return new Map(entries.filter((entry): entry is readonly [string, string] => Boolean(entry)));
+}
+
 function buildRecentActivity(messages: MessageDocument[]) {
   const days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
@@ -483,12 +522,16 @@ function messagesCollectionId() {
   return process.env.APPWRITE_MESSAGES_COLLECTION_ID ?? "messages";
 }
 
+function botsCollectionId() {
+  return process.env.APPWRITE_BOTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID ?? "bots";
+}
+
 function documentsCollectionId() {
-  return process.env.APPWRITE_DOCUMENT_FILES_COLLECTION_ID ?? "document_files";
+  return process.env.APPWRITE_DOCUMENT_FILES_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DOCUMENTS_COLLECTION_ID ?? "document_files";
 }
 
 function ledgerCollectionId() {
-  return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger_transactions";
+  return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger";
 }
 
 function isSafeId(value: string) {

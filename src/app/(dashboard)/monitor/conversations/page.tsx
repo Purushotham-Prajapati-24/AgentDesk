@@ -85,12 +85,18 @@ export default function MonitorConversationsPage() {
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const query = searchInput.trim();
+
+    if (!query) {
+      return;
+    }
+
     setCursor(null);
     setCursorStack([]);
     setSelectedConversation(null);
     setMessages([]);
     setLoading(true);
-    setSearch(searchInput.trim());
+    setSearch(query);
   }
 
   function updateStatus(nextStatus: MonitorSessionStatus | "all") {
@@ -133,13 +139,13 @@ export default function MonitorConversationsPage() {
   return (
     <div className="min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
-        <section className="grid gap-5 rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
+        <section className="grid gap-5 rounded-[2rem] border border-[#f97316]/30 bg-[linear-gradient(135deg,#fff7ed_0%,#fed7aa_46%,#38bdf8_100%)] p-5 text-[#431407] shadow-[0_24px_70px_rgba(249,115,22,0.14)] dark:bg-[linear-gradient(135deg,#241006_0%,#7c2d12_48%,#0369a1_100%)] dark:text-[#fff7ed] lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
           <div className="min-w-0">
-            <p className="studio-kicker text-[var(--ui-blue)]">Monitor / Conversations</p>
-            <h2 className="mt-3 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ui-text)] sm:text-5xl">
+            <p className="studio-kicker text-[#c2410c] dark:text-[#fed7aa]">Monitor / Conversations</p>
+            <h2 className="mt-3 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl">
               Watch every customer conversation as it unfolds.
             </h2>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
+            <p className="mt-4 max-w-2xl text-base font-medium leading-7 opacity-75">
               Search active sessions, read the full transcript, and quickly identify chats where automation needs human support.
             </p>
           </div>
@@ -161,26 +167,30 @@ export default function MonitorConversationsPage() {
 
         {error ? <ErrorNotice message={error} /> : null}
 
-        <div className="grid gap-5 xl:grid-cols-[410px_minmax(0,1fr)]">
-          <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-            <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-4">
+        <div className="grid min-w-0 gap-5 xl:h-[calc(100vh-8rem)] xl:min-h-[680px] xl:grid-cols-[410px_minmax(0,1fr)]">
+          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+            <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
+              <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+                <p className="studio-kicker text-[var(--ui-blue)]">Conversation queue</p>
+                <h3 className="text-base font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Find the chat that needs attention</h3>
+              </div>
               <form className="flex gap-2" onSubmit={submitSearch}>
                 <input
-                  className="min-h-11 min-w-0 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
+                  className="min-h-10 min-w-0 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
                   placeholder="Search session, agent, status"
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                 />
-                <Button aria-label="Search conversations" className="rounded-full" size="icon" type="submit" variant="secondary">
+                <Button aria-label="Search conversations" className="rounded-full" disabled={!searchInput.trim()} size="icon" type="submit" variant="secondary">
                   <Search aria-hidden="true" className="h-4 w-4" />
                 </Button>
               </form>
 
-              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+              <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
                 {statusOptions.map((item) => (
                   <button
                     className={cn(
-                      "min-h-9 shrink-0 rounded-full border px-3 font-mono text-xs font-semibold capitalize transition",
+                      "min-h-8 shrink-0 rounded-full border px-3 font-mono text-xs font-semibold capitalize transition",
                       status === item
                         ? "border-[var(--ui-blue)] bg-[var(--ui-blue)] text-white"
                         : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-muted)] hover:border-[var(--ui-blue)]/60 hover:text-[var(--ui-text)]",
@@ -195,7 +205,7 @@ export default function MonitorConversationsPage() {
               </div>
             </div>
 
-            <div className="grid max-h-[520px] gap-2 overflow-y-auto p-3 lg:max-h-[720px]">
+            <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto p-3">
               {loading ? (
                 <ConversationListRowsSkeleton />
               ) : conversations.length === 0 ? (
@@ -233,7 +243,7 @@ export default function MonitorConversationsPage() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2.5">
               <Button className="rounded-full" disabled={cursorStack.length === 0 || loading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
                 Prev
               </Button>
@@ -246,13 +256,13 @@ export default function MonitorConversationsPage() {
             </div>
           </section>
 
-          <section className="flex h-[620px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[720px]">
-            <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-4">
+          <section className="flex h-[620px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[720px] xl:h-full">
+            <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
               {selectedConversation ? (
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <p className="studio-kicker text-[var(--ui-blue)]">Transcript</p>
-                    <h2 className="mt-1 break-all text-2xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">{selectedConversation.sessionToken}</h2>
+                    <h2 className="mt-1 break-all text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">{selectedConversation.sessionToken}</h2>
                     <p className="mt-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">{selectedConversation.botId || "unassigned agent"}</p>
                   </div>
                   <MonitorStatus status={selectedConversation.status} />
@@ -260,14 +270,14 @@ export default function MonitorConversationsPage() {
               ) : (
                 <div>
                   <p className="studio-kicker text-[var(--ui-blue)]">Transcript</p>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Select a conversation</h2>
+                  <h2 className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Review the full customer journey</h2>
                 </div>
               )}
             </div>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--ui-bg)] p-4">
               {!selectedConversation ? (
-                <MonitorEmpty title="No transcript selected" description="Choose a conversation from the monitor list to inspect the full message flow." />
+                <MonitorEmpty title="Choose a conversation from the queue" description="The transcript will appear here with sender labels, timestamps, and handoff context." />
               ) : messageLoading ? (
                 <TranscriptMessagesSkeleton />
               ) : messages.length === 0 ? (
@@ -289,7 +299,7 @@ function MonitorConversationsPageSkeleton() {
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
         <MonitorHeroSkeleton />
         <MonitorMetricGridSkeleton />
-        <div className="grid gap-5 xl:grid-cols-[410px_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-5 xl:h-[calc(100vh-8rem)] xl:min-h-[680px] xl:grid-cols-[410px_minmax(0,1fr)]">
           <ConversationPanelSkeleton />
           <TranscriptPanelSkeleton />
         </div>
@@ -300,14 +310,14 @@ function MonitorConversationsPageSkeleton() {
 
 function MonitorHeroSkeleton() {
   return (
-    <section className="grid gap-5 rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
+    <section className="grid gap-5 rounded-[2rem] border border-[#f97316]/30 bg-[linear-gradient(135deg,#fff7ed_0%,#fed7aa_46%,#38bdf8_100%)] p-5 text-[#431407] shadow-[0_24px_70px_rgba(249,115,22,0.14)] dark:bg-[linear-gradient(135deg,#241006_0%,#7c2d12_48%,#0369a1_100%)] dark:text-[#fff7ed] lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
       <div className="min-w-0">
-        <Skeleton className="h-3 w-40 bg-[var(--ui-panel-2)]" />
-        <Skeleton className="mt-4 h-10 w-full max-w-2xl bg-[var(--ui-panel-2)] sm:h-12" />
-        <Skeleton className="mt-3 h-10 w-full max-w-xl bg-[var(--ui-panel-2)] sm:h-12" />
+        <Skeleton className="h-3 w-40 bg-white/45 dark:bg-white/20" />
+        <Skeleton className="mt-4 h-10 w-full max-w-2xl bg-white/50 dark:bg-white/20 sm:h-12" />
+        <Skeleton className="mt-3 h-10 w-full max-w-xl bg-white/45 dark:bg-white/15 sm:h-12" />
         <div className="mt-5 grid max-w-2xl gap-2">
-          <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
-          <Skeleton className="h-4 w-4/5 bg-[var(--ui-panel-2)]" />
+          <Skeleton className="h-4 w-full bg-white/40 dark:bg-white/15" />
+          <Skeleton className="h-4 w-4/5 bg-white/40 dark:bg-white/15" />
         </div>
       </div>
       <div className="grid content-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#e0f2fe_0%,#7dd3fc_48%,#0099ff_100%)] p-5">
@@ -350,22 +360,26 @@ function MonitorMetricSkeleton() {
 
 function ConversationPanelSkeleton() {
   return (
-    <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-4">
-        <div className="flex gap-2">
-          <Skeleton className="h-11 min-w-0 flex-1 rounded-full bg-[var(--ui-bg)]" />
-          <Skeleton className="h-11 w-11 rounded-full bg-[var(--ui-bg)]" />
+    <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <Skeleton className="h-3 w-32 bg-[var(--ui-bg)]" />
+          <Skeleton className="h-5 w-56 max-w-full bg-[var(--ui-bg)]" />
         </div>
-        <div className="mt-3 flex gap-2 overflow-hidden pb-1">
+        <div className="flex gap-2">
+          <Skeleton className="h-10 min-w-0 flex-1 rounded-full bg-[var(--ui-bg)]" />
+          <Skeleton className="h-10 w-10 rounded-full bg-[var(--ui-bg)]" />
+        </div>
+        <div className="mt-2 flex gap-2 overflow-hidden pb-1">
           {["all", "active", "paused", "closed"].map((item) => (
-            <Skeleton className="h-9 w-24 shrink-0 rounded-full bg-[var(--ui-bg)]" key={item} />
+            <Skeleton className="h-8 w-24 shrink-0 rounded-full bg-[var(--ui-bg)]" key={item} />
           ))}
         </div>
       </div>
-      <div className="grid max-h-[520px] gap-2 overflow-hidden p-3 lg:max-h-[720px]">
+      <div className="grid min-h-0 flex-1 gap-2 overflow-hidden p-3">
         <ConversationListRowsSkeleton />
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
+      <div className="flex items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2.5">
         <Skeleton className="h-9 w-24 rounded-full bg-[var(--ui-bg)]" />
         <Skeleton className="h-8 w-24 rounded-full bg-[var(--ui-bg)]" />
         <Skeleton className="h-9 w-24 rounded-full bg-[var(--ui-bg)]" />
@@ -402,10 +416,10 @@ function ConversationListRowsSkeleton() {
 
 function TranscriptPanelSkeleton() {
   return (
-    <section className="flex h-[620px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[720px]">
-      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-4">
+    <section className="flex h-[620px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[720px] xl:h-full">
+      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
         <Skeleton className="h-3 w-24 bg-[var(--ui-bg)]" />
-        <Skeleton className="mt-3 h-7 w-64 max-w-full bg-[var(--ui-bg)]" />
+        <Skeleton className="mt-2 h-5 w-64 max-w-full bg-[var(--ui-bg)]" />
         <Skeleton className="mt-2 h-3 w-36 bg-[var(--ui-bg)]" />
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-hidden bg-[var(--ui-bg)] p-4">

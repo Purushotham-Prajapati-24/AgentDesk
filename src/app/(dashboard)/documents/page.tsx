@@ -35,14 +35,14 @@ type IngestResponseBody = {
 
 const FAN_OUT_CONCURRENCY = 3;
 const acceptedPayloads = [
-  { label: "PDF policies", icon: FileText },
-  { label: "DOC manuals", icon: FileArchive },
-  { label: "DOCX playbooks", icon: FileArchive },
-  { label: "XLSX sheets", icon: FileSpreadsheet },
-  { label: "XLS tables", icon: FileSpreadsheet },
-  { label: "CSV datasets", icon: Database },
-  { label: "TXT notes", icon: FileText },
-  { label: "Markdown guides", icon: FileText },
+  { label: "PDF policies", icon: FileText, className: "border-[#ef4444]/30 bg-[linear-gradient(135deg,#fff1f2_0%,#fecdd3_50%,#ef4444_100%)] text-[#7f1d1d] dark:bg-[linear-gradient(135deg,#2a0b0f_0%,#7f1d1d_52%,#ef4444_100%)] dark:text-[#fff1f2]" },
+  { label: "DOC manuals", icon: FileArchive, className: "border-[#2563eb]/30 bg-[linear-gradient(135deg,#eff6ff_0%,#bfdbfe_50%,#2563eb_100%)] text-[#172554] dark:bg-[linear-gradient(135deg,#07152f_0%,#1e3a8a_52%,#2563eb_100%)] dark:text-[#eff6ff]" },
+  { label: "DOCX playbooks", icon: FileArchive, className: "border-[#4f46e5]/30 bg-[linear-gradient(135deg,#eef2ff_0%,#c7d2fe_50%,#4f46e5_100%)] text-[#1e1b4b] dark:bg-[linear-gradient(135deg,#11112d_0%,#312e81_52%,#4f46e5_100%)] dark:text-[#eef2ff]" },
+  { label: "XLSX sheets", icon: FileSpreadsheet, className: "border-[#16a34a]/30 bg-[linear-gradient(135deg,#f0fdf4_0%,#bbf7d0_50%,#16a34a_100%)] text-[#052e16] dark:bg-[linear-gradient(135deg,#051b0d_0%,#166534_52%,#16a34a_100%)] dark:text-[#f0fdf4]" },
+  { label: "XLS tables", icon: FileSpreadsheet, className: "border-[#65a30d]/30 bg-[linear-gradient(135deg,#f7fee7_0%,#d9f99d_50%,#65a30d_100%)] text-[#1a2e05] dark:bg-[linear-gradient(135deg,#101805_0%,#365314_52%,#65a30d_100%)] dark:text-[#f7fee7]" },
+  { label: "CSV datasets", icon: Database, className: "border-[#0891b2]/30 bg-[linear-gradient(135deg,#ecfeff_0%,#a5f3fc_50%,#0891b2_100%)] text-[#083344] dark:bg-[linear-gradient(135deg,#061a20_0%,#155e75_52%,#0891b2_100%)] dark:text-[#ecfeff]" },
+  { label: "TXT notes", icon: FileText, className: "border-[#f59e0b]/30 bg-[linear-gradient(135deg,#fffbeb_0%,#fde68a_50%,#f59e0b_100%)] text-[#451a03] dark:bg-[linear-gradient(135deg,#211403_0%,#92400e_52%,#f59e0b_100%)] dark:text-[#fffbeb]" },
+  { label: "Markdown guides", icon: FileText, className: "border-[#0d9488]/30 bg-[linear-gradient(135deg,#f0fdfa_0%,#99f6e4_50%,#0d9488_100%)] text-[#042f2e] dark:bg-[linear-gradient(135deg,#041715_0%,#115e59_52%,#0d9488_100%)] dark:text-[#f0fdfa]" },
 ];
 
 const workflowSteps = [
@@ -225,29 +225,26 @@ export default function DocumentsPage() {
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <section className="px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#f59e0b]/35 bg-[linear-gradient(135deg,#fef3c7_0%,#ccfbf1_42%,#0f766e_100%)] text-[#132f1f] shadow-[0_24px_70px_rgba(15,118,110,0.18)] dark:bg-[linear-gradient(135deg,#1c1607_0%,#0f3f3a_48%,#d97706_100%)] dark:text-[#fff7ed]">
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-7">
             <div className="min-w-0">
-              <p className="inline-flex rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-1 font-mono text-xs font-semibold uppercase text-[var(--ui-blue)]">
+              <p className="inline-flex rounded-full border border-[#134e4a]/20 bg-white/55 px-3 py-1 font-mono text-xs font-semibold uppercase text-[#134e4a] dark:border-white/20 dark:bg-black/20 dark:text-[#fde68a]">
                 Knowledge intake
               </p>
-              <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ui-text)] sm:text-5xl lg:text-6xl">
+              <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl lg:text-6xl">
                 Turn trusted files and URLs into agent-ready answers.
               </h1>
-              <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
-                Upload documents or capture public pages, then process them into searchable knowledge for the selected agent and tenant workspace.
-              </p>
             </div>
 
-            <div className="grid content-between gap-5 rounded-3xl bg-[linear-gradient(135deg,#dbeafe_0%,#7dd3fc_48%,#0099ff_100%)] p-5 text-[#082f49]">
+            <div className="grid content-between gap-5 rounded-3xl border border-white/35 bg-white/35 p-5 text-[#12372d] shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20 dark:text-[#fff7ed]">
               <div>
                 <p className="font-mono text-xs font-semibold uppercase opacity-70">Tenant workspace</p>
                 <p className="mt-3 break-all font-mono text-2xl font-semibold tracking-[-0.04em]">{tenant?.$id ?? "Unavailable"}</p>
                 <p className="mt-3 text-sm font-medium leading-6 opacity-70">Every source is stored and indexed against this workspace.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white/75 px-3 py-2 text-xs font-semibold text-[#082f49]">{bots.length} agents found</span>
-                <span className="rounded-full border border-[#082f49]/15 bg-white/25 px-3 py-2 text-xs font-semibold text-[#075985]">Hybrid retrieval ready</span>
+                <span className="rounded-full bg-white/70 px-3 py-2 text-xs font-semibold text-[#134e4a] dark:bg-white/20 dark:text-[#fff7ed]">{bots.length} agents found</span>
+                <span className="rounded-full border border-[#134e4a]/15 bg-white/30 px-3 py-2 text-xs font-semibold text-[#0f766e] dark:border-white/20 dark:bg-black/15 dark:text-[#fde68a]">Hybrid retrieval ready</span>
               </div>
             </div>
           </div>
@@ -270,9 +267,9 @@ export default function DocumentsPage() {
               {acceptedPayloads.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3" key={item.label}>
-                    <Icon aria-hidden="true" className="h-4 w-4 text-[#ff5530]" />
-                    <p className="mt-3 text-sm font-semibold leading-5 text-[var(--ui-text)]">{item.label}</p>
+                  <div className={`rounded-2xl border p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] ${item.className}`} key={item.label}>
+                    <Icon aria-hidden="true" className="h-4 w-4 opacity-85" />
+                    <p className="mt-3 text-sm font-semibold leading-5 text-current">{item.label}</p>
                   </div>
                 );
               })}

@@ -87,13 +87,13 @@ export default function MonitorUsersPage() {
   return (
     <div className="min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
-        <section className="grid gap-5 rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
+        <section className="grid gap-5 rounded-[2rem] border border-[#fb7185]/30 bg-[linear-gradient(135deg,#fff1f2_0%,#fce7f3_42%,#22c55e_100%)] p-5 text-[#3f0f1f] shadow-[0_24px_70px_rgba(251,113,133,0.14)] dark:bg-[linear-gradient(135deg,#240713_0%,#831843_46%,#166534_100%)] dark:text-[#fff1f2] lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
           <div className="min-w-0">
-            <p className="studio-kicker text-[var(--ui-blue)]">Monitor / Users</p>
-            <h2 className="mt-3 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-[var(--ui-text)] sm:text-5xl">
+            <p className="studio-kicker text-[#be123c] dark:text-[#fecdd3]">Monitor / Users</p>
+            <h2 className="mt-3 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl">
               Customer sessions with the right signals up front.
             </h2>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
+            <p className="mt-4 max-w-2xl text-base font-medium leading-7 opacity-75">
               Track customers inferred from widget sessions, with last activity, message volume, agent scope, and handoff state in one ledger.
             </p>
           </div>
@@ -180,10 +180,11 @@ export default function MonitorUsersPage() {
                         <p className="mt-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">{user.conversations} conversation</p>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {(user.botIds.length ? user.botIds : ["unassigned"]).map((botId) => (
-                            <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel-2)] px-3 py-1 font-mono text-xs font-semibold text-[var(--ui-muted)]" key={botId}>
-                              {botId}
+                        <div className="grid gap-2">
+                          {(user.agents.length ? user.agents : [{ id: "unassigned", name: "Unassigned agent" }]).map((agent) => (
+                            <span className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-panel-2)] px-3 py-2" key={agent.id}>
+                              <span className="block truncate text-sm font-semibold text-[var(--ui-text)]">{agent.name}</span>
+                              <span className="mt-1 block truncate font-mono text-xs font-semibold text-[var(--ui-muted)]">{agent.id}</span>
                             </span>
                           ))}
                         </div>
@@ -230,14 +231,14 @@ function MonitorUsersPageSkeleton() {
 
 function MonitorUsersHeroSkeleton() {
   return (
-    <section className="grid gap-5 rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
+    <section className="grid gap-5 rounded-[2rem] border border-[#fb7185]/30 bg-[linear-gradient(135deg,#fff1f2_0%,#fce7f3_42%,#22c55e_100%)] p-5 text-[#3f0f1f] shadow-[0_24px_70px_rgba(251,113,133,0.14)] dark:bg-[linear-gradient(135deg,#240713_0%,#831843_46%,#166534_100%)] dark:text-[#fff1f2] lg:grid-cols-[minmax(0,1fr)_320px] lg:p-6">
       <div className="min-w-0">
-        <Skeleton className="h-3 w-32 bg-[var(--ui-panel-2)]" />
-        <Skeleton className="mt-4 h-10 w-full max-w-2xl bg-[var(--ui-panel-2)] sm:h-12" />
-        <Skeleton className="mt-3 h-10 w-full max-w-xl bg-[var(--ui-panel-2)] sm:h-12" />
+        <Skeleton className="h-3 w-32 bg-white/45 dark:bg-white/20" />
+        <Skeleton className="mt-4 h-10 w-full max-w-2xl bg-white/50 dark:bg-white/20 sm:h-12" />
+        <Skeleton className="mt-3 h-10 w-full max-w-xl bg-white/45 dark:bg-white/15 sm:h-12" />
         <div className="mt-5 grid max-w-2xl gap-2">
-          <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
-          <Skeleton className="h-4 w-5/6 bg-[var(--ui-panel-2)]" />
+          <Skeleton className="h-4 w-full bg-white/40 dark:bg-white/15" />
+          <Skeleton className="h-4 w-5/6 bg-white/40 dark:bg-white/15" />
         </div>
       </div>
       <div className="grid content-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#dcfce7_0%,#86efac_48%,#22c55e_100%)] p-5">
