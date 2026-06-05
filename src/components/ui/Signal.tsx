@@ -40,17 +40,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="cockpit-lane min-h-screen overflow-x-hidden">
-      <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-        <aside className="sticky top-0 z-40 border-b border-[#1a1a1a] bg-[#090909] lg:static lg:border-b-0 lg:border-r">
+      <div className="grid min-h-screen lg:grid-cols-[292px_1fr]">
+        <aside className="sticky top-0 z-40 border-b border-[var(--ui-border)] bg-[var(--ui-bg)] lg:static lg:border-b-0 lg:border-r">
           <div className="flex min-w-0 flex-col gap-3 p-3 lg:sticky lg:top-0 lg:min-h-screen lg:gap-5 lg:p-4">
-            <Link className="group border border-[#1a1a1a] bg-[#141414] p-3 transition hover:border-[#0099ff]/70 lg:p-4" href="/">
+            <Link className="group rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3 transition hover:border-[#0099ff]/70 lg:p-4" href="/">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center border border-[#262626] bg-white text-[#090909] lg:h-11 lg:w-11">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-text)] text-[var(--ui-bg)] lg:h-11 lg:w-11">
                   <Boxes aria-hidden="true" className="h-6 w-6" />
                 </span>
                 <div className="min-w-0">
                   <p className="studio-kicker text-[#0099ff]">AgentDesk</p>
-                  <p className="truncate text-base font-semibold leading-none text-white lg:text-lg">Operator cockpit</p>
+                  <p className="truncate text-base font-semibold leading-none text-[var(--ui-text)] lg:text-lg">Operator cockpit</p>
                 </div>
               </div>
             </Link>
@@ -62,10 +62,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 return (
                   <Link
                     className={cn(
-                      "relative flex min-h-10 shrink-0 items-center gap-2 border px-3 py-2 text-sm font-semibold transition duration-200 ease-out lg:min-h-11 lg:gap-3",
+                      "relative flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition duration-200 ease-out lg:min-h-11 lg:gap-3",
                       active
-                        ? "border-white bg-white text-[#090909] before:absolute before:left-0 before:top-1 before:h-[calc(100%-8px)] before:w-1 before:bg-[#0099ff]"
-                        : "border-transparent text-[#999999] hover:border-[#262626] hover:bg-[#141414] hover:text-white",
+                        ? "border-[#0099ff] bg-[#0099ff] text-white"
+                        : "border-transparent text-[var(--ui-muted)] hover:border-[var(--ui-border)] hover:bg-[var(--ui-panel)] hover:text-[var(--ui-text)]",
                     )}
                     href={item.href}
                     key={item.href}
@@ -81,7 +81,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ThemeToggle compact variant="cockpit" />
 
               <button
-                className="flex min-h-10 shrink-0 items-center gap-2 border border-transparent px-3 py-2 text-sm font-semibold text-[#999999] transition duration-200 ease-out hover:border-[#dc2626]/30 hover:bg-[#dc2626]/10 hover:text-[#ef4444] lg:min-h-11 lg:gap-3"
+                className="flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-[var(--ui-muted)] transition duration-200 ease-out hover:border-[#dc2626]/30 hover:bg-[#dc2626]/10 hover:text-[#ef4444] lg:min-h-11 lg:gap-3"
                 onClick={() => void logout()}
                 type="button"
               >
@@ -89,9 +89,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Sign out
               </button>
 
-              <div className="hidden border border-[#1a1a1a] bg-[#141414] p-3 sm:block">
-                <p className="studio-kicker text-[#999999]">Live fabric</p>
-                <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-white">
+              <div className="hidden rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3 sm:block">
+                <p className="studio-kicker text-[var(--ui-muted)]">Live fabric</p>
+                <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-[var(--ui-text)]">
                   <Radio aria-hidden="true" className="h-4 w-4 text-[#22c55e]" />
                   Human handoff ready
                 </div>
@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </aside>
-        <main className="min-w-0 bg-[#090909]">{children}</main>
+        <main className="min-w-0 bg-[var(--ui-bg)]">{children}</main>
       </div>
     </div>
   );

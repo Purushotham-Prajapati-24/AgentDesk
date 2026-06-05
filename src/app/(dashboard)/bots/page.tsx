@@ -6,7 +6,7 @@ import { createBot, deleteBot, listBots, updateBot } from "@/app/bot-actions";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { EmptyState, PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
+import { EmptyState, Panel, StatusPill } from "@/components/ui/Signal";
 
 type Bot = {
   $id: string;
@@ -107,7 +107,7 @@ export default function BotsPage() {
     setBots((current) => [nextBot, ...current.filter((bot) => bot.$id !== nextBot.$id)]);
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
-    setStatus("Bot configuration saved.");
+    setStatus("Agent configuration saved.");
   }
 
   function requestDeleteBot() {
@@ -150,7 +150,7 @@ export default function BotsPage() {
     setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
     setDeleteTarget(null);
     setDeleteConfirmed(false);
-    setStatus("Bot deleted.");
+    setStatus("Agent deleted.");
   }
 
   if (tenantLoading) {
@@ -159,17 +159,12 @@ export default function BotsPage() {
 
   return (
     <div className="cockpit-lane min-h-screen">
-      <PageHeader
-        kicker="Bot studio"
-        title="Support agents as operational artifacts."
-        description="Create tenant-scoped agents, set their instruction spine, and keep fallback behavior explicit before customer traffic arrives."
-        action={<StatusPill tone="warn">{bots.length} configured</StatusPill>}
-      />
+      <BotsHeader botCount={bots.length} />
 
-      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
         <section className="grid content-start gap-3 md:grid-cols-2">
           <button
-            className="min-h-[208px] rounded-2xl border border-[#262626] bg-[#141414] p-5 text-left transition hover:-translate-y-1 hover:border-white/50"
+            className="min-h-[160px] rounded-2xl border border-[#262626] bg-[#141414] p-4 text-left transition hover:-translate-y-1 hover:border-white/50"
             onClick={() => {
               setSelectedId(null);
               setForm(EMPTY_FORM);
@@ -177,19 +172,19 @@ export default function BotsPage() {
             }}
             type="button"
           >
-            <Plus aria-hidden="true" className="h-6 w-6 text-[#0099ff]" />
-            <h2 className="mt-16 text-3xl font-semibold tracking-[-0.04em] text-white">New support bot</h2>
-            <p className="mt-3 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
+            <Plus aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
+            <h2 className="mt-10 text-2xl font-semibold tracking-[-0.03em] text-white">New agent</h2>
+            <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
           </button>
 
           {bots.length === 0 ? (
-            <Panel className="min-h-[208px] p-5">
-              <EmptyState title="No bots configured" description="Create a support agent for this tenant to begin training behavior." />
+            <Panel className="min-h-[160px] p-4">
+              <EmptyState title="No agents configured" description="Create a support agent for this tenant to begin training behavior." />
             </Panel>
           ) : (
             bots.map((bot, index) => (
               <button
-                className={`min-h-[208px] overflow-hidden rounded-2xl p-5 text-left text-white transition hover:-translate-y-1 ${
+                className={`min-h-[160px] overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
                   bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
                 } ${botCardClass(index)}`}
                 key={bot.$id}
@@ -200,22 +195,24 @@ export default function BotsPage() {
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
                   <BotIcon aria-hidden="true" className="h-6 w-6" />
                 </div>
-                <h2 className="mt-16 break-words text-3xl font-semibold tracking-[-0.04em]">{bot.name}</h2>
-                <p className="mt-3 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
+                <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
               </button>
             ))
           )}
         </section>
 
-        <Panel className="h-fit p-5">
+        <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
           <form onSubmit={saveBot}>
-            <section className="mb-5 flex flex-col gap-3 border-b border-[#262626] pb-4">
-            <div>
+            <section className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+              <div className="min-w-0 flex-1">
                 <p className="studio-kicker text-[#0099ff]">Tenant: {tenant?.$id ?? "Unavailable"}</p>
-                <h2 className="mt-1 text-3xl font-semibold leading-tight tracking-[-0.04em] text-white">{selectedBot ? "Edit bot" : "Create bot"}</h2>
-            </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
+                <h2 className="mt-1 text-3xl font-semibold leading-tight tracking-[-0.04em] text-[var(--ui-text)]">{selectedBot ? "Edit agent" : "Create agent"}</h2>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <StatusPill tone={selectedBot ? "hot" : "warn"}>
+                  <span className="block max-w-24 truncate sm:max-w-36">{selectedBot ? selectedBot.$id : "new draft"}</span>
+                </StatusPill>
                 {selectedBot && (
                   <Button
                     className="h-9 w-9 p-0"
@@ -236,9 +233,9 @@ export default function BotsPage() {
 
             <div className="grid gap-4">
               <label className="block">
-                <span className="studio-kicker mb-2 block text-[#999999]">Bot name</span>
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Agent name</span>
                 <input
-                  className="min-h-11 w-full border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
+                  className="min-h-11 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
                   maxLength={80}
                   required
                   value={form.name}
@@ -247,9 +244,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-[#999999]">System prompt</span>
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">System prompt</span>
                 <textarea
-                  className="min-h-60 w-full border border-[#262626] bg-[#090909] px-3 py-3 font-mono text-sm leading-6 text-white focus:border-[#0099ff] focus:bg-[#141414]"
+                  className="min-h-60 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 font-mono text-sm leading-6 text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
                   maxLength={4000}
                   required
                   value={form.system_prompt}
@@ -258,9 +255,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-[#999999]">Fallback message</span>
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Fallback message</span>
                 <textarea
-                  className="min-h-28 w-full border border-[#262626] bg-[#090909] px-3 py-3 text-sm font-semibold leading-6 text-white focus:border-[#0099ff] focus:bg-[#141414]"
+                  className="min-h-28 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 text-sm font-semibold leading-6 text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
                   maxLength={500}
                   required
                   value={form.fallback_message}
@@ -269,11 +266,11 @@ export default function BotsPage() {
               </label>
             </div>
 
-            {status ? <p className="mt-5 border border-[#262626] bg-[#141414] px-3 py-2 text-sm font-semibold text-white">{status}</p> : null}
+            {status ? <p className="mt-5 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-2 text-sm font-semibold text-[var(--ui-text)]">{status}</p> : null}
 
             <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
               <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
-                Save bot
+                Save agent
               </Button>
               <Button
                 className="w-full sm:w-auto"
@@ -298,10 +295,10 @@ export default function BotsPage() {
             </div>
             <div>
               <p className="studio-kicker text-destructive">Permanent delete</p>
-              <h2 className="mt-1 text-2xl font-bold leading-tight">Delete {deleteTarget?.name ?? "this bot"}?</h2>
+              <h2 className="mt-1 text-2xl font-bold leading-tight">Delete {deleteTarget?.name ?? "this agent"}?</h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
-                This removes the bot record, its WebChat preferences, uploaded document records, stored document files, and
-                Qdrant knowledge chunks for this tenant/bot scope.
+                This removes the agent record, its WebChat preferences, uploaded document records, stored document files, and
+                Qdrant knowledge chunks for this tenant/agent scope.
               </p>
             </div>
           </div>
@@ -315,7 +312,7 @@ export default function BotsPage() {
               type="checkbox"
             />
             <span className="text-sm font-semibold leading-6 text-foreground">
-              I understand this permanently deletes {deleteTarget?.name ?? "this bot"} and its indexed knowledge.
+              I understand this permanently deletes {deleteTarget?.name ?? "this agent"} and its indexed knowledge.
             </span>
           </label>
 
@@ -337,6 +334,53 @@ export default function BotsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function BotsHeader({ botCount }: { botCount: number }) {
+  const steps = [
+    "Write the agent's support instructions.",
+    "Set the fallback response customers will see.",
+    "Save the agent before connecting it to WebChat.",
+  ];
+
+  return (
+    <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+          <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:p-8">
+            <div className="min-w-0">
+              <p className="inline-flex rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-1 studio-kicker text-[#0099ff]">
+                Support agent setup
+              </p>
+              <h1 className="mt-4 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-[var(--ui-text)] sm:text-4xl lg:text-5xl">
+                Create customer support agents for this workspace.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)] sm:text-lg">
+                Use this page to create, edit, and delete tenant-specific support agents. Each agent stores the instructions it should follow and the fallback message it should use when it cannot answer with confidence.
+              </p>
+            </div>
+
+            <div className="grid content-start gap-3 rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="studio-kicker text-[var(--ui-muted)]">Configured agents</span>
+                <StatusPill tone="warn">{botCount}</StatusPill>
+              </div>
+              <div className="grid gap-2">
+                {steps.map((step, index) => (
+                  <div className="flex min-h-11 items-center gap-3 rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 text-sm font-semibold text-[var(--ui-text)]" key={step}>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#0099ff]/10 font-mono text-xs text-[#0099ff]">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
