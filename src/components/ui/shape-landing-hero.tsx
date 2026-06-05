@@ -30,7 +30,6 @@ function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate 
       animate={{
         opacity: 1,
         rotate,
-        y: 0,
       }}
       className={cn(
         "pointer-events-none absolute scale-[0.5] sm:scale-[0.75] lg:scale-100 origin-center transition-transform duration-500",
@@ -38,8 +37,7 @@ function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate 
       )}
       initial={{
         opacity: 0,
-        rotate: rotate - 15,
-        y: -150,
+        rotate,
       }}
       transition={{
         delay,

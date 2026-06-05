@@ -194,28 +194,28 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="proof" className="marketing-dark-band bg-[var(--marketing-surface)] px-4 py-16 text-[var(--marketing-ink)] sm:px-6 lg:px-8 lg:py-20">
-        <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="relative overflow-hidden rounded-[2rem] bg-[var(--marketing-inverse)] p-8 text-[var(--marketing-on-inverse)] sm:p-10">
-            <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[radial-gradient(circle,#ff5530_0%,rgba(255,85,48,0.42)_34%,rgba(255,85,48,0)_70%)]" />
-            <div className="absolute -bottom-20 left-8 h-60 w-60 rounded-full bg-[radial-gradient(circle,#1456f0_0%,rgba(20,86,240,0.32)_35%,rgba(20,86,240,0)_72%)]" />
+      <section id="proof" className="marketing-dark-band bg-[var(--marketing-surface)] px-4 pb-8 pt-14 text-[var(--marketing-ink)] sm:px-6 sm:pb-10 sm:pt-16 lg:px-8 lg:pb-10 lg:pt-20">
+        <div className="mx-auto grid max-w-7xl gap-5 sm:gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+          <div className="relative overflow-hidden rounded-[1.75rem] bg-[var(--marketing-inverse)] p-7 text-[var(--marketing-on-inverse)] sm:p-8">
+            <div className="absolute -right-14 -top-16 h-52 w-52 rounded-full bg-[radial-gradient(circle,#ff5530_0%,rgba(255,85,48,0.42)_34%,rgba(255,85,48,0)_70%)]" />
+            <div className="absolute -bottom-16 left-8 h-56 w-56 rounded-full bg-[radial-gradient(circle,#1456f0_0%,rgba(20,86,240,0.32)_35%,rgba(20,86,240,0)_72%)]" />
             <div className="relative">
-              <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--marketing-on-inverse)] text-[var(--marketing-inverse)]">
+              <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--marketing-on-inverse)] text-[var(--marketing-inverse)]">
                 <ShieldCheck aria-hidden="true" className="h-5 w-5" />
               </span>
-              <h2 className="mt-16 max-w-xl text-4xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-5xl">
+              <h2 className="mt-12 max-w-xl text-4xl font-semibold leading-[1.03] tracking-[-0.04em] sm:text-5xl">
                 Ground every answer. Escalate with full context.
               </h2>
-              <p className="mt-6 max-w-lg text-base leading-7 opacity-70">
+              <p className="mt-5 max-w-lg text-base leading-7 opacity-70">
                 The bot starts from your documents, stays scoped to the selected tenant, and hands the thread to a human operator when confidence or policy requires it.
               </p>
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {proofPoints.map(({ number, title, description }) => (
-              <div className="marketing-dark-surface flex min-h-80 flex-col rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-bg)] p-6" key={number}>
+              <div className="marketing-dark-surface flex min-h-72 flex-col rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-bg)] p-6" key={number}>
                 <p className="font-mono text-4xl font-semibold text-[#ff5530]">{number}</p>
-                <div className="mt-auto pt-16">
+                <div className="mt-auto pt-12">
                   <h3 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-[var(--marketing-ink)]">{title}</h3>
                   <p className="mt-4 text-sm leading-6 text-[var(--marketing-muted)]">{description}</p>
                 </div>
@@ -225,8 +225,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="marketing-dark-band bg-[var(--marketing-bg)] px-4 py-12 text-[var(--marketing-ink)] sm:px-6 lg:px-8">
-        <div className="marketing-dark-surface mx-auto flex max-w-7xl flex-col gap-6 rounded-[2rem] border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-6 md:flex-row md:items-center md:justify-between md:p-8">
+      <section className="marketing-dark-band bg-[var(--marketing-surface)] px-4 pb-16 pt-4 text-[var(--marketing-ink)] sm:px-6 sm:pb-20 sm:pt-5 lg:px-8 lg:pb-24">
+        <div className="marketing-dark-surface mx-auto flex max-w-7xl flex-col gap-6 rounded-[1.75rem] border border-[var(--marketing-border)] bg-[var(--marketing-bg)] p-6 md:flex-row md:items-center md:justify-between md:p-8">
           <div>
             <p className="font-mono text-xs font-semibold uppercase text-[#1456f0]">Ready for production support</p>
             <h2 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.03em] text-[var(--marketing-ink)]">
