@@ -37,6 +37,7 @@
 | 🧠 **RAG Pipeline** | PDF, DOCX, XLSX, and TXT docs are chunked, embedded via Gemini, and indexed in Qdrant for grounded answers |
 | 🪄 **Embeddable Widget** | Single `<script>` tag drops a full branded chat widget anywhere on the web |
 | 📡 **Live Inbox** | Real-time session monitor — human agents can pause the AI and take over mid-conversation |
+| 📊 **Real-time Monitor** | Analytics dashboard to track conversation metrics, watch live chats unfold, and view active user records |
 | 💳 **Credit Ledger** | Token-based billing with per-tenant credit tracking visible in a Usage dashboard |
 | ⚡ **Streaming Responses** | Server-Sent Events (SSE) stream bot replies token-by-token for instant feedback |
 | 📄 **Docs Portal** | Public-facing documentation site — no login required |
@@ -209,6 +210,9 @@ agentdesk/
 │   │   │   ├── bots/                # Bot builder & configuration
 │   │   │   ├── inbox/               # Live session inbox
 │   │   │   ├── monitor/             # Session monitor & handoff
+│   │   │   │   ├── analytics/       # Conversation analytics & metrics charts
+│   │   │   │   ├── conversations/   # Real-time customer chat visualizer
+│   │   │   │   └── users/           # User listing & tracking dashboard
 │   │   │   ├── webchat/             # Webchat widget preview & settings
 │   │   │   ├── documents/           # Knowledge base management
 │   │   │   └── billing/             # Credit usage & ledger
@@ -217,12 +221,15 @@ agentdesk/
 │   │   │   ├── documents/           # Document ingestion & management
 │   │   │   └── widget/              # GET /api/widget/config/:botId
 │   │   ├── docs/                    # Public documentation portal
-│   │   └── embed/[botId]/           # Standalone iframe embed page
+│   │   ├── embed/[botId]/           # Standalone iframe embed page
+│   │   └── monitor-actions.ts       # Server actions for conversation & user analytics
 │   ├── context/                     # AuthContext, TenantContext
 │   ├── lib/
 │   │   ├── server/                  # Appwrite admin, Qdrant, LLM, retrieval
 │   │   └── credits.ts               # Ledger & credit balance helpers
 │   ├── components/                  # Shared UI component library
+│   │   └── ui/
+│   │       └── Signal.tsx           # Reusable server/connection status component
 │   └── types/                       # Shared TypeScript types
 │
 ├── widget/                          # Widget source (TypeScript)
