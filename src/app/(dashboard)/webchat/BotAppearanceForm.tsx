@@ -28,7 +28,7 @@ export function BotAppearanceForm() {
         value={appearance.fontFamily}
         onChange={(fontFamily) => updateSection("appearance", { fontFamily })}
       />
-      <div className="grid gap-3 border border-[#262626] bg-[#141414] p-3">
+      <div className="grid gap-3 border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
         <WebChatSwitch
           checked={appearance.useCustomIcon}
           description="Show a custom image inside the closed floating launcher button."

@@ -19,7 +19,7 @@ export function ThemeToggle({ variant = "cream" }: { variant?: "cream" | "cockpi
     <div
       aria-label="Theme selector"
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border p-1",
+        "inline-flex w-fit shrink-0 items-center gap-1 self-start rounded-full border p-1",
         isCockpit ? "border-[var(--ui-border)] bg-[var(--ui-panel)]" : "border-[var(--cream-border)] bg-[var(--cream-card)]",
       )}
       role="group"

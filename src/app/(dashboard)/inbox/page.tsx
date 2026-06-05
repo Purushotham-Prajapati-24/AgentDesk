@@ -386,25 +386,27 @@ export default function InboxPage() {
             </form>
           </Panel>
 
-          <Panel className="p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">Conversation history</h2>
-              <StatusPill tone="dark">{historyLoading ? "..." : history.length}</StatusPill>
+          <Panel className="overflow-hidden">
+            <div className="border-b border-border p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-white">Conversation history</h2>
+                <StatusPill tone="dark">{historyLoading ? "..." : history.length}</StatusPill>
+              </div>
+
+              <form className="flex gap-2" onSubmit={searchHistory}>
+                <input
+                  className="min-h-10 min-w-0 flex-1 border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
+                  placeholder="Search session, bot, status"
+                  value={historySearchInput}
+                  onChange={(event) => setHistorySearchInput(event.target.value)}
+                />
+                <Button aria-label="Search history" size="sm" type="submit" variant="secondary">
+                  <Search aria-hidden="true" className="h-4 w-4" />
+                </Button>
+              </form>
             </div>
 
-            <form className="mb-4 flex gap-2" onSubmit={searchHistory}>
-              <input
-                className="min-h-10 min-w-0 flex-1 border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
-                placeholder="Search session, bot, status"
-                value={historySearchInput}
-                onChange={(event) => setHistorySearchInput(event.target.value)}
-              />
-              <Button aria-label="Search history" size="sm" type="submit" variant="secondary">
-                <Search aria-hidden="true" className="h-4 w-4" />
-              </Button>
-            </form>
-
-            <div className="grid gap-2">
+            <div className="grid max-h-[520px] gap-2 overflow-y-auto p-3 lg:max-h-[720px]">
               {history.length === 0 ? (
                 <EmptyState title="No stored conversations" description="Persisted widget sessions will appear here after customers chat." />
               ) : (
@@ -436,7 +438,7 @@ export default function InboxPage() {
               )}
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 border-t border-border p-4">
               <Button
                 disabled={historyCursorStack.length === 0 || historyLoading}
                 leftIcon={<ChevronLeft aria-hidden="true" className="h-4 w-4" />}

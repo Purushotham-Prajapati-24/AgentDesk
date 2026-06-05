@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bot, Braces, CheckCircle2, CloudUpload, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@/app/webchat-actions";
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
@@ -143,21 +143,21 @@ export function WebChatWorkspace() {
   }
 
   return (
-    <div className="cockpit-lane min-h-screen bg-[#090909] text-white">
-      <section className="border-b border-[#1a1a1a] bg-[#090909] px-4 py-5 sm:px-6 lg:px-8">
+    <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
+      <section className="border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="studio-kicker text-[#0099ff]">WebChat control room</p>
-            <h1 className="mt-3 max-w-5xl text-4xl font-semibold leading-none tracking-[-0.04em] text-white sm:text-6xl">
+            <h1 className="mt-3 max-w-5xl text-4xl font-semibold leading-none tracking-[-0.04em] text-[var(--ui-text)] sm:text-6xl">
               Build the customer chat surface.
             </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[#999999]">
+            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
               Configure identity, appearance, deployment controls, and customer-facing capabilities while watching the widget contract update in real time.
             </p>
           </div>
           <div className="grid gap-3 sm:flex sm:flex-wrap">
             <Button
-              className="w-full border-[#262626] sm:w-auto"
+              className="w-full sm:w-auto"
               leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
               onClick={resetConfig}
               type="button"
@@ -166,7 +166,7 @@ export function WebChatWorkspace() {
               Reset
             </Button>
             <Button
-              className="w-full border-white bg-white text-[#090909] hover:bg-[#f2f2f2] sm:w-auto"
+              className="w-full sm:w-auto"
               disabled={!selectedBotId}
               leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
               loading={saveState === "saving"}
@@ -229,16 +229,16 @@ function BotSelector({
   onSelect: (botId: string) => void;
 }) {
   return (
-    <section className="border border-[#262626] bg-[#141414] p-4">
+    <section className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="studio-kicker text-[#0099ff]">Bot target</p>
-          <h2 className="mt-1 text-lg font-semibold text-white">Preference owner</h2>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--ui-text)]">Preference owner</h2>
         </div>
         {!selectedBotId ? <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" /> : <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-[#22c55e]" />}
       </div>
       <select
-        className="min-h-12 w-full border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff]"
+        className="min-h-12 w-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
         disabled={loading || bots.length === 0}
         value={selectedBotId}
         onChange={(event) => onSelect(event.target.value)}
@@ -250,7 +250,7 @@ function BotSelector({
           </option>
         ))}
       </select>
-      <p className="mt-3 text-sm font-medium leading-6 text-[#999999]">
+      <p className="mt-3 text-sm font-medium leading-6 text-[var(--ui-muted)]">
         WebChat preferences are saved to the selected bot&apos;s Appwrite `theme_config`; the embed script reads them with `data-bot-id`.
       </p>
     </section>
@@ -264,7 +264,7 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
     <div
       className={cn(
         "flex items-center justify-between gap-3 border px-4 py-3",
-        saveState === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-[#262626] bg-[#141414]",
+        saveState === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-text)]",
       )}
       role={saveState === "error" ? "alert" : "status"}
     >
@@ -272,7 +272,7 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
         {saveState === "saved" ? <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-[#22c55e]" /> : <Flag aria-hidden="true" className="h-4 w-4" />}
         {label}
       </span>
-      <span className="text-right text-xs font-semibold text-[#999999]">{error || "Local draft persists in this browser."}</span>
+      <span className="text-right text-xs font-semibold text-[var(--ui-muted)]">{error || "Local draft persists in this browser."}</span>
     </div>
   );
 }
@@ -282,16 +282,16 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
   const showCustomIcon = config.appearance.useCustomIcon && isHttpUrl(config.appearance.widgetIconUrl);
 
   return (
-    <section className="border border-[#262626] bg-[#141414] p-4">
-      <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#262626] pb-4">
+    <section className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
         <div>
           <p className="studio-kicker text-[#0099ff]">Live preview</p>
-          <h2 className="mt-1 text-2xl font-semibold text-white">Customer widget</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-[var(--ui-text)]">Customer widget</h2>
         </div>
         <Eye aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
       </div>
 
-      <div className="flex min-h-[520px] items-center justify-center overflow-hidden bg-[#090909] p-3 sm:p-6 lg:min-h-[620px]">
+      <div className="flex min-h-[520px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-3 sm:p-6 lg:min-h-[620px]">
         <div className="relative w-full max-w-[410px]">
           <div
             className="flex h-[min(590px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
@@ -386,13 +386,32 @@ function PreviewBubble({
 }
 
 function CodeBlock({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copySnippet() {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }
+
   return (
-    <div className="border border-[#262626] bg-[#14191e] p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Braces aria-hidden="true" className="h-4 w-4 text-[#0099ff]" />
-        <p className="studio-kicker text-[#999999]">{label}</p>
+    <div className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Braces aria-hidden="true" className="h-4 w-4 shrink-0 text-[#0099ff]" />
+          <p className="studio-kicker truncate text-[var(--ui-muted)]">{label}</p>
+        </div>
+        <button
+          aria-label={`Copy ${label}`}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] transition hover:border-[var(--ui-blue)] hover:bg-[var(--ui-blue)]/10 hover:text-[var(--ui-text)]"
+          onClick={() => void copySnippet()}
+          title={`Copy ${label}`}
+          type="button"
+        >
+          {copied ? <Check aria-hidden="true" className="h-4 w-4 text-[#22c55e]" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
+        </button>
       </div>
-      <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words font-mono text-xs font-semibold leading-5 text-white">{value}</pre>
+      <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words font-mono text-xs font-semibold leading-5 text-[var(--ui-text)]">{value}</pre>
     </div>
   );
 }

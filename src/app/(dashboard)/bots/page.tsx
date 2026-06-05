@@ -166,10 +166,10 @@ export default function BotsPage() {
         action={<StatusPill tone="warn">{bots.length} configured</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,1.05fr)_420px] lg:px-8">
-        <section className="grid content-start gap-4 md:grid-cols-2">
+      <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,1fr)_380px] lg:px-8">
+        <section className="grid content-start gap-3 md:grid-cols-2">
           <button
-            className="min-h-[260px] rounded-2xl border border-[#262626] bg-[#141414] p-7 text-left transition hover:-translate-y-1 hover:border-white/50"
+            className="min-h-[208px] rounded-2xl border border-[#262626] bg-[#141414] p-5 text-left transition hover:-translate-y-1 hover:border-white/50"
             onClick={() => {
               setSelectedId(null);
               setForm(EMPTY_FORM);
@@ -178,18 +178,18 @@ export default function BotsPage() {
             type="button"
           >
             <Plus aria-hidden="true" className="h-6 w-6 text-[#0099ff]" />
-            <h2 className="mt-24 text-4xl font-semibold tracking-[-0.05em] text-white">New support bot</h2>
+            <h2 className="mt-16 text-3xl font-semibold tracking-[-0.04em] text-white">New support bot</h2>
             <p className="mt-3 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
           </button>
 
           {bots.length === 0 ? (
-            <Panel className="min-h-[260px] p-7">
+            <Panel className="min-h-[208px] p-5">
               <EmptyState title="No bots configured" description="Create a support agent for this tenant to begin training behavior." />
             </Panel>
           ) : (
             bots.map((bot, index) => (
               <button
-                className={`min-h-[260px] overflow-hidden rounded-2xl p-7 text-left text-white transition hover:-translate-y-1 ${
+                className={`min-h-[208px] overflow-hidden rounded-2xl p-5 text-left text-white transition hover:-translate-y-1 ${
                   bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
                 } ${botCardClass(index)}`}
                 key={bot.$id}
@@ -200,7 +200,7 @@ export default function BotsPage() {
                   <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
                   <BotIcon aria-hidden="true" className="h-6 w-6" />
                 </div>
-                <h2 className="mt-24 break-words text-4xl font-semibold tracking-[-0.05em]">{bot.name}</h2>
+                <h2 className="mt-16 break-words text-3xl font-semibold tracking-[-0.04em]">{bot.name}</h2>
                 <p className="mt-3 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
               </button>
             ))
