@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
 import { createBot, deleteBot, listBots, updateBot } from "@/app/bot-actions";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { EmptyState, PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
+import { EmptyState, Panel, StatusPill } from "@/components/ui/Signal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Bot = {
   $id: string;
@@ -35,6 +36,7 @@ export default function BotsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<BotForm>(EMPTY_FORM);
   const [status, setStatus] = useState("");
+  const [isAgentsLoading, setIsAgentsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Bot | null>(null);
@@ -45,15 +47,19 @@ export default function BotsPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
+      setIsAgentsLoading(false);
       return;
     }
 
     let isActive = true;
+    setIsAgentsLoading(true);
+    setStatus("");
     listBots(tenant.$id).then((response) => {
       if (!isActive) {
         return;
       }
 
+      setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
         const firstBot = response.bots[0] ?? null;
@@ -107,7 +113,7 @@ export default function BotsPage() {
     setBots((current) => [nextBot, ...current.filter((bot) => bot.$id !== nextBot.$id)]);
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
-    setStatus("Bot configuration saved.");
+    setStatus("Agent configuration saved.");
   }
 
   function requestDeleteBot() {
@@ -150,77 +156,78 @@ export default function BotsPage() {
     setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
     setDeleteTarget(null);
     setDeleteConfirmed(false);
-    setStatus("Bot deleted.");
+    setStatus("Agent deleted.");
   }
 
   if (tenantLoading) {
-    return <main className="p-6 font-bold text-muted-foreground">Loading workspace...</main>;
+    return <BotsPageSkeleton />;
   }
 
   return (
-    <div className="min-h-screen">
-      <PageHeader
-        kicker="Bot studio"
-        title="Write the behavior before the support line opens."
-        description="Create tenant-scoped support agents, set their instruction spine, and define the fallback message customers hear when knowledge is missing."
-        action={<StatusPill tone="warn">{bots.length} configured</StatusPill>}
-      />
+    <div className="cockpit-lane min-h-screen">
+      <BotsHeader botCount={bots.length} />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:px-8">
-        <Panel className="h-fit p-4">
-          <div className="flex items-center justify-between gap-3 border-b border-border pb-4">
-            <div>
-              <p className="studio-kicker text-muted-foreground">Roster</p>
-              <h2 className="text-2xl font-bold">Bots</h2>
-            </div>
-            <Button
-              leftIcon={<Plus aria-hidden="true" className="h-4 w-4" />}
-              onClick={() => {
-                setSelectedId(null);
-                setForm(EMPTY_FORM);
-                setStatus("");
-              }}
-              size="sm"
-              type="button"
-              variant="secondary"
-            >
-              New
-            </Button>
-          </div>
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
+        <section className="grid content-start gap-3 md:grid-cols-2">
+          {isAgentsLoading ? (
+            <AgentGridSkeleton />
+          ) : (
+            <>
+              <button
+                className="min-h-[160px] rounded-2xl border border-[#262626] bg-[#141414] p-4 text-left transition hover:-translate-y-1 hover:border-white/50"
+                onClick={() => {
+                  setSelectedId(null);
+                  setForm(EMPTY_FORM);
+                  setStatus("");
+                }}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
+                <h2 className="mt-10 text-2xl font-semibold tracking-[-0.03em] text-white">New agent</h2>
+                <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-[#999999]">Create a fresh behavior draft for this tenant.</p>
+              </button>
 
-          <div className="mt-4 grid gap-2">
-            {bots.length === 0 ? (
-              <EmptyState title="No bots configured" description="Create a support agent for this tenant to begin training behavior." />
-            ) : (
-              bots.map((bot) => (
-                <button
-                  className={`group w-full border-2 p-3 text-left text-sm transition hover:-translate-y-0.5 ${
-                    bot.$id === selectedId ? "border-border bg-primary/10" : "border-border bg-card hover:bg-secondary/60"
-                  }`}
-                  key={bot.$id}
-                  onClick={() => selectBot(bot)}
-                  type="button"
-                >
-                  <span className="flex items-center gap-2 font-bold text-foreground">
-                    <BotIcon aria-hidden="true" className="h-4 w-4 text-primary" />
-                    {bot.name}
-                  </span>
-                  <span className="mt-2 block truncate font-mono text-xs font-bold text-muted-foreground">{bot.$id}</span>
-                </button>
-              ))
-            )}
-          </div>
-        </Panel>
+              {bots.length === 0 ? (
+                <Panel className="min-h-[160px] p-4">
+                  <EmptyState title="No agents configured" description="Create a support agent for this tenant to begin training behavior." />
+                </Panel>
+              ) : (
+                bots.map((bot, index) => (
+                  <button
+                    className={`min-h-[160px] overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
+                      bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
+                    } ${botCardClass(index)}`}
+                    key={bot.$id}
+                    onClick={() => selectBot(bot)}
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
+                      <BotIcon aria-hidden="true" className="h-6 w-6" />
+                    </div>
+                    <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
+                    <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                  </button>
+                ))
+              )}
+            </>
+          )}
+        </section>
 
-        <Panel className="p-5">
+        {isAgentsLoading ? (
+          <AgentFormSkeleton />
+        ) : (
+        <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
           <form onSubmit={saveBot}>
-            <section className="mb-5 flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="studio-kicker text-muted-foreground">Tenant: {tenant?.$id ?? "Unavailable"}</p>
-                <h2 className="text-3xl font-bold leading-tight">{selectedBot ? "Edit bot" : "Create bot"}</h2>
+            <section className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+              <div className="min-w-0 flex-1">
+                <p className="studio-kicker text-[#0099ff]">Tenant: {tenant?.$id ?? "Unavailable"}</p>
+                <h2 className="mt-1 text-3xl font-semibold leading-tight tracking-[-0.04em] text-[var(--ui-text)]">{selectedBot ? "Edit agent" : "Create agent"}</h2>
               </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <StatusPill tone={selectedBot ? "hot" : "warn"}>{selectedBot ? selectedBot.$id : "new draft"}</StatusPill>
+              <div className="flex shrink-0 items-center gap-2">
+                <StatusPill tone={selectedBot ? "hot" : "warn"}>
+                  <span className="block max-w-24 truncate sm:max-w-36">{selectedBot ? selectedBot.$id : "new draft"}</span>
+                </StatusPill>
                 {selectedBot && (
                   <Button
                     className="h-9 w-9 p-0"
@@ -241,9 +248,9 @@ export default function BotsPage() {
 
             <div className="grid gap-4">
               <label className="block">
-                <span className="studio-kicker mb-2 block text-muted-foreground">Bot name</span>
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Agent name</span>
                 <input
-                  className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
+                  className="min-h-11 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
                   maxLength={80}
                   required
                   value={form.name}
@@ -252,9 +259,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-muted-foreground">System prompt</span>
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">System prompt</span>
                 <textarea
-                  className="min-h-60 w-full border border-border bg-card px-3 py-3 font-mono text-sm leading-6 focus:bg-secondary/60"
+                  className="min-h-60 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 font-mono text-sm leading-6 text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
                   maxLength={4000}
                   required
                   value={form.system_prompt}
@@ -263,9 +270,9 @@ export default function BotsPage() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-muted-foreground">Fallback message</span>
+                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Fallback message</span>
                 <textarea
-                  className="min-h-28 w-full border border-border bg-card px-3 py-3 text-sm font-bold leading-6 focus:bg-secondary/60"
+                  className="min-h-28 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 text-sm font-semibold leading-6 text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
                   maxLength={500}
                   required
                   value={form.fallback_message}
@@ -274,11 +281,11 @@ export default function BotsPage() {
               </label>
             </div>
 
-            {status ? <p className="mt-5 border border-border bg-secondary/60 px-3 py-2 text-sm font-bold text-foreground">{status}</p> : null}
+            {status ? <p className="mt-5 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-2 text-sm font-semibold text-[var(--ui-text)]">{status}</p> : null}
 
             <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
               <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
-                Save bot
+                Save agent
               </Button>
               <Button
                 className="w-full sm:w-auto"
@@ -293,6 +300,7 @@ export default function BotsPage() {
             </div>
           </form>
         </Panel>
+        )}
       </div>
 
       <Dialog open={Boolean(deleteTarget)}>
@@ -303,10 +311,10 @@ export default function BotsPage() {
             </div>
             <div>
               <p className="studio-kicker text-destructive">Permanent delete</p>
-              <h2 className="mt-1 text-2xl font-bold leading-tight">Delete {deleteTarget?.name ?? "this bot"}?</h2>
+              <h2 className="mt-1 text-2xl font-bold leading-tight">Delete {deleteTarget?.name ?? "this agent"}?</h2>
               <p className="mt-2 text-sm font-semibold leading-6 text-muted-foreground">
-                This removes the bot record, its WebChat preferences, uploaded document records, stored document files, and
-                Qdrant knowledge chunks for this tenant/bot scope.
+                This removes the agent record, its WebChat preferences, uploaded document records, stored document files, and
+                Qdrant knowledge chunks for this tenant/agent scope.
               </p>
             </div>
           </div>
@@ -320,7 +328,7 @@ export default function BotsPage() {
               type="checkbox"
             />
             <span className="text-sm font-semibold leading-6 text-foreground">
-              I understand this permanently deletes {deleteTarget?.name ?? "this bot"} and its indexed knowledge.
+              I understand this permanently deletes {deleteTarget?.name ?? "this agent"} and its indexed knowledge.
             </span>
           </label>
 
@@ -345,11 +353,176 @@ export default function BotsPage() {
   );
 }
 
+function BotsPageSkeleton() {
+  return (
+    <div className="cockpit-lane min-h-screen">
+      <BotsHeaderSkeleton />
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
+        <section className="grid content-start gap-3 md:grid-cols-2">
+          <AgentGridSkeleton />
+        </section>
+        <AgentFormSkeleton />
+      </div>
+    </div>
+  );
+}
+
+function BotsHeaderSkeleton() {
+  return (
+    <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
+          <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
+            <div className="min-w-0">
+              <Skeleton className="h-7 w-44 rounded-full bg-white/45 dark:bg-white/20" />
+              <div className="mt-3 grid max-w-4xl gap-3">
+                <Skeleton className="h-10 w-full max-w-3xl bg-white/50 dark:bg-white/20 sm:h-12" />
+                <Skeleton className="h-10 w-4/5 max-w-2xl bg-white/45 dark:bg-white/15 sm:h-12" />
+              </div>
+            </div>
+
+            <div className="grid content-start gap-3 rounded-3xl border border-white/35 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-36 bg-white/50 dark:bg-white/20" />
+                <Skeleton className="h-7 w-12 rounded-full bg-white/45 dark:bg-white/15" />
+              </div>
+              <div className="grid gap-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div className="flex min-h-10 items-center gap-3 rounded-full border border-white/35 bg-white/30 px-3 dark:bg-black/15" key={index}>
+                    <Skeleton className="h-6 w-6 rounded-full bg-white/50 dark:bg-white/20" />
+                    <Skeleton className="h-4 flex-1 bg-white/45 dark:bg-white/15" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AgentGridSkeleton() {
+  return (
+    <>
+      <AgentCardSkeleton />
+      <AgentCardSkeleton />
+      <AgentCardSkeleton />
+      <AgentCardSkeleton />
+    </>
+  );
+}
+
+function AgentCardSkeleton() {
+  return (
+    <div className="min-h-[160px] overflow-hidden rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-6 w-20 rounded-full bg-[var(--ui-bg)]" />
+        <Skeleton className="h-6 w-6 rounded-full bg-[var(--ui-bg)]" />
+      </div>
+      <Skeleton className="mt-10 h-7 w-3/4 bg-[var(--ui-bg)]" />
+      <Skeleton className="mt-3 h-4 w-2/3 bg-[var(--ui-bg)]" />
+    </div>
+  );
+}
+
+function AgentFormSkeleton() {
+  return (
+    <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+      <div className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+        <div className="min-w-0 flex-1">
+          <Skeleton className="h-4 w-40 bg-[var(--ui-bg)]" />
+          <Skeleton className="mt-2 h-9 w-40 bg-[var(--ui-bg)]" />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-7 w-24 rounded-full bg-[var(--ui-bg)] sm:w-36" />
+          <Skeleton className="h-9 w-9 rounded-md bg-[var(--ui-bg)]" />
+        </div>
+      </div>
+
+      <div className="grid gap-4">
+        <SkeletonField className="h-11" labelWidth="w-24" />
+        <SkeletonField className="h-60" labelWidth="w-28" />
+        <SkeletonField className="h-28" labelWidth="w-36" />
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Skeleton className="h-11 w-28 rounded-md bg-[var(--ui-bg)]" />
+        <Skeleton className="h-11 w-24 rounded-md bg-[var(--ui-bg)]" />
+      </div>
+    </Panel>
+  );
+}
+
+function SkeletonField({ className, labelWidth }: { className: string; labelWidth: string }) {
+  return (
+    <div>
+      <Skeleton className={`mb-2 h-4 ${labelWidth} bg-[var(--ui-bg)]`} />
+      <Skeleton className={`w-full rounded-lg bg-[var(--ui-bg)] ${className}`} />
+    </div>
+  );
+}
+
+function BotsHeader({ botCount }: { botCount: number }) {
+  const steps = [
+    "Write the agent's support instructions.",
+    "Set the fallback response customers will see.",
+    "Save the agent before connecting it to WebChat.",
+  ];
+
+  return (
+    <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
+          <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
+            <div className="min-w-0">
+              <p className="inline-flex rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
+                Support agent setup
+              </p>
+              <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
+                Create customer support agents for this workspace.
+              </h1>
+            </div>
+
+            <div className="grid content-start gap-3 rounded-3xl border border-white/35 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
+              <div className="flex items-center justify-between gap-3">
+                <span className="studio-kicker opacity-70">Agent flow</span>
+                <StatusPill tone="warn">{botCount}</StatusPill>
+              </div>
+              <div className="grid gap-2">
+                {steps.map((step, index) => (
+                  <div className="flex min-h-10 items-center gap-3 rounded-full border border-white/35 bg-white/30 px-3 text-sm font-semibold text-current dark:bg-black/15" key={step}>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#312e81]/10 text-[#312e81] dark:bg-white/15 dark:text-[#ccfbf1]">
+                      <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+                    </span>
+                    <span>{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function botToForm(bot: Bot): BotForm {
   return {
     name: bot.name,
     system_prompt: bot.system_prompt,
     fallback_message: bot.fallback_message,
   };
+}
+
+function botCardClass(index: number) {
+  const cards = [
+    "bg-[linear-gradient(135deg,#ff5530,#f59e0b)]",
+    "bg-[linear-gradient(135deg,#1456f0,#22c5a5)]",
+    "bg-[linear-gradient(135deg,#1c1c1c,#0099ff)]",
+    "bg-[linear-gradient(135deg,#0f766e,#22c55e)]",
+  ];
+
+  return cards[index % cards.length];
 }
 

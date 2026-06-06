@@ -68,13 +68,13 @@ function renderVerificationPage(userId: string, secret: string) {
     <title>Verify sign in</title>
     <style>
       :root {
-        color-scheme: dark;
-        --background: #08090d;
-        --surface: #11131a;
-        --border: #2a2f3a;
-        --text: #f5f7fb;
-        --muted: #a2adbd;
-        --primary: #f6c453;
+        color-scheme: light;
+        --background: #f7f4ed;
+        --surface: #fcfbf8;
+        --border: #eceae4;
+        --text: #1c1c1c;
+        --muted: #5f5f5d;
+        --primary: #1c1c1c;
       }
 
       * {
@@ -89,13 +89,12 @@ function renderVerificationPage(userId: string, secret: string) {
         padding: 24px;
         background: var(--background);
         color: var(--text);
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: Inter, Arial, Helvetica, sans-serif;
       }
 
       main {
         width: min(100%, 460px);
         border: 1px solid var(--border);
-        border-radius: 12px;
         background: var(--surface);
         padding: 28px;
       }
@@ -117,12 +116,13 @@ function renderVerificationPage(userId: string, secret: string) {
         min-height: 48px;
         margin-top: 24px;
         border: 0;
-        border-radius: 8px;
+        border-radius: 6px;
         background: var(--primary);
-        color: #121212;
+        color: #fcfbf8;
         cursor: pointer;
         font: inherit;
         font-weight: 700;
+        box-shadow: rgba(255,255,255,0.2) 0px 0.5px 0px inset, rgba(0,0,0,0.2) 0px 0px 0px 0.5px inset, rgba(0,0,0,0.05) 0px 1px 2px;
       }
     </style>
   </head>

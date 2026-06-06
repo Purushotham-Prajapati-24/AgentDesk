@@ -32,6 +32,11 @@
             this.isSending = false;
             this.sessionToken = getSessionToken(botId);
             this.socket = null;
+            this.messageListRef = null;
+            this.typingRowRef = null;
+            this.composerInputRef = null;
+            this.sendButtonRef = null;
+            this.quickActionButtons = [];
             this.shadowRootRef = this.attachShadow({ mode: "open" });
         }
         connectedCallback() {
@@ -119,13 +124,14 @@
                 this.socket = socket;
                 if (socket) {
                     socket.on("agent-message", (message) => {
-                        this.messages.push({
+                        const chatMessage = {
                             id: message.message_id,
                             sender: "bot",
                             content: message.content,
-                        });
+                        };
+                        this.messages.push(chatMessage);
                         saveMessages(this.messages);
-                        this.renderShell();
+                        this.appendMessageRow(chatMessage);
                     });
                 }
             }
@@ -136,6 +142,11 @@
         renderShell() {
             var _a;
             const config = (_a = this.config) !== null && _a !== void 0 ? _a : buildFallbackConfig(botId);
+            this.messageListRef = null;
+            this.typingRowRef = null;
+            this.composerInputRef = null;
+            this.sendButtonRef = null;
+            this.quickActionButtons = [];
             this.shadowRootRef.replaceChildren(createStyles(config.theme), this.createWidget(config));
         }
         createWidget(config) {
@@ -210,35 +221,105 @@
         }
         createMessageList() {
             const list = createElement("div", "ad-messages");
+            this.messageListRef = list;
             for (const message of this.messages) {
-                const row = createElement("div", `ad-message-row ${message.sender}`);
-                const bubble = createElement("div", `ad-message ${message.sender}`);
-                appendMarkdown(bubble, message.content);
-                row.append(bubble);
-                list.append(row);
+                list.append(this.createMessageRow(message));
             }
             if (this.isSending) {
-                const row = createElement("div", "ad-message-row bot");
-                const typing = createElement("div", "ad-message bot ad-typing");
-                for (let index = 0; index < 3; index += 1) {
-                    typing.append(createElement("span", "ad-typing-dot"));
-                }
-                row.append(typing);
-                list.append(row);
+                this.appendTypingIndicator(list);
             }
             queueMicrotask(() => {
                 list.scrollTop = list.scrollHeight;
             });
             return list;
         }
+        createMessageRow(message) {
+            const row = createElement("div", `ad-message-row ${message.sender}`);
+            row.dataset.messageId = message.id;
+            const bubble = createElement("div", `ad-message ${message.sender}`);
+            appendMarkdown(bubble, message.content);
+            row.append(bubble);
+            return row;
+        }
+        appendMessageRow(message) {
+            if (!this.messageListRef) {
+                this.renderShell();
+                return null;
+            }
+            const row = this.createMessageRow(message);
+            this.messageListRef.append(row);
+            this.scrollMessagesToBottom();
+            return row;
+        }
+        updateMessageRow(message, row) {
+            var _a, _b, _c;
+            const targetRow = (_c = row !== null && row !== void 0 ? row : [...((_b = (_a = this.messageListRef) === null || _a === void 0 ? void 0 : _a.querySelectorAll("[data-message-id]")) !== null && _b !== void 0 ? _b : [])].find((item) => item.dataset.messageId === message.id)) !== null && _c !== void 0 ? _c : null;
+            const bubble = targetRow === null || targetRow === void 0 ? void 0 : targetRow.querySelector(".ad-message");
+            if (!bubble) {
+                return;
+            }
+            bubble.replaceChildren();
+            appendMarkdown(bubble, message.content);
+            this.scrollMessagesToBottom();
+        }
+        appendTypingIndicator(list = this.messageListRef) {
+            if (!list || this.typingRowRef) {
+                return;
+            }
+            const row = createElement("div", "ad-message-row bot");
+            row.dataset.typing = "true";
+            const typing = createElement("div", "ad-message bot ad-typing");
+            for (let index = 0; index < 3; index += 1) {
+                typing.append(createElement("span", "ad-typing-dot"));
+            }
+            row.append(typing);
+            list.append(row);
+            this.typingRowRef = row;
+            this.scrollMessagesToBottom();
+        }
+        removeTypingIndicator() {
+            if (this.typingRowRef) {
+                this.typingRowRef.remove();
+            }
+            this.typingRowRef = null;
+        }
+        setSendingState(isSending) {
+            this.isSending = isSending;
+            if (this.composerInputRef) {
+                this.composerInputRef.toggleAttribute("disabled", isSending);
+            }
+            if (this.sendButtonRef) {
+                this.sendButtonRef.disabled = isSending;
+            }
+            for (const button of this.quickActionButtons) {
+                button.disabled = isSending;
+            }
+            if (isSending) {
+                this.appendTypingIndicator();
+            }
+            else {
+                this.removeTypingIndicator();
+            }
+        }
+        scrollMessagesToBottom() {
+            const list = this.messageListRef;
+            if (!list) {
+                return;
+            }
+            queueMicrotask(() => {
+                list.scrollTop = list.scrollHeight;
+            });
+        }
         createQuickActions() {
             const actions = createElement("div", "ad-actions");
+            this.quickActionButtons = [];
             for (const label of ["Track order", "Return policy", "Talk to support"]) {
                 const button = createElement("button", "ad-action");
                 button.type = "button";
                 button.textContent = label;
                 button.disabled = this.isSending;
                 button.addEventListener("click", () => void this.sendMessage(label));
+                this.quickActionButtons.push(button);
                 actions.append(button);
             }
             return actions;
@@ -252,6 +333,7 @@
             input.maxLength = MAX_MESSAGE_LENGTH;
             input.rows = 1;
             input.disabled = this.isSending;
+            this.composerInputRef = input;
             input.addEventListener("keydown", (event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -262,6 +344,7 @@
             send.type = "submit";
             send.disabled = this.isSending;
             send.textContent = "Send";
+            this.sendButtonRef = send;
             const footer = createElement("p", "ad-footer");
             footer.textContent = "Powered by AgentDesk";
             form.addEventListener("submit", (event) => {
@@ -285,10 +368,11 @@
             }
             const config = (_a = explicitConfig !== null && explicitConfig !== void 0 ? explicitConfig : this.config) !== null && _a !== void 0 ? _a : buildFallbackConfig(botId);
             const content = text.slice(0, MAX_MESSAGE_LENGTH);
-            this.messages.push({ id: createId(), sender: "user", content });
+            const userMessage = { id: createId(), sender: "user", content };
+            this.messages.push(userMessage);
             saveMessages(this.messages);
-            this.isSending = true;
-            this.renderShell();
+            this.appendMessageRow(userMessage);
+            this.setSendingState(true);
             if (this.socket && this.socket.connected) {
                 try {
                     this.socket.emit("customer-message", {
@@ -310,19 +394,20 @@
                 await this.typeBotMessage(config.fallbackMessage);
             }
             finally {
-                this.isSending = false;
-                this.renderShell();
+                this.setSendingState(false);
             }
         }
         async typeBotMessage(content) {
+            this.removeTypingIndicator();
             const message = { id: createId(), sender: "bot", content: "" };
             this.messages.push(message);
+            const row = this.appendMessageRow(message);
             const chars = Array.from(content);
             for (let index = 0; index < chars.length; index += 1) {
                 message.content += chars[index];
                 if (index % 3 === 0 || index === chars.length - 1) {
                     saveMessages(this.messages);
-                    this.renderShell();
+                    this.updateMessageRow(message, row);
                     await delay(12);
                 }
             }
@@ -454,13 +539,13 @@
             messageEndpoint: `${scriptOrigin}/api/chat/message`,
             websocketEndpoint: null,
             theme: {
-                headerHsl: "224 20% 18%",
-                backgroundHsl: "224 25% 12%",
-                textHsl: "210 40% 98%",
-                mutedTextHsl: "215 20% 75%",
-                userBubbleHsl: "250 85% 60%",
-                botBubbleHsl: "224 20% 18%",
-                accentHsl: "250 85% 60%",
+                headerHsl: "0 0% 11%",
+                backgroundHsl: "43 38% 95%",
+                textHsl: "0 0% 11%",
+                mutedTextHsl: "60 1% 37%",
+                userBubbleHsl: "224 88% 51%",
+                botBubbleHsl: "40 50% 98%",
+                accentHsl: "204 100% 50%",
                 fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
             },
         };
@@ -469,18 +554,18 @@
         const style = document.createElement("style");
         style.textContent = `
       :host {
-        --ad-bg-primary: hsla(${theme.backgroundHsl} / 0.9);
-        --ad-bg-secondary: hsla(${theme.botBubbleHsl} / 0.96);
-        --ad-header-bg: hsla(${theme.headerHsl} / 0.96);
+        --ad-bg-primary: hsl(${theme.backgroundHsl});
+        --ad-bg-secondary: hsl(${theme.botBubbleHsl});
+        --ad-header-bg: hsl(${theme.headerHsl});
         --ad-text-primary: hsl(${theme.textHsl});
         --ad-text-secondary: hsl(${theme.mutedTextHsl});
         --ad-accent-solid: hsl(${theme.accentHsl});
         --ad-user-bubble: hsl(${theme.userBubbleHsl});
-        --ad-border-color: hsla(224 20% 80% / 0.16);
-        --ad-accent-glow: hsla(${theme.accentHsl} / 0.25);
+        --ad-border-color: #eceae4;
+        --ad-accent-glow: hsla(${theme.accentHsl} / 0.18);
         --ad-font-body: ${theme.fontFamily};
         all: initial;
-        color-scheme: dark;
+        color-scheme: light;
         display: block;
         font-family: var(--ad-font-body);
       }
@@ -515,8 +600,8 @@
       .ad-chat-pane {
         background: var(--ad-bg-primary);
         border: 1px solid var(--ad-border-color);
-        border-radius: 18px;
-        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+        border-radius: 22px;
+        box-shadow: 0 18px 60px rgba(28, 28, 28, 0.16);
         color: var(--ad-text-primary);
         display: flex;
         flex-direction: column;
@@ -531,8 +616,6 @@
         transition: opacity 180ms ease, transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
         max-width: calc(100svw - 32px);
         width: min(380px, calc(100svw - 32px));
-        backdrop-filter: blur(16px) saturate(180%);
-        -webkit-backdrop-filter: blur(16px) saturate(180%);
       }
 
       .ad-widget.inline .ad-chat-pane {
@@ -556,10 +639,12 @@
         align-items: center;
         background: var(--ad-header-bg);
         border-bottom: 1px solid var(--ad-border-color);
+        border-radius: 999px;
         display: flex;
         justify-content: space-between;
         min-height: 74px;
-        padding: 16px;
+        margin: 12px;
+        padding: 12px 14px;
       }
 
       .ad-identity {
@@ -641,7 +726,8 @@
       }
 
       .ad-message {
-        border-radius: 16px;
+        animation: stream-in 180ms ease-out both;
+        border-radius: 18px;
         font-size: 14px;
         line-height: 1.5;
         max-width: 88%;
@@ -706,7 +792,7 @@
       }
 
       .ad-action {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.68);
         border: 1px solid var(--ad-border-color);
         border-radius: 999px;
         color: var(--ad-text-primary);
@@ -734,7 +820,7 @@
       }
 
       .ad-input {
-        background: rgba(255, 255, 255, 0.08);
+        background: #ffffff;
         border: 1px solid var(--ad-border-color);
         border-radius: 14px;
         color: var(--ad-text-primary);
@@ -753,7 +839,7 @@
 
       .ad-input:focus {
         border-color: var(--ad-accent-solid);
-        box-shadow: 0 0 0 3px var(--ad-accent-glow);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
       }
 
       .ad-send {
@@ -781,7 +867,7 @@
         border: 0;
         border-radius: 50%;
         bottom: 0;
-        box-shadow: 0 10px 30px var(--ad-accent-glow);
+        box-shadow: 0 12px 32px var(--ad-accent-glow);
         color: white;
         cursor: pointer;
         display: flex;
@@ -815,6 +901,11 @@
       @keyframes ad-bubble-breath {
         0%, 100% { box-shadow: 0 10px 30px var(--ad-accent-glow), 0 0 0 0 hsla(${theme.accentHsl} / 0.38); }
         70% { box-shadow: 0 12px 36px var(--ad-accent-glow), 0 0 0 12px hsla(${theme.accentHsl} / 0); }
+      }
+
+      @keyframes stream-in {
+        0% { opacity: 0; transform: translateY(4px); }
+        100% { opacity: 1; transform: translateY(0); }
       }
 
       @media (max-width: 480px) {

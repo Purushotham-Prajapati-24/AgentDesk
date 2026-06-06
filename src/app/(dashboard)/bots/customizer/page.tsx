@@ -37,18 +37,18 @@ const DEFAULT_STATE: CustomizerState = {
   botName: "AgentDesk Support",
   greeting: "You hit the support line. I can check policy, answer from documents, or bring in an operator.",
   headerColor: "#0D1013",
-  backgroundColor: "#050607",
-  textColor: "#F5F1E8",
-  userBubbleColor: "#F59E0B",
-  botBubbleColor: "#14191E",
-  accentColor: "#22D3EE",
+  backgroundColor: "#F7F4ED",
+  textColor: "#1C1C1C",
+  userBubbleColor: "#1456F0",
+  botBubbleColor: "#FCFBF8",
+  accentColor: "#0099FF",
   fontFamily: "Fira",
   useCustomIcon: false,
   widgetIconUrl: "",
 };
 
 const fontStacks: Record<FontChoice, string> = {
-  Fira: "Fira Sans, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  Fira: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
   Outfit: "Outfit, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
   System: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
 };
@@ -93,7 +93,7 @@ export default function WidgetCustomizerPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="cockpit-lane min-h-screen">
       <PageHeader
         kicker="Widget design"
         title="Make the embedded bot look unmistakably on duty."
@@ -101,12 +101,40 @@ export default function WidgetCustomizerPage() {
         action={<StatusPill tone="hot">Live preview</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[380px_minmax(0,1fr)] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[300px_minmax(0,1fr)_420px] lg:px-8">
+        <Panel className="h-fit p-5">
+          <p className="studio-kicker text-[#0099ff]">Build checklist</p>
+          <div className="mt-5 grid gap-2">
+            {["Identity", "Greeting", "Color system", "Launcher icon", "Embed snippets"].map((item) => (
+              <div className="flex items-center justify-between border border-[#262626] bg-[#090909] px-3 py-3 text-sm font-semibold text-white" key={item}>
+                {item}
+                <span className="h-2 w-2 rounded-full bg-[#22c55e]" />
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <section className="studio-surface relative min-w-0 p-4 text-white sm:p-5">
+          <div className="flex w-fit items-center gap-2 rounded-full border border-[#0099ff]/40 bg-[#0099ff]/10 px-3 py-2 font-mono text-xs font-semibold text-[#0099ff]">
+            <Paintbrush aria-hidden="true" className="h-4 w-4" />
+            Widget preview
+          </div>
+          <div className="flex min-h-[520px] items-center justify-center overflow-hidden py-6 lg:min-h-[680px]">
+            <WidgetPreview config={config} />
+          </div>
+          <div className="grid gap-3 border-t border-[#262626] pt-5 lg:grid-cols-2">
+            <CodeBlock label="Script" value={snippets.script} />
+            <CodeBlock label="Iframe" value={snippets.iframe} />
+            <CodeBlock label="React" value={snippets.react} />
+            <CodeBlock label="Vue" value={snippets.vue} />
+          </div>
+        </section>
+
         <Panel className="p-5">
           <form className="space-y-5" onSubmit={saveTheme}>
             <section className="border-b border-border pb-4">
-              <p className="studio-kicker text-muted-foreground">Control deck</p>
-              <h2 className="mt-1 text-2xl font-bold">Theme controls</h2>
+              <p className="studio-kicker text-[#0099ff]">Control deck</p>
+              <h2 className="mt-1 text-2xl font-semibold text-white">Theme controls</h2>
             </section>
 
             <section className="grid gap-3">
@@ -181,22 +209,6 @@ export default function WidgetCustomizerPage() {
             </Button>
           </form>
         </Panel>
-
-        <section className="studio-surface relative min-w-0 rounded-xl p-4 text-foreground sm:p-5">
-          <div className="flex w-fit items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-3 py-2 font-mono text-xs font-bold text-primary">
-            <Paintbrush aria-hidden="true" className="h-4 w-4" />
-            WIDGET ARTIFACT
-          </div>
-          <div className="flex min-h-[520px] items-center justify-center overflow-hidden py-6 lg:min-h-[680px]">
-            <WidgetPreview config={config} />
-          </div>
-          <div className="grid gap-3 border-t border-border pt-5 lg:grid-cols-2">
-            <CodeBlock label="Script" value={snippets.script} />
-            <CodeBlock label="Iframe" value={snippets.iframe} />
-            <CodeBlock label="React" value={snippets.react} />
-            <CodeBlock label="Vue" value={snippets.vue} />
-          </div>
-        </section>
       </div>
     </div>
   );
@@ -205,9 +217,9 @@ export default function WidgetCustomizerPage() {
 function TextField({ label, value, disabled = false, onChange }: { label: string; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   return (
     <label className="block">
-      <span className="studio-kicker mb-2 block text-muted-foreground">{label}</span>
+      <span className="studio-kicker mb-2 block text-[#999999]">{label}</span>
       <input
-        className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60 disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-11 w-full border border-[#262626] bg-[#090909] px-3 text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414] disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -220,16 +232,16 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   return (
     <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] items-end gap-3">
       <span className="min-w-0">
-        <span className="studio-kicker mb-2 block text-muted-foreground">{label}</span>
+        <span className="studio-kicker mb-2 block text-[#999999]">{label}</span>
         <input
-          className="min-h-11 w-full border border-border bg-card px-3 font-mono text-sm font-bold focus:bg-secondary/60"
+          className="min-h-11 w-full border border-[#262626] bg-[#090909] px-3 font-mono text-sm font-semibold text-white focus:border-[#0099ff] focus:bg-[#141414]"
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
       </span>
       <input
         aria-label={`${label} color picker`}
-        className="h-11 w-14 border border-border bg-card p-1"
+        className="h-11 w-14 border border-[#262626] bg-[#090909] p-1"
         type="color"
         value={normalizeHex(value)}
         onChange={(event) => onChange(event.target.value)}
@@ -240,9 +252,9 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 
 function CodeBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-border bg-card/80 p-3">
-      <p className="studio-kicker mb-2 text-muted-foreground">{label}</p>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-foreground">{value}</pre>
+    <div className="border border-[#262626] bg-[#14191e] p-3">
+      <p className="studio-kicker mb-2 text-[#999999]">{label}</p>
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-white">{value}</pre>
     </div>
   );
 }
@@ -253,7 +265,7 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
   return (
     <div className="relative w-full max-w-[390px]">
       <div
-        className="flex h-[min(620px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-border shadow-[0_18px_48px_rgba(0,0,0,0.38)] sm:shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
+        className="flex h-[min(620px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
         style={{
           background: config.backgroundColor,
           color: config.textColor,
@@ -261,7 +273,7 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
         }}
       >
         <div className="flex items-center gap-3 border-b border-black/30 px-4 py-4 text-white" style={{ background: config.headerColor }}>
-          <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/30 font-bold" style={{ background: config.accentColor }}>
+          <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/30 font-semibold" style={{ background: config.accentColor }}>
             {config.botName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -284,10 +296,10 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
 
         <div className="border-t border-black/30 p-4">
           <div className="flex gap-2">
-            <div className="flex min-h-11 min-w-0 flex-1 items-center rounded-md border border-white/10 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
+            <div className="flex min-h-11 min-w-0 flex-1 items-center rounded-xl border border-[#eceae4] bg-white px-3 text-sm font-semibold text-[#5f5f5d]">
               Write your message here...
             </div>
-            <button className="min-h-11 rounded-md border border-white/20 px-4 text-sm font-bold text-white" style={{ background: config.accentColor }} type="button">
+            <button className="min-h-11 rounded-xl border border-white/20 px-4 text-sm font-semibold text-white" style={{ background: config.accentColor }} type="button">
               Send
             </button>
           </div>
@@ -296,7 +308,7 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
 
       <button
         aria-label="Launcher preview"
-        className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-0 text-2xl font-black text-white shadow-[0_12px_30px_rgba(0,0,0,0.36)] sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl sm:shadow-[0_16px_42px_rgba(0,0,0,0.4)]"
+        className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-0 text-2xl font-semibold text-white sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
         style={{ background: config.accentColor }}
         type="button"
       >
@@ -324,7 +336,7 @@ function PreviewBubble({
 }) {
   return (
     <div className={`flex ${align === "right" ? "justify-end" : "justify-start"}`}>
-      <p className="max-w-[92%] break-words rounded-[18px] border border-white/10 px-4 py-3 text-sm font-bold leading-6 sm:max-w-[78%]" style={{ background: color, color: textColor }}>
+      <p className="max-w-[92%] break-words rounded-[18px] border border-black/10 px-4 py-3 text-sm font-medium leading-6 sm:max-w-[78%]" style={{ background: color, color: textColor }}>
         {children}
       </p>
     </div>
@@ -392,7 +404,7 @@ function getHue(red: number, green: number, blue: number, max: number, delta: nu
 }
 
 function normalizeHex(value: string) {
-  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#F59E0B";
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#0099FF";
 }
 
 function isSafeId(value: string) {

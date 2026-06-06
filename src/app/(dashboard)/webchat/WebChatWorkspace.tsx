@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bot, Braces, CheckCircle2, CloudUpload, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
 import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@/app/webchat-actions";
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
@@ -143,21 +143,21 @@ export function WebChatWorkspace() {
   }
 
   return (
-    <div className="webchat-brutalist min-h-screen bg-[var(--webchat-bg)] text-foreground">
-      <section className="border-b border-[var(--webchat-line)] bg-black px-4 py-5 sm:px-6 lg:px-8">
+    <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
+      <section className="border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-5 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="webchat-kicker text-[var(--webchat-acid)]">WebChat control room</p>
-            <h1 className="mt-3 max-w-5xl text-4xl font-black uppercase leading-none tracking-[-0.02em] text-foreground sm:text-6xl">
+            <p className="studio-kicker text-[#0099ff]">WebChat control room</p>
+            <h1 className="mt-3 max-w-5xl text-4xl font-semibold leading-none tracking-[-0.04em] text-[var(--ui-text)] sm:text-6xl">
               Build the customer chat surface.
             </h1>
-            <p className="mt-4 max-w-2xl text-base font-semibold leading-7 text-muted-foreground">
+            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
               Configure identity, appearance, deployment controls, and customer-facing capabilities while watching the widget contract update in real time.
             </p>
           </div>
           <div className="grid gap-3 sm:flex sm:flex-wrap">
             <Button
-              className="w-full rounded-none border-[var(--webchat-line)] sm:w-auto"
+              className="w-full sm:w-auto"
               leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
               onClick={resetConfig}
               type="button"
@@ -166,7 +166,7 @@ export function WebChatWorkspace() {
               Reset
             </Button>
             <Button
-              className="w-full rounded-none border-[var(--webchat-acid)] bg-[var(--webchat-acid)] text-black hover:bg-[#d8ff2f] sm:w-auto"
+              className="w-full sm:w-auto"
               disabled={!selectedBotId}
               leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
               loading={saveState === "saving"}
@@ -229,16 +229,16 @@ function BotSelector({
   onSelect: (botId: string) => void;
 }) {
   return (
-    <section className="border border-[var(--webchat-line)] bg-[var(--webchat-panel)] p-4">
+    <section className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="webchat-kicker text-[var(--webchat-acid)]">Bot target</p>
-          <h2 className="mt-1 text-lg font-black uppercase">Preference owner</h2>
+          <p className="studio-kicker text-[#0099ff]">Bot target</p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--ui-text)]">Preference owner</h2>
         </div>
-        {!selectedBotId ? <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" /> : <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-[var(--webchat-acid)]" />}
+        {!selectedBotId ? <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" /> : <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-[#22c55e]" />}
       </div>
       <select
-        className="webchat-input"
+        className="min-h-12 w-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
         disabled={loading || bots.length === 0}
         value={selectedBotId}
         onChange={(event) => onSelect(event.target.value)}
@@ -250,7 +250,7 @@ function BotSelector({
           </option>
         ))}
       </select>
-      <p className="mt-3 text-sm font-semibold leading-6 text-muted-foreground">
+      <p className="mt-3 text-sm font-medium leading-6 text-[var(--ui-muted)]">
         WebChat preferences are saved to the selected bot&apos;s Appwrite `theme_config`; the embed script reads them with `data-bot-id`.
       </p>
     </section>
@@ -264,15 +264,15 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
     <div
       className={cn(
         "flex items-center justify-between gap-3 border px-4 py-3",
-        saveState === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-[var(--webchat-line)] bg-[var(--webchat-panel)]",
+        saveState === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-text)]",
       )}
       role={saveState === "error" ? "alert" : "status"}
     >
-      <span className="flex items-center gap-2 font-mono text-xs font-black uppercase tracking-[0.16em]">
-        {saveState === "saved" ? <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-[var(--webchat-acid)]" /> : <Flag aria-hidden="true" className="h-4 w-4" />}
+      <span className="flex items-center gap-2 font-mono text-xs font-semibold uppercase">
+        {saveState === "saved" ? <CheckCircle2 aria-hidden="true" className="h-4 w-4 text-[#22c55e]" /> : <Flag aria-hidden="true" className="h-4 w-4" />}
         {label}
       </span>
-      <span className="text-right text-xs font-bold text-muted-foreground">{error || "Local draft persists in this browser."}</span>
+      <span className="text-right text-xs font-semibold text-[var(--ui-muted)]">{error || "Local draft persists in this browser."}</span>
     </div>
   );
 }
@@ -282,19 +282,19 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
   const showCustomIcon = config.appearance.useCustomIcon && isHttpUrl(config.appearance.widgetIconUrl);
 
   return (
-    <section className="border border-[var(--webchat-line)] bg-[var(--webchat-panel)] p-4">
-      <div className="mb-4 flex items-center justify-between gap-3 border-b border-[var(--webchat-line)] pb-4">
+    <section className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
         <div>
-          <p className="webchat-kicker text-[var(--webchat-acid)]">Live preview</p>
-          <h2 className="mt-1 text-2xl font-black uppercase">Customer widget</h2>
+          <p className="studio-kicker text-[#0099ff]">Live preview</p>
+          <h2 className="mt-1 text-2xl font-semibold text-[var(--ui-text)]">Customer widget</h2>
         </div>
-        <Eye aria-hidden="true" className="h-5 w-5 text-[var(--webchat-acid)]" />
+        <Eye aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
       </div>
 
-      <div className="flex min-h-[520px] items-center justify-center overflow-hidden bg-black/45 p-3 sm:p-6 lg:min-h-[620px]">
+      <div className="flex min-h-[520px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-3 sm:p-6 lg:min-h-[620px]">
         <div className="relative w-full max-w-[410px]">
           <div
-            className="flex h-[min(590px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden border border-black shadow-[8px_8px_0_#000] sm:shadow-[18px_18px_0_#000]"
+            className="flex h-[min(590px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
             style={{
               background: config.appearance.backgroundColor,
               color: config.appearance.textColor,
@@ -303,7 +303,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
           >
             <div className="flex items-center gap-3 border-b border-black px-4 py-4" style={{ background: config.appearance.headerColor }}>
               <div
-                className="flex h-12 w-12 items-center justify-center overflow-hidden border border-black text-lg font-black text-black"
+                className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black/10 text-lg font-semibold text-black"
                 style={{ background: config.appearance.accentColor }}
               >
                 {config.identity.avatarUrl ? (
@@ -314,7 +314,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
                 )}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-base font-black">{config.identity.botName}</p>
+                <p className="truncate text-base font-semibold">{config.identity.botName}</p>
                 <p className="text-xs font-bold opacity-75">{config.deploy.environment} / {config.deploy.versionTag}</p>
               </div>
             </div>
@@ -330,16 +330,16 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
                 I can answer from verified sources{config.features.humanHandoff ? " and bring in a human operator" : ""}.
               </PreviewBubble>
               {config.features.sourceCitations ? (
-                <div className="border border-black/40 bg-black/20 px-3 py-2 font-mono text-xs font-bold">Sources enabled</div>
+                <div className="border border-black/20 bg-black/10 px-3 py-2 font-mono text-xs font-semibold">Sources enabled</div>
               ) : null}
             </div>
 
             <div className="border-t border-black p-4">
               <div className="flex gap-2">
-                <div className="flex min-h-12 flex-1 items-center border border-black/40 bg-white/10 px-3 text-sm font-bold text-muted-foreground">
+                <div className="flex min-h-12 flex-1 items-center rounded-xl border border-[#eceae4] bg-white px-3 text-sm font-semibold text-[#5f5f5d]">
                   Write your message...
                 </div>
-                <button className="min-h-12 border border-black px-4 text-sm font-black text-black" style={{ background: config.appearance.accentColor }} type="button">
+                <button className="min-h-12 rounded-xl border border-black/10 px-4 text-sm font-semibold text-black" style={{ background: config.appearance.accentColor }} type="button">
                   Send
                 </button>
               </div>
@@ -348,7 +348,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
           <button
             aria-label="Launcher preview"
-            className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black text-2xl font-black text-black shadow-[6px_6px_0_#000] sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl sm:shadow-[8px_8px_0_#000]"
+            className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
             style={{ background: config.appearance.accentColor }}
             type="button"
           >
@@ -378,7 +378,7 @@ function PreviewBubble({
 }) {
   return (
     <div className={cn("flex", align === "right" ? "justify-end" : "justify-start")}>
-      <p className="max-w-[92%] break-words border border-black/35 px-4 py-3 text-sm font-bold leading-6 sm:max-w-[82%]" style={{ background: color, color: textColor }}>
+      <p className="max-w-[92%] break-words rounded-[18px] border border-black/15 px-4 py-3 text-sm font-medium leading-6 sm:max-w-[82%]" style={{ background: color, color: textColor }}>
         {children}
       </p>
     </div>
@@ -386,13 +386,32 @@ function PreviewBubble({
 }
 
 function CodeBlock({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copySnippet() {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  }
+
   return (
-    <div className="border border-[var(--webchat-line)] bg-black p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Braces aria-hidden="true" className="h-4 w-4 text-[var(--webchat-acid)]" />
-        <p className="webchat-kicker text-muted-foreground">{label}</p>
+    <div className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Braces aria-hidden="true" className="h-4 w-4 shrink-0 text-[#0099ff]" />
+          <p className="studio-kicker truncate text-[var(--ui-muted)]">{label}</p>
+        </div>
+        <button
+          aria-label={`Copy ${label}`}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] transition hover:border-[var(--ui-blue)] hover:bg-[var(--ui-blue)]/10 hover:text-[var(--ui-text)]"
+          onClick={() => void copySnippet()}
+          title={`Copy ${label}`}
+          type="button"
+        >
+          {copied ? <Check aria-hidden="true" className="h-4 w-4 text-[#22c55e]" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
+        </button>
       </div>
-      <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words font-mono text-xs font-bold leading-5 text-foreground">{value}</pre>
+      <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words font-mono text-xs font-semibold leading-5 text-[var(--ui-text)]">{value}</pre>
     </div>
   );
 }
@@ -422,7 +441,7 @@ function fontStack(font: WebChatConfig["appearance"]["fontFamily"]) {
     return "Fira Code, Consolas, ui-monospace, monospace";
   }
 
-  return "Fira Sans, system-ui, sans-serif";
+  return "Inter, system-ui, sans-serif";
 }
 
 function isHttpUrl(value: string) {

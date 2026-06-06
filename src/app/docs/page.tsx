@@ -19,6 +19,7 @@ import {
   Terminal,
   Workflow,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type DocCategory = "Getting Started" | "Knowledge & Ingestion" | "Widget Embed" | "Developer API";
 type SandboxMode = "launcher" | "inline";
@@ -103,7 +104,7 @@ export default function DocsPage() {
                 text="Upload PDFs, DOCX files, CSVs, text, Markdown, and URLs for retrieval-grounded answers."
               />
               <FeatureCard
-                icon={<Workflow aria-hidden="true" className="h-6 w-6 text-indigo-400" />}
+                icon={<Workflow aria-hidden="true" className="h-6 w-6 text-[#1456f0]" />}
                 title="WebChat Embed"
                 text={
                   <>
@@ -157,7 +158,7 @@ export default function DocsPage() {
               <FeatureCard icon={<Bot aria-hidden="true" className="h-5 w-5 text-primary" />} title="Bot Identity" text="Bot name, avatar URL, and the short customer-facing operating description." />
               <FeatureCard icon={<Palette aria-hidden="true" className="h-5 w-5 text-accent" />} title="Bot Appearance" text="Header, background, text, bubble colors, typography, custom CSS, and custom launcher icon controls." />
               <FeatureCard icon={<Settings aria-hidden="true" className="h-5 w-5 text-success" />} title="Deploy Settings" text="Bot ID, version tag, theme token, rollout posture, and whether customers use launcher or embedded mode." />
-              <FeatureCard icon={<Layers aria-hidden="true" className="h-5 w-5 text-indigo-400" />} title="Feature Toggles" text="Voice, transcript export, file uploads, human handoff, and source citation behavior." />
+              <FeatureCard icon={<Layers aria-hidden="true" className="h-5 w-5 text-[#1456f0]" />} title="Feature Toggles" text="Voice, transcript export, file uploads, human handoff, and source citation behavior." />
             </div>
             <Note title="Custom launcher icon">
               In WebChat &gt; Bot Appearance, enable <strong>Use custom launcher icon</strong> and provide a public image URL. The widget config API exposes this as <code>useCustomIcon</code> and <code>widgetIconUrl</code>.
@@ -360,25 +361,28 @@ function toggleWidget() {
   const activeSectionData = docSections.find((section) => section.id === activeSection) ?? docSections[0];
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-background text-foreground">
+    <div className="cream-lane flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[#f7f4ed] text-[#1c1c1c]">
       <a className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-primary-foreground" href="#docs-content">
         Skip to Content
       </a>
-      <header className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background/85 px-4 py-4 backdrop-blur-md sm:px-5">
+      <header className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-[#eceae4] bg-[#f7f4ed] px-4 py-4 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Link className="flex items-center gap-2 font-bold text-foreground transition hover:text-primary" href="/">
+          <Link className="flex items-center gap-2 font-semibold text-[#1c1c1c] transition hover:text-[#1456f0]" href="/">
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             <span>AgentDesk</span>
           </Link>
-          <span className="text-border">/</span>
-          <span className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
-            <BookOpen aria-hidden="true" className="h-4 w-4 text-primary" />
+          <span className="text-[#eceae4]">/</span>
+          <span className="flex items-center gap-2 text-sm font-semibold text-[#5f5f5d]">
+            <BookOpen aria-hidden="true" className="h-4 w-4 text-[#1456f0]" />
             Developer Docs
           </span>
         </div>
-        <Link className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground transition hover:text-foreground" href="/login">
-          Sign In
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle compact />
+          <Link className="text-xs font-semibold uppercase text-[#5f5f5d] transition hover:text-[#1c1c1c]" href="/login">
+            Sign In
+          </Link>
+        </div>
       </header>
 
       <div className="mx-auto grid w-full max-w-7xl flex-1 gap-8 px-4 py-6 sm:px-5 md:grid-cols-[240px_minmax(0,1fr)] lg:grid-cols-[280px_minmax(0,1fr)] lg:py-8">
@@ -388,7 +392,7 @@ function toggleWidget() {
             <input
               aria-label="Search documentation"
               autoComplete="off"
-              className="w-full rounded-lg border border-border bg-card/50 py-2.5 pl-10 pr-4 text-sm font-semibold text-foreground transition focus:border-primary focus:bg-card"
+              className="w-full rounded-md border border-[#eceae4] bg-[#fcfbf8] py-2.5 pl-10 pr-4 text-sm font-semibold text-[#1c1c1c] transition focus:border-[#0099ff] focus:bg-white"
               name="docs-search"
               placeholder="Search documentation..."
               spellCheck={false}
@@ -407,15 +411,15 @@ function toggleWidget() {
 
               return (
                 <div className="space-y-2" key={category}>
-                  <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground/70">{category}</h2>
+                  <h2 className="text-xs font-semibold uppercase text-[#5f5f5d]">{category}</h2>
                   <ul className="space-y-1">
                     {categorySections.map((section) => (
                       <li key={section.id}>
                         <button
                           className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-bold transition ${
                             activeSection === section.id
-                              ? "border-l-2 border-primary bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:bg-card/30 hover:text-foreground"
+                              ? "border-l-2 border-[#0099ff] bg-[#0099ff]/10 text-[#1456f0]"
+                              : "text-[#5f5f5d] hover:bg-[#fcfbf8] hover:text-[#1c1c1c]"
                           }`}
                           type="button"
                           onClick={() => setActiveSection(section.id)}
@@ -432,20 +436,20 @@ function toggleWidget() {
         </aside>
 
         <main className="min-w-0 space-y-10" id="docs-content">
-          <article className="studio-surface relative overflow-hidden rounded-xl border border-border p-6 sm:p-8">
-            <Terminal aria-hidden="true" className="absolute right-4 top-4 h-32 w-32 text-primary opacity-10" />
-            <span className="studio-kicker text-primary">{activeSectionData.category}</span>
-            <h1 className="mt-2 text-3xl font-extrabold uppercase tracking-tight text-foreground sm:text-4xl">{activeSectionData.title}</h1>
-            <div className="mt-8 leading-relaxed text-foreground">{activeSectionData.content}</div>
+          <article className="relative overflow-hidden border border-[#eceae4] bg-[#fcfbf8] p-6 sm:p-8">
+            <Terminal aria-hidden="true" className="absolute right-4 top-4 h-32 w-32 text-[#1456f0] opacity-10" />
+            <span className="studio-kicker text-[#1456f0]">{activeSectionData.category}</span>
+            <h1 className="mt-2 text-4xl font-semibold tracking-[-0.03em] text-[#1c1c1c] sm:text-5xl">{activeSectionData.title}</h1>
+            <div className="mt-8 text-sm leading-6 text-[#1c1c1c]">{activeSectionData.content}</div>
           </article>
 
-          <section className="studio-surface rounded-xl border border-border p-6 sm:p-8">
-            <span className="studio-kicker flex items-center gap-2 text-accent">
+          <section className="border border-[#eceae4] bg-[#fcfbf8] p-6 sm:p-8">
+            <span className="studio-kicker flex items-center gap-2 text-[#0099ff]">
               <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
               Interactive Tool
             </span>
-            <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-foreground">Embed Code Generator</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#1c1c1c]">Embed Code Generator</h2>
+            <p className="mt-2 text-sm leading-6 text-[#5f5f5d]">
               Enter your Bot ID and theme token, then copy the launcher script or inline iframe snippet.
             </p>
 
@@ -480,7 +484,7 @@ function toggleWidget() {
       </div>
 
       <footer className="mt-12 border-t border-border bg-card/30 py-6">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 text-center text-xs text-muted-foreground sm:flex-row">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 text-center text-xs text-[#5f5f5d] sm:flex-row">
           <p>(c) 2026 AgentDesk. Built for auditable, human-in-the-loop AI support.</p>
           <div className="flex gap-4">
             <Link className="transition hover:text-foreground" href="/">
@@ -566,7 +570,7 @@ function CodeBlock({
         <span>{label}</span>
         <CopyButton copied={copiedId === id} onCopy={() => onCopy(value, id)} />
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-foreground">{value}</pre>
+      <pre className="overflow-x-auto whitespace-pre-wrap p-4 font-mono text-xs leading-5 text-white">{value}</pre>
     </div>
   );
 }

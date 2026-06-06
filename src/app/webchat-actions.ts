@@ -410,7 +410,7 @@ function fontStack(font: WebChatConfig["appearance"]["fontFamily"]) {
   if (font === "Outfit") return "Outfit, system-ui, sans-serif";
   if (font === "System") return "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
   if (font === "Mono") return "Fira Code, Consolas, ui-monospace, monospace";
-  return "Fira Sans, system-ui, sans-serif";
+  return "Inter, system-ui, sans-serif";
 }
 
 function fontChoiceFromStack(value: string): WebChatConfig["appearance"]["fontFamily"] {

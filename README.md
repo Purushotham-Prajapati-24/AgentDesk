@@ -16,84 +16,82 @@ Multi-tenant AI customer support platform with RAG-grounded answers, an embeddab
 
 </div>
 
-## Overview
+---
 
-AgentDesk is a full-stack support automation system for teams that need AI answers they can audit and override. It provides a protected operator dashboard, tenant-scoped bots, document and website ingestion, vector retrieval, streaming chat responses, usage credits, and a Socket.IO-backed inbox where human agents can pause automation and take over a conversation.
+## 📸 Screenshots
 
-The project is built as a Next.js App Router application with a separate realtime service for handoff state and live messaging.
+> Dashboard · Bot Builder · Live Inbox · Embeddable Widget
 
-## Core Capabilities
+---
 
-| Area | Capability |
-| --- | --- |
-| Multi-tenancy | Tenant-scoped bots, documents, sessions, messages, credits, and retrieval filters. |
-| Authentication | Appwrite-backed passwordless login and protected dashboard routes. |
-| Bot studio | Create and configure support bots with prompts, fallbacks, identity, and WebChat settings. |
-| WebChat | Embeddable script widget, iframe route, customer-facing preview, and framework adapters under `widget/`. |
-| Knowledge base | Upload and ingest PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, Markdown, public URLs, and sitemaps. |
-| RAG pipeline | Chunking, Gemini embeddings, Qdrant indexing, tenant/bot-filtered retrieval, and grounded prompting. |
-| Streaming chat | Server-Sent Events response streaming through `/api/chat/message` and `/api/v1/chat/message`. |
-| Human handoff | Socket.IO inbox with session monitoring, AI pause, human reply, and release-to-AI controls. |
-| Billing | Credit balance checks, token charging, and ledger-backed usage tracking. |
-| Operations | Setup scripts for Qdrant hybrid indexes and Appwrite ingestion schema. |
+## ✨ Features
 
-## Product Screenshots
+| Feature | Description |
+|---|---|
+| 🔐 **Magic-link Auth** | Passwordless login via Appwrite — no OAuth credentials required |
+| 🏢 **Multi-tenant** | Every account gets its own isolated workspace with independent credit ledger |
+| 🤖 **Bot Builder** | Create, configure, and embed AI support bots in minutes with a visual editor |
+| 🧠 **RAG Pipeline** | PDF, DOCX, XLSX, and TXT docs are chunked, embedded via Gemini, and indexed in Qdrant for grounded answers |
+| 🪄 **Embeddable Widget** | Single `<script>` tag drops a full branded chat widget anywhere on the web |
+| 📡 **Live Inbox** | Real-time session monitor — human agents can pause the AI and take over mid-conversation |
+| 📊 **Real-time Monitor** | Analytics dashboard to track conversation metrics, watch live chats unfold, and view active user records |
+| 💳 **Credit Ledger** | Token-based billing with per-tenant credit tracking visible in a Usage dashboard |
+| ⚡ **Streaming Responses** | Server-Sent Events (SSE) stream bot replies token-by-token for instant feedback |
+| 📄 **Docs Portal** | Public-facing documentation site — no login required |
 
-Curated screenshots are copied from the Playwright verification output into `public/readme-screenshots/` with stable numeric names.
+See [`docs/Features.md`](docs/Features.md) for the maintained feature catalog.
 
-| 01 - Landing | 02 - Live Inbox |
-| --- | --- |
-| ![AgentDesk public landing page](public/readme-screenshots/01-home-landing.png) | ![AgentDesk live inbox and handoff controls](public/readme-screenshots/02-live-inbox-handoff.png) |
+---
 
-| 03 - WebChat Customizer | 04 - Knowledge Ingestion |
-| --- | --- |
-| ![AgentDesk WebChat customizer](public/readme-screenshots/03-webchat-customizer.png) | ![AgentDesk knowledge ingestion dashboard](public/readme-screenshots/04-knowledge-ingestion.png) |
+## 🏗️ Architecture
 
-| 05 - Billing | 06 - Mobile |
-| --- | --- |
-| ![AgentDesk billing and usage dashboard](public/readme-screenshots/05-billing-usage.png) | ![AgentDesk mobile landing page](public/readme-screenshots/06-mobile-home.png) |
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        USER / CUSTOMER                              │
+│                    (Embedded Widget / iframe)                       │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │  script tag / iframe embed
+                            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│               AGENTDESK — Next.js 16 App (Vercel)                   │
+│                                                                     │
+│  ┌─────────────┐   ┌──────────────┐   ┌──────────────────────────┐ │
+│  │   /embed    │   │  Dashboard   │   │      API Routes           │ │
+│  │  [botId]    │   │  (protected) │   │  /api/chat/message (SSE)  │ │
+│  └──────┬──────┘   │  ┌─────────┐ │   │  /api/widget/config       │ │
+│         │           │  │  Bots   │ │   │  /api/documents/*         │ │
+│  widget.js          │  │  Inbox  │ │   └───────────┬──────────────┘ │
+│  (compiled)         │  │  Docs   │ │               │                │
+│                     │  │  Usage  │ │   ┌───────────▼──────────────┐ │
+│                     │  └─────────┘ │   │       RAG Pipeline        │ │
+│                     └──────────────┘   │  Gemini Embed → Qdrant   │ │
+│                                        │  Retrieval → LLM Prompt   │ │
+│                                        └──────────────────────────┘ │
+└─────────────────────────┬──────────────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┐
+          ▼               ▼               ▼
+   ┌─────────────┐ ┌───────────┐  ┌────────────────┐
+   │  Appwrite   │ │  Qdrant   │  │  WebSocket Srv │
+   │   Cloud     │ │  Cloud    │  │  (Render)      │
+   │  Auth / DB  │ │  Vectors  │  │  Socket.IO     │
+   │  Storage    │ │  Hybrid   │  │  Live Handoff  │
+   └─────────────┘ └───────────┘  └────────────────┘
+          ▲                               ▲
+          │                               │
+   ┌──────┴──────────────────────────────┐│
+   │          HUMAN AGENT (Dashboard)    ││
+   │    Monitors sessions in real-time   ││
+   │    Can pause AI & take over chat ───┘│
+   └──────────────────────────────────────┘
+```
 
-## Architecture
+---
 
-```text
-Customer Website
-  |
-  |-- <script src="/widget.js" data-bot-id="...">
-  |-- <iframe src="/embed/[botId]">
-  v
-Next.js Application
-  |
-  |-- Public routes
-  |     |-- /                  Marketing and product entry
-  |     |-- /docs              Public documentation
-  |     |-- /embed/[botId]     Standalone WebChat surface
-  |
-  |-- Protected dashboard
-  |     |-- /bots              Bot configuration
-  |     |-- /webchat           WebChat identity, appearance, deployment, feature flags
-  |     |-- /documents         File and URL ingestion
-  |     |-- /inbox             Human handoff cockpit
-  |     |-- /monitor           Analytics, users, and conversations
-  |     |-- /billing           Credit balance and ledger
-  |
-  |-- API layer
-        |-- /api/chat/message
-        |-- /api/v1/chat/message
-        |-- /api/documents/upload
-        |-- /api/documents/url
-        |-- /api/documents/ingest
-        |-- /api/widget/config/[botId]
-        |-- /api/webchat/config
-        |-- /api/webchat/config/update
+## 🔄 Workflows
 
-External Services
-  |
-  |-- Appwrite        Auth, database, storage, tenant records, sessions, messages, ledger
-  |-- Qdrant          Vector storage and hybrid retrieval
-  |-- Gemini          Embeddings and default chat provider
-  |-- Groq/OpenAI     Optional chat provider fallback
-  |-- Socket.IO       Realtime human handoff service
-  |-- Browserless     Optional dynamic website crawling
+### 1. User Chat Flow (RAG Pipeline)
+
 ```
 
 ## Repository Layout
@@ -145,7 +143,55 @@ public/readme-screenshots/  README screenshot assets
 - Optional Browserless API key for JavaScript-heavy URL ingestion
 - Optional Upstash Redis for durable websocket state and clustered Socket.IO pub/sub
 
-## Local Development
+```
+agentdesk/
+├── src/
+│   ├── app/
+│   │   ├── (auth)/                  # Login & magic-link verify pages
+│   │   ├── (dashboard)/             # Protected dashboard routes
+│   │   │   ├── bots/                # Bot builder & configuration
+│   │   │   ├── inbox/               # Live session inbox
+│   │   │   ├── monitor/             # Session monitor & handoff
+│   │   │   │   ├── analytics/       # Conversation analytics & metrics charts
+│   │   │   │   ├── conversations/   # Real-time customer chat visualizer
+│   │   │   │   └── users/           # User listing & tracking dashboard
+│   │   │   ├── webchat/             # Webchat widget preview & settings
+│   │   │   ├── documents/           # Knowledge base management
+│   │   │   └── billing/             # Credit usage & ledger
+│   │   ├── api/
+│   │   │   ├── chat/                # POST /api/chat/message — streaming SSE
+│   │   │   ├── documents/           # Document ingestion & management
+│   │   │   └── widget/              # GET /api/widget/config/:botId
+│   │   ├── docs/                    # Public documentation portal
+│   │   ├── embed/[botId]/           # Standalone iframe embed page
+│   │   └── monitor-actions.ts       # Server actions for conversation & user analytics
+│   ├── context/                     # AuthContext, TenantContext
+│   ├── lib/
+│   │   ├── server/                  # Appwrite admin, Qdrant, LLM, retrieval
+│   │   └── credits.ts               # Ledger & credit balance helpers
+│   ├── components/                  # Shared UI component library
+│   │   └── ui/
+│   │       └── Signal.tsx           # Reusable server/connection status component
+│   └── types/                       # Shared TypeScript types
+│
+├── widget/                          # Widget source (TypeScript)
+│   └── index.tsx                    # Compiled → public/widget.js
+│
+├── websocket-server/                # Standalone Socket.IO handoff server
+│   ├── server.js                    # Express + Socket.IO server
+│   └── session-store.js             # In-memory / Upstash Redis session state
+│
+├── scripts/                         # Build & setup scripts
+│   ├── build-widget.mjs             # Bundles widget/index.tsx → public/widget.js
+│   └── create-qdrant-hybrid.mjs     # Creates Qdrant collection with hybrid vectors
+│
+└── public/
+    └── widget.js                    # Compiled embeddable widget (do not edit directly)
+```
+
+---
+
+## 🚀 Getting Started
 
 ### 1. Install Dependencies
 

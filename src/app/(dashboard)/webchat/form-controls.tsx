@@ -21,9 +21,9 @@ export function WebChatTextField({
 }) {
   return (
     <label className="block">
-      <span className="webchat-label">{label}</span>
+      <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">{label}</span>
       <input
-        className="webchat-input"
+        className="min-h-12 w-full rounded-md border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
         maxLength={maxLength}
         placeholder={placeholder}
         readOnly={readOnly}
@@ -52,9 +52,9 @@ export function WebChatTextarea({
 }) {
   return (
     <label className="block">
-      <span className="webchat-label">{label}</span>
+      <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">{label}</span>
       <textarea
-        className="webchat-input resize-y py-3 leading-6"
+        className="min-h-12 w-full resize-y rounded-md border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 text-sm font-semibold leading-6 text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
         maxLength={maxLength}
         placeholder={placeholder}
         rows={rows}
@@ -78,8 +78,8 @@ export function WebChatSelect<T extends string>({
 }) {
   return (
     <label className="block">
-      <span className="webchat-label">{label}</span>
-      <select className="webchat-input" value={value} onChange={(event) => onChange(event.target.value as T)}>
+      <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">{label}</span>
+      <select className="min-h-12 w-full rounded-md border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]" value={value} onChange={(event) => onChange(event.target.value as T)}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -102,14 +102,14 @@ export function WebChatColorField({
   return (
     <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] items-end gap-3">
       <span className="min-w-0">
-        <span className="webchat-label">{label}</span>
-        <input className="webchat-input font-mono" value={value} onChange={(event) => onChange(event.target.value)} />
+        <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">{label}</span>
+        <input className="min-h-12 w-full rounded-md border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 font-mono text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]" value={value} onChange={(event) => onChange(event.target.value)} />
       </span>
       <input
         aria-label={`${label} color`}
-        className="h-12 w-14 border border-[var(--webchat-line)] bg-black p-1"
+        className="h-12 w-14 rounded-md border border-[var(--ui-border)] bg-[var(--ui-bg)] p-1"
         type="color"
-        value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#CCFF00"}
+        value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#0099FF"}
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
@@ -128,20 +128,20 @@ export function WebChatSwitch({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 border border-[var(--webchat-line)] bg-black/25 p-3">
+    <label className="flex items-center justify-between gap-4 border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3">
       <span>
-        <span className="block text-sm font-black uppercase tracking-[0.12em] text-foreground">{label}</span>
-        <span className="mt-1 block text-sm font-semibold leading-5 text-muted-foreground">{description}</span>
+        <span className="block text-sm font-semibold text-[var(--ui-text)]">{label}</span>
+        <span className="mt-1 block text-sm font-medium leading-5 text-[var(--ui-muted)]">{description}</span>
       </span>
       <input className="sr-only" checked={checked} type="checkbox" onChange={(event) => onChange(event.target.checked)} />
       <span
         aria-hidden="true"
         className={cn(
           "relative h-7 w-12 shrink-0 border transition-colors",
-          checked ? "border-[var(--webchat-acid)] bg-[var(--webchat-acid)]" : "border-[var(--webchat-line)] bg-black",
+          checked ? "border-[var(--ui-blue)] bg-[var(--ui-blue)]" : "border-[var(--ui-border)] bg-[var(--ui-panel-2)]",
         )}
       >
-        <span className={cn("absolute top-1 h-5 w-5 bg-foreground transition-transform", checked ? "translate-x-6 bg-black" : "translate-x-1")} />
+        <span className={cn("absolute top-1 h-5 w-5 bg-white transition-transform", checked ? "translate-x-6 bg-white" : "translate-x-1")} />
       </span>
     </label>
   );

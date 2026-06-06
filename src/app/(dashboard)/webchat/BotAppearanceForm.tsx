@@ -28,7 +28,7 @@ export function BotAppearanceForm() {
         value={appearance.fontFamily}
         onChange={(fontFamily) => updateSection("appearance", { fontFamily })}
       />
-      <div className="grid gap-3 border border-[var(--webchat-line)] bg-black/20 p-3">
+      <div className="grid gap-3 border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
         <WebChatSwitch
           checked={appearance.useCustomIcon}
           description="Show a custom image inside the closed floating launcher button."
@@ -47,7 +47,7 @@ export function BotAppearanceForm() {
       <WebChatTextarea
         label="Custom CSS"
         maxLength={2000}
-        placeholder=".agentdesk-widget { border: 1px solid #ccff00; }"
+        placeholder=".agentdesk-widget { border: 1px solid #0099ff; }"
         rows={6}
         value={appearance.customCss}
         onChange={(customCss) => updateSection("appearance", { customCss })}

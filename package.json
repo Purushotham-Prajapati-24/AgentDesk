@@ -16,7 +16,9 @@
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
     "@qdrant/js-client-rest": "^1.18.0",
+    "@splinetool/react-spline": "^4.1.0",
     "appwrite": "^25.2.0",
+    "framer-motion": "^12.40.0",
     "jsdom": "^29.1.1",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",
@@ -41,6 +43,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
+    "agentation": "^3.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "playwright": "^1.60.0",
