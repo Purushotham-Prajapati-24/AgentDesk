@@ -9,6 +9,7 @@ import {
   type MonitorMessage,
   type MonitorSessionStatus,
 } from "@/app/monitor-actions";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTenant } from "@/context/TenantContext";
@@ -496,7 +497,7 @@ function MessageBubble({ message }: { message: MonitorMessage }) {
           </span>
           <MessageSquareText aria-hidden="true" className="h-4 w-4 opacity-70" />
         </div>
-        <p className="text-sm font-medium leading-6">{message.content}</p>
+        <MarkdownRenderer text={message.content} />
         <time className="mt-3 block font-mono text-xs font-semibold opacity-75">{formatTime(message.createdAt)}</time>
       </article>
     </div>

@@ -335,6 +335,7 @@
             input.disabled = this.isSending;
             this.composerInputRef = input;
             input.addEventListener("keydown", (event) => {
+                event.stopPropagation();
                 if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
                     form.requestSubmit();
@@ -469,51 +470,232 @@
         }
     }
     function appendMarkdown(target, text) {
-        const lines = text.split(/\n{2,}/);
-        for (const line of lines) {
-            const paragraph = createElement("p", "ad-paragraph");
-            appendInlineMarkdown(paragraph, line);
-            target.append(paragraph);
+        for (const block of parseMarkdownBlocks(text)) {
+            appendMarkdownBlock(target, block);
         }
+    }
+    function parseMarkdownBlocks(text) {
+        const blocks = [];
+        const lines = text.replace(/\r\n?/g, "\n").split("\n");
+        const paragraphLines = [];
+        let pendingList = null;
+        const flushParagraph = () => {
+            const paragraph = paragraphLines.join(" ").trim();
+            paragraphLines.length = 0;
+            if (paragraph) {
+                blocks.push({ kind: "paragraph", text: paragraph });
+            }
+        };
+        const flushList = () => {
+            if (pendingList === null || pendingList === void 0 ? void 0 : pendingList.items.length) {
+                blocks.push({ kind: "list", ordered: pendingList.kind === "ol", items: pendingList.items });
+            }
+            pendingList = null;
+        };
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                flushParagraph();
+                flushList();
+                continue;
+            }
+            const headingMatch = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+            if (headingMatch) {
+                flushParagraph();
+                flushList();
+                blocks.push({ kind: "heading", level: headingMatch[1].length, text: headingMatch[2].trim() });
+                continue;
+            }
+            const unorderedMatch = /^[-*]\s+(.+)$/.exec(trimmed);
+            const orderedMatch = /^\d+[.)]\s+(.+)$/.exec(trimmed);
+            const listMatch = unorderedMatch !== null && unorderedMatch !== void 0 ? unorderedMatch : orderedMatch;
+            if (listMatch) {
+                flushParagraph();
+                const listKind = orderedMatch ? "ol" : "ul";
+                if (!pendingList || pendingList.kind !== listKind) {
+                    flushList();
+                    pendingList = { kind: listKind, items: [] };
+                }
+                pendingList.items.push(listMatch[1].trim());
+                continue;
+            }
+            if (pendingList) {
+                const itemIndex = pendingList.items.length - 1;
+                if (itemIndex >= 0) {
+                    pendingList.items[itemIndex] = `${pendingList.items[itemIndex]} ${trimmed}`;
+                    continue;
+                }
+            }
+            paragraphLines.push(trimmed);
+        }
+        flushParagraph();
+        flushList();
+        return blocks;
+    }
+    function appendMarkdownBlock(target, block) {
+        if (block.kind === "heading") {
+            const heading = document.createElement(`h${block.level}`);
+            heading.className = `ad-heading ad-heading-${block.level}`;
+            appendInlineMarkdown(heading, block.text);
+            target.append(heading);
+            return;
+        }
+        if (block.kind === "list") {
+            const list = document.createElement(block.ordered ? "ol" : "ul");
+            list.className = block.ordered ? "ad-list-ol" : "ad-list-ul";
+            for (const item of block.items) {
+                const listItem = document.createElement("li");
+                listItem.className = "ad-list-item";
+                appendInlineMarkdown(listItem, item);
+                list.append(listItem);
+            }
+            target.append(list);
+            return;
+        }
+        const paragraph = createElement("p", "ad-paragraph");
+        appendInlineMarkdown(paragraph, block.text);
+        target.append(paragraph);
     }
     function appendInlineMarkdown(target, text) {
-        var _a;
-        const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g;
         let cursor = 0;
-        for (const match of text.matchAll(pattern)) {
-            const token = match[0];
-            const index = (_a = match.index) !== null && _a !== void 0 ? _a : 0;
-            if (index > cursor) {
-                target.append(document.createTextNode(text.slice(cursor, index)));
+        let textBuffer = "";
+        const flushText = () => {
+            if (textBuffer) {
+                target.append(document.createTextNode(textBuffer));
+                textBuffer = "";
             }
-            target.append(formatMarkdownToken(token));
-            cursor = index + token.length;
+        };
+        while (cursor < text.length) {
+            const code = readDelimitedToken(text, cursor, "`", "`");
+            if (code) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "code", text: code.text }));
+                cursor = code.end;
+                continue;
+            }
+            const markdownLink = readMarkdownLink(text, cursor);
+            if (markdownLink) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "link", text: markdownLink.text, href: markdownLink.href }));
+                cursor = markdownLink.end;
+                continue;
+            }
+            const strong = readDelimitedToken(text, cursor, "**", "**");
+            if (strong) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "strong", text: strong.text }));
+                cursor = strong.end;
+                continue;
+            }
+            const emphasis = text.startsWith("*", cursor) && !text.startsWith("**", cursor) ? readDelimitedToken(text, cursor, "*", "*") : null;
+            if (emphasis) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "emphasis", text: emphasis.text }));
+                cursor = emphasis.end;
+                continue;
+            }
+            const rawUrl = readRawUrl(text, cursor);
+            if (rawUrl) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "link", text: rawUrl.href, href: rawUrl.href }));
+                textBuffer += rawUrl.trailing;
+                cursor = rawUrl.end;
+                continue;
+            }
+            textBuffer += text[cursor];
+            cursor += 1;
         }
-        if (cursor < text.length) {
-            target.append(document.createTextNode(text.slice(cursor)));
-        }
+        flushText();
     }
     function formatMarkdownToken(token) {
-        if (token.startsWith("**")) {
+        if (token.kind === "strong") {
             const strong = document.createElement("strong");
-            strong.textContent = token.slice(2, -2);
+            appendInlineMarkdown(strong, token.text);
             return strong;
         }
-        if (token.startsWith("`")) {
+        if (token.kind === "emphasis") {
+            const emphasis = document.createElement("em");
+            appendInlineMarkdown(emphasis, token.text);
+            return emphasis;
+        }
+        if (token.kind === "code") {
             const code = document.createElement("code");
-            code.textContent = token.slice(1, -1);
+            code.textContent = token.text;
             return code;
         }
-        const linkMatch = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(token);
-        if (linkMatch) {
-            const anchor = document.createElement("a");
-            anchor.href = linkMatch[2];
-            anchor.textContent = linkMatch[1];
-            anchor.target = "_blank";
-            anchor.rel = "noopener noreferrer";
-            return anchor;
+        const anchor = document.createElement("a");
+        anchor.className = "ad-link";
+        anchor.href = token.href;
+        anchor.textContent = token.text;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        return anchor;
+    }
+    function readDelimitedToken(text, cursor, opener, closer) {
+        if (!text.startsWith(opener, cursor)) {
+            return null;
         }
-        return document.createTextNode(token);
+        const contentStart = cursor + opener.length;
+        const contentEnd = text.indexOf(closer, contentStart);
+        if (contentEnd <= contentStart) {
+            return null;
+        }
+        return {
+            text: text.slice(contentStart, contentEnd),
+            end: contentEnd + closer.length,
+        };
+    }
+    function readMarkdownLink(text, cursor) {
+        if (!text.startsWith("[", cursor)) {
+            return null;
+        }
+        const labelEnd = text.indexOf("](", cursor + 1);
+        if (labelEnd === -1) {
+            return null;
+        }
+        const hrefStart = labelEnd + 2;
+        const hrefEnd = text.indexOf(")", hrefStart);
+        if (hrefEnd === -1) {
+            return null;
+        }
+        const label = text.slice(cursor + 1, labelEnd);
+        const href = text.slice(hrefStart, hrefEnd);
+        if (!label.trim() || !isSafeHttpUrl(href)) {
+            return null;
+        }
+        return {
+            text: label,
+            href,
+            end: hrefEnd + 1,
+        };
+    }
+    function readRawUrl(text, cursor) {
+        const match = /^https?:\/\/[^\s<>"']+/i.exec(text.slice(cursor));
+        if (!match) {
+            return null;
+        }
+        const candidate = match[0];
+        const { href, trailing } = splitTrailingUrlPunctuation(candidate);
+        if (!isSafeHttpUrl(href)) {
+            return null;
+        }
+        return {
+            href,
+            trailing,
+            end: cursor + candidate.length,
+        };
+    }
+    function splitTrailingUrlPunctuation(value) {
+        let href = value;
+        let trailing = "";
+        while (href && /[.,!?;:)\]]/.test(href[href.length - 1])) {
+            trailing = `${href[href.length - 1]}${trailing}`;
+            href = href.slice(0, -1);
+        }
+        return { href, trailing };
+    }
+    function isSafeHttpUrl(value) {
+        return /^https?:\/\/[^\s]+$/i.test(value);
     }
     function normalizeConfig(config) {
         return {
@@ -754,9 +936,58 @@
         margin-top: 8px;
       }
 
+      .ad-heading {
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.35;
+        margin: 0;
+      }
+
+      .ad-heading-1 {
+        font-size: 15px;
+      }
+
+      .ad-paragraph + .ad-heading,
+      .ad-heading + .ad-paragraph,
+      .ad-heading + .ad-list-ul,
+      .ad-heading + .ad-list-ol,
+      .ad-list-ul + .ad-paragraph,
+      .ad-list-ol + .ad-paragraph,
+      .ad-list-ul + .ad-heading,
+      .ad-list-ol + .ad-heading {
+        margin-top: 8px;
+      }
+
+      .ad-list-ul,
+      .ad-list-ol {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .ad-list-ul + .ad-list-ul,
+      .ad-list-ul + .ad-list-ol,
+      .ad-list-ol + .ad-list-ul,
+      .ad-list-ol + .ad-list-ol,
+      .ad-paragraph + .ad-list-ul,
+      .ad-paragraph + .ad-list-ol {
+        margin-top: 8px;
+      }
+
+      .ad-list-item {
+        margin: 0;
+        padding-left: 2px;
+      }
+
+      .ad-list-item + .ad-list-item {
+        margin-top: 4px;
+      }
+
+      .ad-link,
       .ad-message a {
         color: inherit;
         font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
 
       .ad-message code {

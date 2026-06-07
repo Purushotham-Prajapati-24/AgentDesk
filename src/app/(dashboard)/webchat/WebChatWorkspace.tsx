@@ -348,7 +348,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
           <button
             aria-label="Launcher preview"
-            className="absolute bottom-[-10px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:bottom-[-18px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
+            className="absolute bottom-[-26px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:bottom-[-32px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
             style={{ background: config.appearance.accentColor }}
             type="button"
           >
@@ -356,7 +356,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
               // eslint-disable-next-line @next/next/no-img-element
               <img alt="" className="h-full w-full object-cover" src={config.appearance.widgetIconUrl} />
             ) : (
-              "✦"
+              <Bot aria-hidden="true" className="h-7 w-7" />
             )}
           </button>
         </div>

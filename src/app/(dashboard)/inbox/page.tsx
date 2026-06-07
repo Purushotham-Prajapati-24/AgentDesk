@@ -19,6 +19,7 @@ import {
   listConversationSessions,
   type ConversationSummary,
 } from "@/app/inbox-actions";
+import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -992,7 +993,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             <span className="font-mono text-xs font-semibold opacity-75">{message.shouldCallRag ? "RAG active" : "AI bypassed"}</span>
           ) : null}
         </div>
-        <p className="text-sm font-medium leading-6">{message.content}</p>
+        <MarkdownRenderer text={message.content} />
         <time className="mt-3 block font-mono text-xs font-semibold opacity-75">{formatTime(message.createdAt)}</time>
       </article>
     </div>
