@@ -145,51 +145,51 @@ export function WebChatWorkspace() {
 
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
-      <section className="px-4 py-6 sm:px-6 lg:px-8">
+      <section className="px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#12b981]/35 bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.32)_0%,transparent_28%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.28)_0%,transparent_30%),linear-gradient(135deg,#f8fffb_0%,#d7fff1_42%,#e8f1ff_100%)] text-[#083344] shadow-[0_24px_70px_rgba(20,184,166,0.15)] dark:bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.26)_0%,transparent_30%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.22)_0%,transparent_32%),linear-gradient(135deg,#08110f_0%,#0b332e_48%,#10243d_100%)] dark:text-[#ecfeff]">
-          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-6">
+          <div className="grid items-center gap-4 p-3 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-4">
             <div className="min-w-0">
-              <p className="inline-flex rounded-full border border-[#0f766e]/20 bg-white/55 px-3 py-1 studio-kicker text-[#0f766e] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
+              <p className="inline-flex rounded-full border border-[#0f766e]/20 bg-white/55 px-2.5 py-1 studio-kicker text-[#0f766e] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
                 WebChat control room
               </p>
-              <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
+              <h1 className="mt-1.5 max-w-4xl text-2xl font-semibold leading-[1.08] tracking-[-0.02em] text-current sm:text-3xl lg:text-4xl">
                 Shape the customer chat surface.
               </h1>
             </div>
 
-            <div className="grid content-between gap-4 rounded-3xl border border-white/35 bg-white/40 p-4 text-[#083344] shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20 dark:text-[#ecfeff]">
+            <div className="grid gap-2 rounded-2xl border border-white/35 bg-white/40 p-3 text-[#083344] shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20 dark:text-[#ecfeff]">
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-mono text-xs font-semibold uppercase opacity-70">Publishing target</p>
-                  <span className="rounded-full border border-white/35 bg-white/35 px-3 py-1 font-mono text-xs font-semibold dark:bg-black/15">
+                  <span className="rounded-full border border-white/35 bg-white/35 px-2.5 py-0.5 font-mono text-xs font-semibold dark:bg-black/15">
                     {saveState === "saved" ? "saved" : saveState}
                   </span>
                 </div>
-                <p className="mt-3 min-w-0 break-words text-2xl font-semibold tracking-[-0.03em]">
+                <p className="mt-1.5 min-w-0 break-words text-lg font-semibold tracking-[-0.03em]">
                   {selectedBot?.name ?? (botLoading ? "Loading bots..." : "Choose a bot")}
                 </p>
-                <p className="mt-2 break-all font-mono text-xs font-semibold opacity-70">{selectedBotId || tenant?.$id || "No target selected"}</p>
+                <p className="mt-0.5 break-all font-mono text-xs font-semibold opacity-70">{selectedBotId || tenant?.$id || "No target selected"}</p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="grid gap-2 sm:grid-cols-2">
                 <Button
-                  className="w-full rounded-full border-white/35 bg-white/35 text-current hover:bg-white/50 dark:bg-black/20 dark:hover:bg-black/30"
+                  className="h-9 w-full rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
                   leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
                   onClick={resetConfig}
                   type="button"
                   variant="outline"
                 >
-                  Reset draft
+                  Reset
                 </Button>
                 <Button
-                  className="w-full rounded-full"
+                  className="h-9 w-full rounded-full border-[#22c55e]/60 bg-[linear-gradient(135deg,#86efac_0%,#22c55e_45%,#15803d_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(21,128,61,0.24)] hover:border-[#86efac]/80 hover:brightness-[1.06] disabled:shadow-none"
                   disabled={!selectedBotId}
                   leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
                   loading={saveState === "saving"}
                   onClick={() => void saveSelectedBotConfig()}
                   type="button"
                 >
-                  Save to bot
+                  Save changes
                 </Button>
               </div>
             </div>
