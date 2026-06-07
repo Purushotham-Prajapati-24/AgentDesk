@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal } from "lucide-react";
+import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
 import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@/app/webchat-actions";
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
@@ -279,6 +279,11 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
 
 function WidgetPreview({ config }: { config: WebChatConfig }) {
   const fontFamily = fontStack(config.appearance.fontFamily);
+  const headerFontFamily = fontStack(config.appearance.headerFontFamily);
+  const inputFontFamily = fontStack(config.appearance.inputFontFamily);
+  const headerTitle = config.appearance.headerTitle || config.identity.botName;
+  const headerSubtitle = config.appearance.headerSubtitle || `${config.deploy.environment} / ${config.deploy.versionTag}`;
+  const inputPlaceholder = config.appearance.inputPlaceholder || "Write your message here...";
   const showCustomIcon = config.appearance.useCustomIcon && isHttpUrl(config.appearance.widgetIconUrl);
 
   return (
@@ -301,22 +306,40 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
               fontFamily,
             }}
           >
-            <div className="flex items-center gap-3 border-b border-black px-4 py-4" style={{ background: config.appearance.headerColor }}>
-              <div
-                className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-black/10 text-lg font-semibold text-black"
-                style={{ background: config.appearance.accentColor }}
+            <div
+              className="flex items-center justify-between gap-3 border-b border-black/15 px-4 py-4"
+              style={{ background: config.appearance.headerColor, fontFamily: headerFontFamily }}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-black/10 text-lg font-semibold text-black"
+                  style={{ background: config.appearance.accentColor }}
+                >
+                  {config.identity.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img alt="" className="h-full w-full object-cover" src={config.identity.avatarUrl} />
+                  ) : (
+                    config.identity.botName.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold" style={{ color: config.appearance.headerTextColor }}>
+                    {headerTitle}
+                  </p>
+                  <p className="truncate text-xs font-bold" style={{ color: config.appearance.headerSubtextColor }}>
+                    {headerSubtitle}
+                  </p>
+                </div>
+              </div>
+              <button
+                aria-label="Close widget preview"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 transition hover:bg-white/20"
+                style={{ color: config.appearance.headerCloseButtonColor }}
+                title="Close"
+                type="button"
               >
-                {config.identity.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img alt="" className="h-full w-full object-cover" src={config.identity.avatarUrl} />
-                ) : (
-                  config.identity.botName.charAt(0).toUpperCase()
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="truncate text-base font-semibold">{config.identity.botName}</p>
-                <p className="text-xs font-bold opacity-75">{config.deploy.environment} / {config.deploy.versionTag}</p>
-              </div>
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
             </div>
 
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -336,8 +359,16 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
             <div className="border-t border-black p-4">
               <div className="flex gap-2">
-                <div className="flex min-h-12 flex-1 items-center rounded-xl border border-[#eceae4] bg-white px-3 text-sm font-semibold text-[#5f5f5d]">
-                  Write your message...
+                <div
+                  className="flex min-h-12 flex-1 items-center rounded-xl border px-3 text-sm font-semibold"
+                  style={{
+                    background: config.appearance.inputBackgroundColor,
+                    borderColor: config.appearance.inputBorderColor,
+                    color: config.appearance.inputPlaceholderColor,
+                    fontFamily: inputFontFamily,
+                  }}
+                >
+                  {inputPlaceholder}
                 </div>
                 <button className="min-h-12 rounded-xl border border-black/10 px-4 text-sm font-semibold text-black" style={{ background: config.appearance.accentColor }} type="button">
                   Send
@@ -348,7 +379,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
           <button
             aria-label="Launcher preview"
-            className="absolute bottom-[-26px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:bottom-[-32px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
+            className="absolute bottom-[-50px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:bottom-[-52px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
             style={{ background: config.appearance.accentColor }}
             type="button"
           >

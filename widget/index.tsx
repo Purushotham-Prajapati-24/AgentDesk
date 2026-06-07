@@ -3,6 +3,10 @@
 
   type WidgetTheme = {
     headerHsl: string;
+    headerTextHsl: string;
+    headerSubtextHsl: string;
+    headerCloseButtonHsl: string;
+    headerFontFamily: string;
     backgroundHsl: string;
     textHsl: string;
     mutedTextHsl: string;
@@ -10,18 +14,26 @@
     botBubbleHsl: string;
     accentHsl: string;
     fontFamily: string;
+    inputBackgroundHsl: string;
+    inputTextHsl: string;
+    inputPlaceholderHsl: string;
+    inputBorderHsl: string;
+    inputFontFamily: string;
   };
 
   type WidgetConfig = {
     botId: string;
     tenantId: string;
     botName: string;
+    headerTitle: string;
+    headerSubtitle: string;
     greeting: string;
     fallbackMessage: string;
     logoUrl: string | null;
     useCustomIcon: boolean;
     widgetIconUrl: string | null;
     bannerText: string;
+    inputPlaceholder: string;
     messageEndpoint: string;
     websocketEndpoint: string | null;
     theme: WidgetTheme;
@@ -270,9 +282,9 @@
 
       const copy = createElement("div", "ad-title-wrap");
       const title = createElement("strong", "ad-title");
-      title.textContent = config.botName;
+      title.textContent = config.headerTitle || config.botName;
       const status = createElement("span", "ad-status");
-      status.textContent = config.bannerText;
+      status.textContent = config.headerSubtitle || config.bannerText;
       copy.append(title, status);
 
       identity.append(avatar, copy);
@@ -426,7 +438,7 @@
       const input = document.createElement("textarea");
       input.className = "ad-input";
       input.name = "message";
-      input.placeholder = "Write your message here...";
+      input.placeholder = config.inputPlaceholder || "Write your message here...";
       input.maxLength = MAX_MESSAGE_LENGTH;
       input.rows = 1;
       input.disabled = this.isSending;
@@ -874,14 +886,23 @@
   }
 
   function normalizeConfig(config: WidgetConfig): WidgetConfig {
+    const fallback = buildFallbackConfig(config.botId);
+
     return {
-      ...buildFallbackConfig(config.botId),
+      ...fallback,
       ...config,
-      theme: { ...buildFallbackConfig(config.botId).theme, ...config.theme },
+      headerTitle: stringValue(config.headerTitle, stringValue(config.botName, fallback.botName)),
+      headerSubtitle: stringValue(config.headerSubtitle, stringValue(config.bannerText, fallback.headerSubtitle)),
+      inputPlaceholder: stringValue(config.inputPlaceholder, fallback.inputPlaceholder),
+      theme: { ...fallback.theme, ...config.theme },
       logoUrl: config.logoUrl || null,
       useCustomIcon: config.useCustomIcon === true,
       widgetIconUrl: normalizeImageUrl(config.widgetIconUrl),
     };
+  }
+
+  function stringValue(value: unknown, fallback: string) {
+    return typeof value === "string" && value.trim() ? value.trim() : fallback;
   }
 
   function buildFallbackConfig(currentBotId: string): WidgetConfig {
@@ -889,16 +910,23 @@
       botId: currentBotId,
       tenantId: "public-demo-tenant",
       botName: "AgentDesk Support",
+      headerTitle: "AgentDesk Support",
+      headerSubtitle: "Online - responds instantly",
       greeting: "Hello. I can help with orders, policies, and support questions.",
       fallbackMessage: "I could not reach the support engine. Please try again in a moment.",
       logoUrl: null,
       useCustomIcon: false,
       widgetIconUrl: null,
       bannerText: "Online - responds instantly",
+      inputPlaceholder: "Write your message here...",
       messageEndpoint: `${scriptOrigin}/api/chat/message`,
       websocketEndpoint: null,
       theme: {
         headerHsl: "0 0% 11%",
+        headerTextHsl: "0 0% 100%",
+        headerSubtextHsl: "0 0% 84%",
+        headerCloseButtonHsl: "0 0% 100%",
+        headerFontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
         backgroundHsl: "43 38% 95%",
         textHsl: "0 0% 11%",
         mutedTextHsl: "60 1% 37%",
@@ -906,6 +934,11 @@
         botBubbleHsl: "40 50% 98%",
         accentHsl: "204 100% 50%",
         fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+        inputBackgroundHsl: "0 0% 100%",
+        inputTextHsl: "0 0% 11%",
+        inputPlaceholderHsl: "60 1% 37%",
+        inputBorderHsl: "40 34% 93%",
+        inputFontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
       },
     };
   }  
@@ -917,6 +950,9 @@
         --ad-bg-primary: hsl(${theme.backgroundHsl});
         --ad-bg-secondary: hsl(${theme.botBubbleHsl});
         --ad-header-bg: hsl(${theme.headerHsl});
+        --ad-header-text: hsl(${theme.headerTextHsl});
+        --ad-header-subtext: hsl(${theme.headerSubtextHsl});
+        --ad-header-close: hsl(${theme.headerCloseButtonHsl});
         --ad-text-primary: hsl(${theme.textHsl});
         --ad-text-secondary: hsl(${theme.mutedTextHsl});
         --ad-accent-solid: hsl(${theme.accentHsl});
@@ -924,6 +960,12 @@
         --ad-border-color: #eceae4;
         --ad-accent-glow: hsla(${theme.accentHsl} / 0.18);
         --ad-font-body: ${theme.fontFamily};
+        --ad-font-header: ${theme.headerFontFamily};
+        --ad-font-input: ${theme.inputFontFamily};
+        --ad-input-bg: hsl(${theme.inputBackgroundHsl});
+        --ad-input-text: hsl(${theme.inputTextHsl});
+        --ad-input-placeholder: hsl(${theme.inputPlaceholderHsl});
+        --ad-input-border: hsl(${theme.inputBorderHsl});
         all: initial;
         color-scheme: light;
         display: block;
@@ -1001,6 +1043,7 @@
         border-bottom: 1px solid var(--ad-border-color);
         border-radius: 999px;
         display: flex;
+        font-family: var(--ad-font-header);
         justify-content: space-between;
         min-height: 74px;
         margin: 12px;
@@ -1042,7 +1085,7 @@
       }
 
       .ad-title {
-        color: var(--ad-text-primary);
+        color: var(--ad-header-text);
         font-size: 15px;
         line-height: 1.2;
         overflow: hidden;
@@ -1051,7 +1094,7 @@
       }
 
       .ad-status {
-        color: var(--ad-text-secondary);
+        color: var(--ad-header-subtext);
         font-size: 12px;
         line-height: 1.3;
       }
@@ -1059,7 +1102,7 @@
       .ad-icon-button {
         background: transparent;
         border: 0;
-        color: var(--ad-text-secondary);
+        color: var(--ad-header-close);
         cursor: pointer;
         font-size: 24px;
         height: 34px;
@@ -1229,10 +1272,11 @@
       }
 
       .ad-input {
-        background: #ffffff;
-        border: 1px solid var(--ad-border-color);
+        background: var(--ad-input-bg);
+        border: 1px solid var(--ad-input-border);
         border-radius: 14px;
-        color: var(--ad-text-primary);
+        color: var(--ad-input-text);
+        font-family: var(--ad-font-input);
         max-height: 96px;
         min-width: 0;
         min-height: 42px;
@@ -1243,7 +1287,7 @@
       }
 
       .ad-input::placeholder {
-        color: var(--ad-text-secondary);
+        color: var(--ad-input-placeholder);
       }
 
       .ad-input:focus {
