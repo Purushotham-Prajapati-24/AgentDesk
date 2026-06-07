@@ -1,199 +1,129 @@
-<div align="center">
-
 # AgentDesk
 
-Multi-tenant AI customer support platform with RAG-grounded answers, an embeddable WebChat widget, credit metering, and live human handoff.
+AgentDesk is a multi-tenant AI customer support workspace for teams that need grounded answers, embeddable WebChat, live human handoff, and credit-aware usage tracking in one product.
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.2.6-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.2.4-149eca?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38bdf8?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Appwrite](https://img.shields.io/badge/Appwrite-25.x-f02e65?logo=appwrite&logoColor=white)](https://appwrite.io/)
-[![Qdrant](https://img.shields.io/badge/Qdrant-Cloud-dc244c)](https://qdrant.tech/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-010101?logo=socket.io&logoColor=white)](https://socket.io/)
+<p align="center">
+  <a href="https://agentdeskbot.vercel.app">Live Demo</a>
+  |
+  <a href="https://agentdeskbot.vercel.app/docs">Hosted Docs</a>
+  |
+  <a href="https://github.com/Purushotham-Prajapati-24/AgentDesk/issues">Report an Issue</a>
+</p>
 
-[Live Demo](https://agentdeskbot.vercel.app) | [Documentation](https://agentdeskbot.vercel.app/docs) | [Report an Issue](https://github.com/Purushotham-Prajapati-24/AgentDesk/issues)
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16.2.6-000000?logo=next.js&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19.2.4-149eca?logo=react&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white">
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-4.x-38bdf8?logo=tailwindcss&logoColor=white">
+  <img alt="Appwrite" src="https://img.shields.io/badge/Appwrite-25.x-f02e65?logo=appwrite&logoColor=white">
+  <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-Hybrid_Search-dc244c">
+  <img alt="Socket.IO" src="https://img.shields.io/badge/Socket.IO-4.x-010101?logo=socket.io&logoColor=white">
+</p>
 
-</div>
+## Product Snapshots
 
----
+The screenshots below are generated from the current UI and stored in `public/readme-screenshots/`.
 
-## 📸 Screenshots
+| Landing page | Live inbox and handoff |
+| --- | --- |
+| <img src="public/readme-screenshots/01-home-landing.png" alt="AgentDesk landing page" width="100%"> | <img src="public/readme-screenshots/02-live-inbox-handoff.png" alt="AgentDesk live inbox handoff dashboard" width="100%"> |
 
-> Dashboard · Bot Builder · Live Inbox · Embeddable Widget
+| WebChat customizer | Knowledge ingestion |
+| --- | --- |
+| <img src="public/readme-screenshots/03-webchat-customizer.png" alt="AgentDesk WebChat customizer" width="100%"> | <img src="public/readme-screenshots/04-knowledge-ingestion.png" alt="AgentDesk knowledge ingestion dashboard" width="100%"> |
 
----
+| Billing and usage | Mobile landing page |
+| --- | --- |
+| <img src="public/readme-screenshots/05-billing-usage.png" alt="AgentDesk billing and usage dashboard" width="100%"> | <img src="public/readme-screenshots/06-mobile-home.png" alt="AgentDesk mobile landing page" width="100%"> |
 
-## ✨ Features
+## What AgentDesk Does
 
-| Feature | Description |
-|---|---|
-| 🔐 **Magic-link Auth** | Passwordless login via Appwrite — no OAuth credentials required |
-| 🏢 **Multi-tenant** | Every account gets its own isolated workspace with independent credit ledger |
-| 🤖 **Bot Builder** | Create, configure, and embed AI support bots in minutes with a visual editor |
-| 🧠 **RAG Pipeline** | PDF, DOCX, XLSX, and TXT docs are chunked, embedded via Gemini, and indexed in Qdrant for grounded answers |
-| 🪄 **Embeddable Widget** | Single `<script>` tag drops a full branded chat widget anywhere on the web |
-| 📡 **Live Inbox** | Real-time session monitor — human agents can pause the AI and take over mid-conversation |
-| 📊 **Real-time Monitor** | Analytics dashboard to track conversation metrics, watch live chats unfold, and view active user records |
-| 💳 **Credit Ledger** | Token-based billing with per-tenant credit tracking visible in a Usage dashboard |
-| ⚡ **Streaming Responses** | Server-Sent Events (SSE) stream bot replies token-by-token for instant feedback |
-| 📄 **Docs Portal** | Public-facing documentation site — no login required |
+| Area | Capability |
+| --- | --- |
+| AI support agents | Create tenant-scoped bots with identity, instructions, fallback behavior, and WebChat settings. |
+| Retrieval grounded answers | Upload documents or ingest URLs, chunk source material, embed content, and retrieve context from Qdrant before generation. |
+| WebChat deployment | Ship a Shadow DOM widget with a single script tag or embed a full chat surface with an iframe. |
+| Live handoff | Route active sessions into a Socket.IO powered operator inbox, pause automation, and reply as a human agent. |
+| Monitoring | Review users, conversations, active sessions, escalation pressure, and persisted transcripts. |
+| Usage control | Track credits, token spend, ledger activity, message volume, and tenant balances. |
+| Developer surface | Use public chat, ingestion, widget config, and WebChat configuration APIs. |
 
-See [`docs/Features.md`](docs/Features.md) for the maintained feature catalog.
+## Architecture
 
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        USER / CUSTOMER                              │
-│                    (Embedded Widget / iframe)                       │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │  script tag / iframe embed
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│               AGENTDESK — Next.js 16 App (Vercel)                   │
-│                                                                     │
-│  ┌─────────────┐   ┌──────────────┐   ┌──────────────────────────┐ │
-│  │   /embed    │   │  Dashboard   │   │      API Routes           │ │
-│  │  [botId]    │   │  (protected) │   │  /api/chat/message (SSE)  │ │
-│  └──────┬──────┘   │  ┌─────────┐ │   │  /api/widget/config       │ │
-│         │           │  │  Bots   │ │   │  /api/documents/*         │ │
-│  widget.js          │  │  Inbox  │ │   └───────────┬──────────────┘ │
-│  (compiled)         │  │  Docs   │ │               │                │
-│                     │  │  Usage  │ │   ┌───────────▼──────────────┐ │
-│                     │  └─────────┘ │   │       RAG Pipeline        │ │
-│                     └──────────────┘   │  Gemini Embed → Qdrant   │ │
-│                                        │  Retrieval → LLM Prompt   │ │
-│                                        └──────────────────────────┘ │
-└─────────────────────────┬──────────────────────────────────────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          ▼               ▼               ▼
-   ┌─────────────┐ ┌───────────┐  ┌────────────────┐
-   │  Appwrite   │ │  Qdrant   │  │  WebSocket Srv │
-   │   Cloud     │ │  Cloud    │  │  (Render)      │
-   │  Auth / DB  │ │  Vectors  │  │  Socket.IO     │
-   │  Storage    │ │  Hybrid   │  │  Live Handoff  │
-   └─────────────┘ └───────────┘  └────────────────┘
-          ▲                               ▲
-          │                               │
-   ┌──────┴──────────────────────────────┐│
-   │          HUMAN AGENT (Dashboard)    ││
-   │    Monitors sessions in real-time   ││
-   │    Can pause AI & take over chat ───┘│
-   └──────────────────────────────────────┘
+```mermaid
+flowchart LR
+  Customer[Customer site] --> Widget[widget.js or iframe embed]
+  Widget --> ChatAPI[Next.js API routes]
+  Dashboard[Agent dashboard] --> ChatAPI
+  Dashboard --> Socket[Socket.IO handoff service]
+  ChatAPI --> Appwrite[Appwrite auth, DB, storage]
+  ChatAPI --> Qdrant[Qdrant hybrid vector search]
+  ChatAPI --> LLM[Gemini, Groq, or OpenAI-compatible LLM]
+  Widget --> Socket
+  Socket --> Appwrite
 ```
 
----
+Runtime flow:
 
-## 🔄 Workflows
+1. A customer message enters through the embedded widget or iframe route.
+2. The chat API validates tenant, bot, session, credit, and safety constraints.
+3. The message is embedded and searched against tenant-scoped Qdrant chunks.
+4. Retrieved source context is passed to the selected LLM provider.
+5. The response streams back with Server-Sent Events.
+6. Conversation state, messages, and credit ledger entries are persisted in Appwrite.
+7. If an operator pauses automation, Socket.IO keeps the conversation live without triggering RAG generation.
 
-### 1. User Chat Flow (RAG Pipeline)
+## Tech Stack
 
-```
+| Layer | Implementation |
+| --- | --- |
+| Web app | Next.js 16 App Router, React 19, TypeScript |
+| Styling | Tailwind CSS 4, custom UI primitives, Lucide icons |
+| Auth and persistence | Appwrite Cloud, `appwrite`, `node-appwrite` |
+| Retrieval | Qdrant Cloud hybrid collection |
+| Document parsing | `mammoth`, `unpdf`, `xlsx`, `jsdom`, Readability, Turndown |
+| Generation | Gemini by default, with Groq and OpenAI-compatible fallback support |
+| Realtime | Socket.IO service in `websocket-server/` |
+| Widget | React-based custom element bundled into `public/widget.js` |
+| Verification | ESLint, Node test runner, Playwright |
 
 ## Repository Layout
 
 ```text
 src/
   app/
-    (auth)/                 Login and magic-link verification
-    (dashboard)/            Protected dashboard routes
-    api/                    Chat, ingestion, widget, and WebChat APIs
-    docs/                   Public documentation route
-    embed/[botId]/          Iframe-compatible chat route
-  components/               Shared UI components
-  context/                  Auth, tenant, and WebChat providers
+    (auth)/                  Magic-link login and verification
+    (dashboard)/             Protected dashboard routes
+    api/                     Chat, ingestion, widget, and WebChat APIs
+    docs/                    Public documentation route
+    embed/[botId]/           Iframe-compatible chat surface
+  components/                Shared UI and product components
+  context/                   Auth, tenant, theme, and WebChat providers
   lib/
-    server/                 Appwrite admin, parsing, embeddings, retrieval, Qdrant, LLM providers
-    credits.ts              Credit and ledger helpers
-  types/                    Shared TypeScript declarations
-widget/                     Embeddable widget source and framework adapters
-websocket-server/           Standalone Socket.IO handoff server
-scripts/                    Build and provisioning scripts
-docs/                       Product, architecture, schema, and design notes
-public/readme-screenshots/  README screenshot assets
+    server/                  Appwrite admin, parsers, embeddings, retrieval, Qdrant, LLM providers
+    credits.ts               Credit ledger helpers
+  types/                     Shared declarations
+widget/                      Embeddable widget source and framework adapters
+websocket-server/            Standalone Socket.IO handoff service
+scripts/                     Appwrite and Qdrant provisioning helpers
+public/readme-screenshots/   README screenshot assets
+test/                        Node test runner suites
 ```
 
-## Technology Stack
+## Getting Started
 
-| Layer | Implementation |
-| --- | --- |
-| Framework | Next.js 16.2.6 App Router |
-| UI | React 19.2.4, Tailwind CSS 4, Lucide icons |
-| Language | TypeScript 5 |
-| Auth and data | Appwrite Cloud, `appwrite`, `node-appwrite` |
-| Vector search | Qdrant Cloud, `@qdrant/js-client-rest` |
-| LLM orchestration | Gemini by default, Groq and OpenAI-compatible fallback support |
-| Realtime | Socket.IO server in `websocket-server/` |
-| Parsing and ingestion | `mammoth`, `unpdf`, `xlsx`, `jsdom`, `@mozilla/readability`, `turndown` |
-| Validation | Zod |
-| Verification | ESLint, Node test runner, Playwright screenshot verification |
+### Prerequisites
 
-## Prerequisites
-
-- Node.js 20 or newer
+- Node.js 20.9 or newer
 - npm
-- Appwrite project with database, storage bucket, and server API key
+- Appwrite project with database, storage bucket, collections, and a server API key
 - Qdrant cluster and API key
 - Gemini API key
-- Optional Groq or OpenAI-compatible API key for fallback generation
-- Optional Browserless API key for JavaScript-heavy URL ingestion
+- Optional Groq or OpenAI-compatible key for fallback generation
+- Optional Browserless key for JavaScript-heavy URL ingestion
 - Optional Upstash Redis for durable websocket state and clustered Socket.IO pub/sub
 
-```
-agentdesk/
-├── src/
-│   ├── app/
-│   │   ├── (auth)/                  # Login & magic-link verify pages
-│   │   ├── (dashboard)/             # Protected dashboard routes
-│   │   │   ├── bots/                # Bot builder & configuration
-│   │   │   ├── inbox/               # Live session inbox
-│   │   │   ├── monitor/             # Session monitor & handoff
-│   │   │   │   ├── analytics/       # Conversation analytics & metrics charts
-│   │   │   │   ├── conversations/   # Real-time customer chat visualizer
-│   │   │   │   └── users/           # User listing & tracking dashboard
-│   │   │   ├── webchat/             # Webchat widget preview & settings
-│   │   │   ├── documents/           # Knowledge base management
-│   │   │   └── billing/             # Credit usage & ledger
-│   │   ├── api/
-│   │   │   ├── chat/                # POST /api/chat/message — streaming SSE
-│   │   │   ├── documents/           # Document ingestion & management
-│   │   │   └── widget/              # GET /api/widget/config/:botId
-│   │   ├── docs/                    # Public documentation portal
-│   │   ├── embed/[botId]/           # Standalone iframe embed page
-│   │   └── monitor-actions.ts       # Server actions for conversation & user analytics
-│   ├── context/                     # AuthContext, TenantContext
-│   ├── lib/
-│   │   ├── server/                  # Appwrite admin, Qdrant, LLM, retrieval
-│   │   └── credits.ts               # Ledger & credit balance helpers
-│   ├── components/                  # Shared UI component library
-│   │   └── ui/
-│   │       └── Signal.tsx           # Reusable server/connection status component
-│   └── types/                       # Shared TypeScript types
-│
-├── widget/                          # Widget source (TypeScript)
-│   └── index.tsx                    # Compiled → public/widget.js
-│
-├── websocket-server/                # Standalone Socket.IO handoff server
-│   ├── server.js                    # Express + Socket.IO server
-│   └── session-store.js             # In-memory / Upstash Redis session state
-│
-├── scripts/                         # Build & setup scripts
-│   ├── build-widget.mjs             # Bundles widget/index.tsx → public/widget.js
-│   └── create-qdrant-hybrid.mjs     # Creates Qdrant collection with hybrid vectors
-│
-└── public/
-    └── widget.js                    # Compiled embeddable widget (do not edit directly)
-```
-
----
-
-## 🚀 Getting Started
-
-### 1. Install Dependencies
+### Install
 
 ```bash
 git clone https://github.com/Purushotham-Prajapati-24/AgentDesk.git
@@ -201,9 +131,9 @@ cd AgentDesk
 npm install
 ```
 
-### 2. Configure Environment
+### Configure `.env.local`
 
-Create `.env.local` in the repository root.
+Create `.env.local` in the repository root. Keep real secrets out of version control.
 
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -213,15 +143,22 @@ NEXT_PUBLIC_APPWRITE_PROJECT_ID=your-project-id
 APPWRITE_API_KEY=your-server-api-key
 NEXT_PUBLIC_APPWRITE_DATABASE_ID=agentdesk
 APPWRITE_DATABASE_ID=agentdesk
+
 NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID=tenants
+APPWRITE_TENANTS_COLLECTION_ID=tenants
 NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID=bots
+APPWRITE_BOTS_COLLECTION_ID=bots
 NEXT_PUBLIC_APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID=webchat_configs
+APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID=webchat_configs
 NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID=documents
 APPWRITE_DOCUMENTS_BUCKET_ID=documents
 APPWRITE_DOCUMENT_FILES_COLLECTION_ID=document_files
+NEXT_PUBLIC_APPWRITE_DOCUMENTS_COLLECTION_ID=document_files
 APPWRITE_INGESTION_LOCKS_COLLECTION_ID=ingestion_locks
 APPWRITE_SESSIONS_COLLECTION_ID=sessions
+NEXT_PUBLIC_APPWRITE_SESSIONS_COLLECTION_ID=sessions
 APPWRITE_MESSAGES_COLLECTION_ID=messages
+NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID=messages
 NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID=ledger
 
 QDRANT_URL=https://your-cluster.qdrant.io
@@ -248,22 +185,19 @@ BROWSERLESS_API_KEY=
 CREDIT_PER_TOKEN=0.001
 ```
 
-The Qdrant scripts also accept the legacy variable names `ENPOINT_URL` and `API_KEY`.
+The Qdrant scripts also accept the legacy names `ENPOINT_URL` and `API_KEY`.
 
-### 3. Provision Required Services
+### Provision Services
 
 ```bash
 npm run setup:ingestion
 npm run qdrant:hybrid
-```
-
-If your Appwrite project does not already contain the WebChat config collection, run:
-
-```bash
 node --env-file=.env.local scripts/setup-webchat-configs.mjs
 ```
 
-### 4. Start The App
+### Run Locally
+
+Start the Next.js app:
 
 ```bash
 npm run dev
@@ -275,70 +209,56 @@ Start the realtime handoff service in a second terminal:
 npm run dev:ws
 ```
 
-The app runs at `http://localhost:3000`; the Socket.IO service defaults to `http://localhost:4000`.
+The app runs at `http://localhost:3000`. The websocket service defaults to `http://localhost:4000`.
+
+For UI review without real Appwrite credentials, use the built-in visual audit mode:
+
+```powershell
+$env:NEXT_PUBLIC_VISUAL_AUDIT_MODE = "true"
+npm run dev
+```
 
 ## WebChat Embeds
 
-Script embed:
+Script launcher:
 
 ```html
 <script
   src="https://agentdeskbot.vercel.app/widget.js"
   data-bot-id="YOUR_BOT_ID"
+  data-theme="webchat-v1"
+  data-mode="launcher"
   async
 ></script>
 ```
 
-Iframe embed:
+Inline iframe:
 
 ```html
 <iframe
-  src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID"
-  style="width:100%;height:640px;border:0"
+  src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID?theme=webchat-v1"
   title="AgentDesk Support"
+  style="width: 100%; height: 640px; border: 0;"
 ></iframe>
 ```
 
-Rebuild the compiled widget after changes under `widget/`:
+After changing files under `widget/`, rebuild the compiled widget:
 
 ```bash
 npm run build:widget
 ```
 
-## Runtime Workflows
-
-### RAG Chat
-
-1. A customer message reaches `/api/chat/message`.
-2. The route validates tenant, bot, session, credits, and prompt-injection rules.
-3. The query is embedded and sent to Qdrant with tenant and bot filters.
-4. Retrieved chunks are injected into the provider prompt.
-5. The answer streams back over Server-Sent Events.
-6. Messages and ledger transactions are persisted in Appwrite.
-
-### Knowledge Ingestion
-
-1. Operators upload a file or submit a URL from the dashboard.
-2. Source content is extracted, normalized, and chunked.
-3. Chunks are embedded with Gemini and upserted to Qdrant.
-4. Appwrite-backed locks and deterministic Qdrant IDs make retries idempotent.
-
-### Live Handoff
-
-1. The customer session and operator inbox join the same Socket.IO session room.
-2. The operator can mark the session `paused_by_human`.
-3. Customer messages continue in realtime but no longer trigger RAG generation.
-4. The operator replies manually and can later release control back to AI.
+Do not edit `public/widget.js` directly; it is generated from `widget/`.
 
 ## API Surface
 
 | Method | Route | Purpose |
 | --- | --- | --- |
-| `POST` | `/api/chat/message` | Stream a bot response with RAG context. |
+| `POST` | `/api/chat/message` | Stream a RAG-grounded bot answer. |
 | `POST` | `/api/v1/chat/message` | Versioned chat endpoint. |
-| `POST` | `/api/documents/upload` | Upload file metadata and storage object for ingestion. |
+| `POST` | `/api/documents/upload` | Store uploaded document metadata and file references. |
 | `POST` | `/api/documents/url` | Queue URL or sitemap ingestion. |
-| `POST` | `/api/documents/ingest` | Process pending documents into vector chunks. |
+| `POST` | `/api/documents/ingest` | Process pending sources into vector chunks. |
 | `POST` | `/api/v1/ingest/upload` | Versioned upload ingestion endpoint. |
 | `POST` | `/api/v1/ingest/url` | Versioned URL ingestion endpoint. |
 | `GET` | `/api/widget/config/[botId]` | Return public widget configuration. |
@@ -358,9 +278,9 @@ Example chat request:
 
 Successful chat responses stream as `text/event-stream`.
 
-## WebSocket Service
+## WebSocket Handoff Service
 
-The handoff service is isolated in `websocket-server/`.
+The realtime service lives in `websocket-server/` and can run independently from the Next.js app.
 
 ```bash
 cd websocket-server
@@ -368,7 +288,9 @@ npm install
 npm start
 ```
 
-Key environment variables:
+Default port: `4000`.
+
+Key websocket environment variables:
 
 ```env
 PORT=4000
@@ -383,7 +305,7 @@ APPWRITE_DATABASE_ID=agentdesk
 APPWRITE_SESSIONS_COLLECTION_ID=sessions
 ```
 
-Without Redis, session state is stored in memory and is suitable only for local development or single-instance testing.
+Without Redis, session state is stored in memory and is suitable only for local development or single-instance deployments. See [websocket-server/README.md](websocket-server/README.md) for event details.
 
 ## Scripts
 
@@ -391,50 +313,34 @@ Without Redis, session state is stored in memory and is suitable only for local 
 | --- | --- |
 | `npm run dev` | Start the Next.js development server. |
 | `npm run dev:ws` | Start the Socket.IO handoff service. |
-| `npm run build` | Build `public/widget.js` and the production Next.js app. |
-| `npm run build:widget` | Compile the widget source. |
+| `npm run build` | Build the widget and production Next.js app. |
+| `npm run build:widget` | Compile `widget/` into `public/widget.js`. |
 | `npm run start` | Start the built Next.js app. |
 | `npm run qdrant:hybrid` | Create the Qdrant hybrid collection and indexes. |
 | `npm run setup:ingestion` | Create Appwrite ingestion metadata and lock schema. |
 | `npm run test` | Run Node test files in `test/`. |
 | `npm run lint` | Run ESLint. |
 
-## Deployment
+## Deployment Notes
 
-### Next.js Application
+- Deploy the Next.js app to Vercel or any Node-compatible host that supports Next.js runtime features.
+- Deploy `websocket-server/` as a separate Node service when using live handoff.
+- Set `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_WEBSOCKET_URL`, and `WEBSOCKET_URL` to production origins.
+- Configure Appwrite, Qdrant, and LLM provider secrets in the deployment environment.
+- Run `npm run build` before production startup.
+- If multiple websocket instances are used, configure Redis-backed Socket.IO pub/sub.
 
-Deploy the application to Vercel or another Node-compatible Next.js host.
-
-1. Set all production environment variables.
-2. Set `NEXT_PUBLIC_APP_URL` to the production app origin.
-3. Set `NEXT_PUBLIC_WEBSOCKET_URL` and `WEBSOCKET_URL` to the deployed handoff service.
-4. Run `npm run build`.
-5. Start with `npm run start` or the hosting provider's Next.js runtime.
-
-### Socket.IO Handoff Service
-
-Deploy `websocket-server/` as a separate Node service, commonly on Render.
-
-1. Set the service root to `websocket-server/`, or run `node websocket-server/server.js` from the repository root.
-2. Configure `PORT`, `CORS_ORIGIN`, Appwrite variables, and optional Redis variables.
-3. Update the Next.js app with the service URL.
-
-## Security And Operational Notes
+## Security And Operations
 
 - Dashboard routes are protected by Appwrite session handling.
-- Server-side Appwrite access uses `APPWRITE_API_KEY`; do not expose this key to the browser.
-- Widget-facing APIs must use tenant and bot filters for retrieval isolation.
-- Chat requests check available credits before provider calls.
-- Prompt-injection patterns are screened before LLM generation.
-- `public/widget.js` is generated; edit `widget/` source files and rebuild.
-- `public/readme-screenshots/` contains curated README assets; raw Playwright output remains ignored through `.design`.
+- Server-side Appwrite access uses `APPWRITE_API_KEY`; never expose this key to the browser.
+- Widget-facing APIs must preserve tenant and bot filters for retrieval isolation.
+- Chat requests check available credits before model calls.
+- Prompt-injection patterns are screened before generation.
+- Document ingestion uses deterministic IDs and lock records so retries are idempotent.
+- `.env*`, `.next/`, generated debug output, and assistant tooling folders are intentionally ignored.
 - This repository currently does not include a license file.
 
-## Reference Documentation
+## Screenshot Maintenance
 
-- [`docs/Features.md`](docs/Features.md) - maintained feature catalog.
-- [`docs/Schema.md`](docs/Schema.md) - Appwrite collection model.
-- [`docs/WebChat.md`](docs/WebChat.md) - WebChat behavior and configuration.
-- [`docs/WebsiteIngestion.md`](docs/WebsiteIngestion.md) - website ingestion details.
-- [`docs/UrlToChunking.md`](docs/UrlToChunking.md) - URL-to-vector flow.
-- [`websocket-server/README.md`](websocket-server/README.md) - handoff server events and runtime behavior.
+README images live in `public/readme-screenshots/`. To refresh protected dashboard screenshots locally, start the app with visual audit mode enabled, capture the target routes, and commit only the curated PNG files.
