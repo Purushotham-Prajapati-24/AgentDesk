@@ -64,6 +64,7 @@ export function WebChatWorkspace() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
   const snippets = useMemo(() => buildSnippets(config), [config]);
+  const selectedBot = useMemo(() => bots.find((bot) => bot.id === selectedBotId) ?? null, [bots, selectedBotId]);
 
   useEffect(() => {
     if (!tenant?.$id) {
@@ -144,43 +145,60 @@ export function WebChatWorkspace() {
 
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
-      <section className="border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="studio-kicker text-[#0099ff]">WebChat control room</p>
-            <h1 className="mt-3 max-w-5xl text-4xl font-semibold leading-none tracking-[-0.04em] text-[var(--ui-text)] sm:text-6xl">
-              Build the customer chat surface.
-            </h1>
-            <p className="mt-4 max-w-2xl text-base font-medium leading-7 text-[var(--ui-muted)]">
-              Configure identity, appearance, deployment controls, and customer-facing capabilities while watching the widget contract update in real time.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:flex sm:flex-wrap">
-            <Button
-              className="w-full sm:w-auto"
-              leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
-              onClick={resetConfig}
-              type="button"
-              variant="outline"
-            >
-              Reset
-            </Button>
-            <Button
-              className="w-full sm:w-auto"
-              disabled={!selectedBotId}
-              leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
-              loading={saveState === "saving"}
-              onClick={() => void saveSelectedBotConfig()}
-              type="button"
-            >
-              Save to bot
-            </Button>
+      <section className="px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#12b981]/35 bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.32)_0%,transparent_28%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.28)_0%,transparent_30%),linear-gradient(135deg,#f8fffb_0%,#d7fff1_42%,#e8f1ff_100%)] text-[#083344] shadow-[0_24px_70px_rgba(20,184,166,0.15)] dark:bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.26)_0%,transparent_30%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.22)_0%,transparent_32%),linear-gradient(135deg,#08110f_0%,#0b332e_48%,#10243d_100%)] dark:text-[#ecfeff]">
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:p-6">
+            <div className="min-w-0">
+              <p className="inline-flex rounded-full border border-[#0f766e]/20 bg-white/55 px-3 py-1 studio-kicker text-[#0f766e] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
+                WebChat control room
+              </p>
+              <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
+                Shape the customer chat surface.
+              </h1>
+            </div>
+
+            <div className="grid content-between gap-4 rounded-3xl border border-white/35 bg-white/40 p-4 text-[#083344] shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20 dark:text-[#ecfeff]">
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-mono text-xs font-semibold uppercase opacity-70">Publishing target</p>
+                  <span className="rounded-full border border-white/35 bg-white/35 px-3 py-1 font-mono text-xs font-semibold dark:bg-black/15">
+                    {saveState === "saved" ? "saved" : saveState}
+                  </span>
+                </div>
+                <p className="mt-3 min-w-0 break-words text-2xl font-semibold tracking-[-0.03em]">
+                  {selectedBot?.name ?? (botLoading ? "Loading bots..." : "Choose a bot")}
+                </p>
+                <p className="mt-2 break-all font-mono text-xs font-semibold opacity-70">{selectedBotId || tenant?.$id || "No target selected"}</p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                <Button
+                  className="w-full rounded-full border-white/35 bg-white/35 text-current hover:bg-white/50 dark:bg-black/20 dark:hover:bg-black/30"
+                  leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
+                  onClick={resetConfig}
+                  type="button"
+                  variant="outline"
+                >
+                  Reset draft
+                </Button>
+                <Button
+                  className="w-full rounded-full"
+                  disabled={!selectedBotId}
+                  leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
+                  loading={saveState === "saving"}
+                  onClick={() => void saveSelectedBotConfig()}
+                  type="button"
+                >
+                  Save to bot
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
-        <aside className="grid min-w-0 content-start gap-3">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
+        <aside className="grid min-w-0 content-start gap-4">
           <BotSelector
             bots={bots}
             loading={botLoading}
@@ -229,16 +247,18 @@ function BotSelector({
   onSelect: (botId: string) => void;
 }) {
   return (
-    <section className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+    <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="studio-kicker text-[#0099ff]">Bot target</p>
           <h2 className="mt-1 text-lg font-semibold text-[var(--ui-text)]">Preference owner</h2>
         </div>
-        {!selectedBotId ? <AlertTriangle aria-hidden="true" className="h-5 w-5 text-destructive" /> : <CheckCircle2 aria-hidden="true" className="h-5 w-5 text-[#22c55e]" />}
+        <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-full", selectedBotId ? "bg-[#22c55e]/15 text-[#22c55e]" : "bg-destructive/10 text-destructive")}>
+          {!selectedBotId ? <AlertTriangle aria-hidden="true" className="h-5 w-5" /> : <CheckCircle2 aria-hidden="true" className="h-5 w-5" />}
+        </span>
       </div>
       <select
-        className="min-h-12 w-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
+        className="min-h-12 w-full rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] outline-none transition focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]"
         disabled={loading || bots.length === 0}
         value={selectedBotId}
         onChange={(event) => onSelect(event.target.value)}
@@ -263,8 +283,8 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border px-4 py-3",
-        saveState === "error" ? "border-destructive bg-destructive/10 text-destructive" : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-text)]",
+        "flex items-center justify-between gap-3 rounded-[1.25rem] border px-4 py-3",
+        saveState === "error" ? "border-destructive/45 bg-destructive/10 text-destructive" : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-text)]",
       )}
       role={saveState === "error" ? "alert" : "status"}
     >
@@ -287,16 +307,18 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
   const showCustomIcon = config.appearance.useCustomIcon && isHttpUrl(config.appearance.widgetIconUrl);
 
   return (
-    <section className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-      <div className="mb-4 flex items-center justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+    <section className="overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] px-5 py-4">
         <div>
           <p className="studio-kicker text-[#0099ff]">Live preview</p>
           <h2 className="mt-1 text-2xl font-semibold text-[var(--ui-text)]">Customer widget</h2>
         </div>
-        <Eye aria-hidden="true" className="h-5 w-5 text-[#0099ff]" />
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--ui-text)] text-[var(--ui-bg)]">
+          <Eye aria-hidden="true" className="h-5 w-5" />
+        </span>
       </div>
 
-      <div className="flex min-h-[520px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-3 sm:p-6 lg:min-h-[620px]">
+      <div className="flex min-h-[540px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-4 sm:p-6 lg:min-h-[640px]">
         <div className="relative w-full max-w-[410px]">
           <div
             className="flex h-[min(590px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
@@ -426,7 +448,7 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
   }
 
   return (
-    <div className="border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+    <div className="overflow-hidden rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Braces aria-hidden="true" className="h-4 w-4 shrink-0 text-[#0099ff]" />

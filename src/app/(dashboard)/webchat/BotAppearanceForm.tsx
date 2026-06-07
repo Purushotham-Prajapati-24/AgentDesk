@@ -100,7 +100,7 @@ export function BotAppearanceForm() {
 
 function AppearanceGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="grid gap-4 border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
+    <section className="grid gap-4 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3 sm:p-4">
       <h3 className="studio-kicker text-[var(--ui-muted)]">{title}</h3>
       {children}
     </section>
