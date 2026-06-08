@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { SelectMenu, type SelectMenuOption } from "@/components/ui/SelectMenu";
 
 type UploadState = {
   status: "idle" | "uploading" | "processing" | "success" | "error";
@@ -59,6 +60,18 @@ export default function DocumentsPage() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>({ status: "idle", message: "" });
+  const botOptions: SelectMenuOption[] = [
+    {
+      label: bots.length === 0 ? "Create an agent before uploading knowledge" : "Select an agent",
+      value: "",
+      description: bots.length === 0 ? "No upload target available" : "Choose the exact agent that will read this source",
+    },
+    ...bots.map((bot) => ({
+      label: bot.name,
+      value: bot.$id,
+      description: bot.$id,
+    })),
+  ];
 
   useEffect(() => {
     if (!tenant?.$id) {
@@ -314,24 +327,13 @@ export default function DocumentsPage() {
 
           <div className="p-5">
             <form onSubmit={uploadDocument}>
-              <label className="block">
+              <div className="block">
                 <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Agent</span>
-                <select
-                  className="min-h-11 w-full rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-2 text-sm font-semibold text-[var(--ui-text)] outline-none transition focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]"
-                  value={botId}
-                  onChange={(event) => setBotId(event.target.value)}
-                >
-                  <option value="">{bots.length === 0 ? "Create an agent before uploading knowledge" : "Select an agent"}</option>
-                  {bots.map((bot) => (
-                    <option key={bot.$id} value={bot.$id}>
-                      {bot.name} / {bot.$id}
-                    </option>
-                  ))}
-                </select>
+                <SelectMenu ariaLabel="Agent" disabled={bots.length === 0} options={botOptions} value={botId} onChange={setBotId} />
                 <p className="mt-2 text-xs font-medium leading-5 text-[var(--ui-muted)]">
                   Sources are indexed for this exact agent ID. The widget must use the same agent.
                 </p>
-              </label>
+              </div>
 
               <label
                 className="mt-5 flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] border-2 border-dashed border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-8 text-center transition hover:border-[var(--ui-blue)] hover:bg-[var(--ui-panel-2)] sm:min-h-72 sm:px-6 sm:py-10"

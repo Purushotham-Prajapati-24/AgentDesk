@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { cn } from "@/lib/utils";
 
 export function WebChatTextField({
@@ -116,17 +118,15 @@ export function WebChatSelect<T extends string>({
   options: Array<{ label: string; value: T }>;
   onChange: (value: T) => void;
 }) {
+  const labelId = useId();
+
   return (
-    <label className="block">
-      <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">{label}</span>
-      <select className="min-h-12 w-full rounded-xl border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 text-sm font-semibold text-[var(--ui-text)] outline-none focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]" value={value} onChange={(event) => onChange(event.target.value as T)}>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="block">
+      <span className="studio-kicker mb-2 block text-[var(--ui-muted)]" id={labelId}>
+        {label}
+      </span>
+      <SelectMenu ariaLabelledBy={labelId} menuPlacement="inline" options={options} value={value} onChange={onChange} />
+    </div>
   );
 }
 

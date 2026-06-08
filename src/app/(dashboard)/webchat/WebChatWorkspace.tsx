@@ -6,6 +6,7 @@ import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye
 import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@/app/webchat-actions";
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
+import { SelectMenu, type SelectMenuOption } from "@/components/ui/SelectMenu";
 import { useWebChatConfig } from "@/context/WebChatConfigContext";
 import { useTenant } from "@/context/TenantContext";
 import { cn } from "@/lib/utils";
@@ -58,24 +59,146 @@ const sections: Array<{
 const deploymentTabs: Array<{
   id: DeploymentTabId;
   label: string;
+  summary: string;
 }> = [
   {
     id: "script",
     label: "Script",
+    summary: "Floating launcher on any website.",
   },
   {
     id: "iframe",
     label: "Iframe embedded",
+    summary: "Inline chat surface inside a page.",
   },
   {
     id: "react",
     label: "React/Next.js",
+    summary: "Component install for app shells.",
   },
   {
     id: "vue",
     label: "Vue",
+    summary: "Component install for Vue apps.",
   },
 ];
+
+type DeploymentGuide = {
+  title: string;
+  intro: string;
+  placement: string;
+  highlight: string;
+  steps: Array<{
+    title: string;
+    body: string;
+    example?: string;
+  }>;
+};
+
+const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
+  script: {
+    title: "Install the floating website launcher",
+    intro: "Use this when the chat should appear as a floating bubble on your website.",
+    placement: "Put the script once, just before the closing </body> tag.",
+    highlight: "Keep data-bot-id unchanged. It controls which bot and saved appearance load.",
+    steps: [
+      {
+        title: "Open the global page shell",
+        body: "Use the shared HTML layout, theme footer, or site-wide custom-code area.",
+      },
+      {
+        title: "Paste the snippet once",
+        body: "Place it after the page content so it loads after the visible page.",
+        example: "<body>\n  <main>...</main>\n  <!-- AgentDesk WebChat goes here -->\n  <script ...></script>\n</body>",
+      },
+      {
+        title: "Check the live page",
+        body: "Confirm the launcher does not cover cookie banners, checkout buttons, or sticky support controls.",
+      },
+      {
+        title: "Use separate bot IDs per environment",
+        body: "Use a staging bot ID or theme tag if your team tests changes before production.",
+      },
+    ],
+  },
+  iframe: {
+    title: "Embed a full chat panel inside a page",
+    intro: "Use this when the chat should be visible inside a help page or dashboard section.",
+    placement: "Place the iframe inside the content area where users expect support.",
+    highlight: "Give the iframe a stable height, usually around 640px on desktop.",
+    steps: [
+      {
+        title: "Choose the support section",
+        body: "Put it under a support heading or beside the article/task it helps with.",
+      },
+      {
+        title: "Wrap it in a responsive container",
+        body: "Use a full-width wrapper with enough height for the header, messages, and input.",
+        example: '<section class="support-chat">\n  <iframe ...></iframe>\n</section>',
+      },
+      {
+        title: "Check mobile height",
+        body: "Preview under 480px width and make sure the message input stays usable.",
+      },
+      {
+        title: "Compare with preview",
+        body: "Open the preview link and confirm the iframe shows the same bot, greeting, and theme.",
+      },
+    ],
+  },
+  react: {
+    title: "Mount the widget in a React or Next.js app",
+    intro: "Use this when the launcher should follow users across app routes.",
+    placement: "Render the widget once near the root layout, usually after the page children.",
+    highlight: "Do not mount it inside every page. That can create duplicate launchers.",
+    steps: [
+      {
+        title: "Create a small client component",
+        body: "Keep the widget in a small browser-only component instead of mixing it into page content.",
+        example: '"use client";\nimport { AgentDeskWidget } from "@agentdesk/widget/react";\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="YOUR_BOT_ID" theme="production" />;\n}',
+      },
+      {
+        title: "Place it in the app shell",
+        body: "Render it after the page content so it floats without changing the page layout.",
+        example: "<body>\n  {children}\n  <SupportWidget />\n</body>",
+      },
+      {
+        title: "Use the public bot ID",
+        body: "The client bundle should only contain the public bot ID and theme tag.",
+      },
+      {
+        title: "Test route changes",
+        body: "Navigate across two routes and confirm the launcher appears once and keeps its position.",
+      },
+    ],
+  },
+  vue: {
+    title: "Register the widget in a Vue app",
+    intro: "Use this when the launcher should live in a shared Vue or Nuxt layout.",
+    placement: "Place the widget once near the end of App.vue or the default layout template.",
+    highlight: "Use kebab-case props in templates: bot-id and theme.",
+    steps: [
+      {
+        title: "Import or register the component",
+        body: "Add the widget to the shared layout that wraps your pages.",
+        example: '<script setup>\nimport { AgentDeskWidget } from "@agentdesk/widget/vue";\n</script>',
+      },
+      {
+        title: "Place it after the router view",
+        body: "Render it after the page outlet so it floats over the app without pushing content.",
+        example: "<template>\n  <RouterView />\n  <AgentDeskWidget bot-id=\"YOUR_BOT_ID\" theme=\"production\" />\n</template>",
+      },
+      {
+        title: "Verify production values",
+        body: "Confirm bot-id points to the saved bot and theme matches the customer-facing deployment.",
+      },
+      {
+        title: "Check navigation and overlays",
+        body: "Open pages with drawers, modals, or sticky footers and make sure the launcher stays reachable.",
+      },
+    ],
+  },
+};
 
 export function WebChatWorkspace() {
   const { tenant } = useTenant();
@@ -97,6 +220,8 @@ export function WebChatWorkspace() {
   const saveButtonActive = Boolean(selectedBotId && (hasUnsavedChanges || saveState === "saving"));
   const saveButtonTitle = !selectedBotId ? "Choose a bot before saving." : hasUnsavedChanges ? "Save changes to this bot." : "No changes to save.";
   const deployPreviewUrl = selectedBotId ? buildEmbedPreviewUrl(selectedBotId) : "";
+  const deploymentGuide = deploymentGuides[deployTab];
+  const selectedDeploymentLabel = deploymentTabs.find((tab) => tab.id === deployTab)?.label ?? "Deploy";
   const [previewCopied, setPreviewCopied] = useState(false);
 
   useEffect(() => {
@@ -256,20 +381,20 @@ export function WebChatWorkspace() {
         <div
           aria-labelledby="webchat-deploy-title"
           aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 shadow-[inset_0_0_160px_rgba(0,0,0,0.72)] backdrop-blur-sm"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-3 py-4 shadow-[inset_0_0_160px_rgba(0,0,0,0.72)] backdrop-blur-sm sm:px-5"
           id="webchat-deploy-modal"
           onClick={() => setDeployModalOpen(false)}
           role="dialog"
         >
           <div
-            className="max-h-[min(720px,calc(100svh-48px))] w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0b1020] text-white shadow-[0_34px_120px_rgba(0,0,0,0.62)]"
+            className="flex h-[min(820px,calc(100svh-32px))] w-[min(1120px,calc(100vw-24px))] flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#070b14] text-white shadow-[0_34px_120px_rgba(0,0,0,0.62)] sm:w-[min(1120px,calc(100vw-40px))]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-white/10 bg-[#0b1020] px-4 py-3 sm:px-5">
               <div className="min-w-0">
-                <p className="font-mono text-xs font-semibold uppercase text-[#93c5fd]">Deployment</p>
-                <h2 className="mt-1 truncate text-2xl font-semibold tracking-[-0.03em]" id="webchat-deploy-title">
-                  Choose deployment type
+                <p className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Deployment guide</p>
+                <h2 className="mt-1 truncate text-xl font-semibold tracking-[-0.02em] sm:text-2xl" id="webchat-deploy-title">
+                  Publish WebChat with {selectedDeploymentLabel}
                 </h2>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -296,66 +421,80 @@ export function WebChatWorkspace() {
               </div>
             </div>
 
-            <div className="grid gap-4 p-4 sm:p-5">
-              <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/[0.06] p-1.5 sm:grid-cols-4" role="tablist" aria-label="Deployment formats">
-                {deploymentTabs.map((tab) => {
-                  const selected = deployTab === tab.id;
+            <div className="grid min-h-0 flex-1 lg:grid-cols-[244px_minmax(0,1fr)]">
+              <div className="shrink-0 border-b border-white/10 bg-[#090e19] p-2 lg:border-b-0 lg:border-r" role="tablist" aria-label="Deployment formats">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  {deploymentTabs.map((tab) => {
+                    const selected = deployTab === tab.id;
 
-                  return (
-                    <button
-                      aria-controls={`webchat-deploy-panel-${tab.id}`}
-                      aria-selected={selected}
-                      className={cn(
-                        "h-10 rounded-xl px-3 text-sm font-semibold transition",
-                        selected ? "bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_50%,#7c3aed_100%)] text-white shadow-[0_10px_24px_rgba(99,102,241,0.24)]" : "text-white/70 hover:bg-white/10 hover:text-white",
-                      )}
-                      id={`webchat-deploy-tab-${tab.id}`}
-                      key={tab.id}
-                      onClick={() => setDeployTab(tab.id)}
-                      role="tab"
-                      type="button"
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        aria-controls={`webchat-deploy-panel-${tab.id}`}
+                        aria-selected={selected}
+                        className={cn(
+                          "min-h-14 rounded-xl px-3 py-2 text-left transition",
+                          selected ? "bg-white/[0.1] text-white" : "text-white/55 hover:bg-white/[0.06] hover:text-white",
+                        )}
+                        id={`webchat-deploy-tab-${tab.id}`}
+                        key={tab.id}
+                        onClick={() => setDeployTab(tab.id)}
+                        role="tab"
+                        type="button"
+                      >
+                        <span className="block text-sm font-semibold">{tab.label}</span>
+                        <span className={cn("mt-1 block text-[11px] font-medium leading-4", selected ? "text-white/65" : "text-white/40")}>{tab.summary}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div
                 aria-labelledby={`webchat-deploy-tab-${deployTab}`}
-                className="grid gap-3"
+                className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto]"
                 id={`webchat-deploy-panel-${deployTab}`}
                 role="tabpanel"
               >
-                <CodeBlock label={`${deploymentTabs.find((tab) => tab.id === deployTab)?.label ?? "Deploy"} snippet`} value={snippets[deployTab]} />
-              </div>
+                <div className="min-h-0 overflow-y-auto p-4 sm:p-5">
+                  <div className="grid gap-4 xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] xl:items-start">
+                    <DeploymentGuidePanel guide={deploymentGuide} />
+                    <div className="grid gap-2">
+                      <p className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Snippet</p>
+                      <CodeBlock label={`${selectedDeploymentLabel} snippet`} value={snippets[deployTab]} />
+                    </div>
+                  </div>
+                </div>
 
-              <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 sm:flex-row sm:items-center">
-                {deployPreviewUrl ? (
-                  <a
-                    className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-semibold text-white/80 transition hover:border-[#60a5fa]/40 hover:text-white"
-                    href={deployPreviewUrl}
-                    rel="noreferrer"
-                    target="_blank"
+                <div className="flex shrink-0 flex-col gap-3 border-t border-white/10 bg-[#090e19] p-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-1 font-mono text-[11px] font-semibold uppercase text-white/40">Preview link</p>
+                    {deployPreviewUrl ? (
+                      <a
+                        className="block min-w-0 truncate rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-semibold text-white/80 transition hover:border-[#60a5fa]/40 hover:text-white"
+                        href={deployPreviewUrl}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {deployPreviewUrl}
+                      </a>
+                    ) : (
+                      <p className="min-w-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs font-medium text-white/45">
+                        Choose a bot to generate a live preview link.
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    className="h-10 rounded-full border-white/10 bg-white/[0.08] px-4 !text-white hover:bg-white/[0.12] disabled:bg-white/[0.04]"
+                    disabled={!deployPreviewUrl}
+                    leftIcon={previewCopied ? <Check aria-hidden="true" className="h-4 w-4" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
+                    onClick={copyLivePreviewUrl}
+                    size="sm"
+                    type="button"
+                    variant="outline"
                   >
-                    {deployPreviewUrl}
-                  </a>
-                ) : (
-                  <p className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm font-medium text-white/45">
-                    Choose a bot to generate a live preview link.
-                  </p>
-                )}
-                <Button
-                  className="h-10 rounded-full border-white/10 bg-white/[0.08] px-4 !text-white hover:bg-white/[0.12] disabled:bg-white/[0.04]"
-                  disabled={!deployPreviewUrl}
-                  leftIcon={previewCopied ? <Check aria-hidden="true" className="h-4 w-4" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
-                  onClick={copyLivePreviewUrl}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  {previewCopied ? "Copied" : "Copy"}
-                </Button>
+                    {previewCopied ? "Copied" : "Copy"}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -589,6 +728,19 @@ function BotSelector({
   selectedBotId: string;
   onSelect: (botId: string) => void;
 }) {
+  const botOptions: SelectMenuOption[] = [
+    {
+      label: loading ? "Loading bots..." : bots.length === 0 ? "No bots available" : "Select a bot",
+      value: "",
+      description: loading ? "Fetching bot targets" : bots.length === 0 ? "Create a bot before configuring WebChat" : "No preference owner selected",
+    },
+    ...bots.map((bot) => ({
+      label: bot.name,
+      value: bot.id,
+      description: bot.id,
+    })),
+  ];
+
   return (
     <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -600,19 +752,14 @@ function BotSelector({
           {!selectedBotId ? <AlertTriangle aria-hidden="true" className="h-5 w-5" /> : <CheckCircle2 aria-hidden="true" className="h-5 w-5" />}
         </span>
       </div>
-      <select
-        className="min-h-12 w-full rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] outline-none transition focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]"
+      <SelectMenu
+        ariaLabel="Bot target"
         disabled={loading || bots.length === 0}
+        options={botOptions}
+        placeholder={loading ? "Loading bots..." : "Select a bot"}
         value={selectedBotId}
-        onChange={(event) => onSelect(event.target.value)}
-      >
-        <option value="">{loading ? "Loading bots..." : "Select a bot"}</option>
-        {bots.map((bot) => (
-          <option key={bot.id} value={bot.id}>
-            {bot.name} / {bot.id}
-          </option>
-        ))}
-      </select>
+        onChange={onSelect}
+      />
       <p className="mt-3 text-sm font-medium leading-6 text-[var(--ui-muted)]">
         WebChat preferences are saved to the selected bot&apos;s Appwrite `theme_config`; the embed script reads them with `data-bot-id`.
       </p>
@@ -781,6 +928,41 @@ function PreviewBubble({
   );
 }
 
+function DeploymentGuidePanel({ guide }: { guide: DeploymentGuide }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
+      <div className="p-4">
+        <p className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Install guide</p>
+        <h3 className="mt-2 text-lg font-semibold leading-6 tracking-[-0.02em] text-white">{guide.title}</h3>
+        <p className="mt-2 text-xs font-medium leading-5 text-white/60">{guide.intro}</p>
+      </div>
+
+      <div className="border-y border-white/10 px-4 py-3">
+        <p className="text-xs font-medium leading-5 text-white/70">
+          <span className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Place it: </span>
+          {guide.placement}
+        </p>
+        <p className="mt-1 text-xs font-semibold leading-5 text-[#facc15]">{guide.highlight}</p>
+      </div>
+
+      <ol className="divide-y divide-white/10">
+        {guide.steps.map((step, index) => (
+          <li className="p-4 transition hover:bg-white/[0.04]" key={step.title}>
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 font-mono text-xs font-semibold text-[#93c5fd]">{String(index + 1).padStart(2, "0")}</span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold leading-5 text-white">{step.title}</p>
+                <p className="mt-1 text-xs font-medium leading-5 text-white/60">{step.body}</p>
+                {step.example ? <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-2 font-mono text-[11px] font-semibold leading-4 text-[#bfdbfe]">{step.example}</pre> : null}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
 function CodeBlock({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -791,15 +973,15 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#050816]">
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
-          <Braces aria-hidden="true" className="h-4 w-4 shrink-0 text-[#0099ff]" />
-          <p className="studio-kicker truncate text-[var(--ui-muted)]">{label}</p>
+          <Braces aria-hidden="true" className="h-4 w-4 shrink-0 text-[#93c5fd]" />
+          <p className="font-mono text-[11px] font-semibold uppercase text-white/50">{label}</p>
         </div>
         <button
           aria-label={`Copy ${label}`}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] transition hover:border-[var(--ui-blue)] hover:bg-[var(--ui-blue)]/10 hover:text-[var(--ui-text)]"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:border-[#60a5fa]/40 hover:bg-white/[0.1] hover:text-white"
           onClick={() => void copySnippet()}
           title={`Copy ${label}`}
           type="button"
@@ -807,7 +989,7 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
           {copied ? <Check aria-hidden="true" className="h-4 w-4 text-[#22c55e]" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
         </button>
       </div>
-      <pre className="max-h-36 overflow-auto whitespace-pre-wrap break-words font-mono text-xs font-semibold leading-5 text-[var(--ui-text)]">{value}</pre>
+      <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words p-3 font-mono text-[11px] font-semibold leading-5 text-[#dbeafe]">{value}</pre>
     </div>
   );
 }
