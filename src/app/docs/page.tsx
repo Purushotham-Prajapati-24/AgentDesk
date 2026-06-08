@@ -546,7 +546,7 @@ function askShipping() {
   const activeSnippet = sandboxSnippets[sandboxMode];
 
   return (
-    <div className="cockpit-lane flex min-h-screen min-w-0 flex-col overflow-x-hidden bg-[var(--ui-bg)] text-[var(--ui-text)]">
+    <div className="cockpit-lane flex min-h-screen min-w-0 flex-col bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <a
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-[#0099ff] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[#041018]"
         href="#docs-content"
@@ -627,8 +627,8 @@ function askShipping() {
 
       <div className="mx-auto grid w-full max-w-7xl flex-1 gap-5 px-4 pb-8 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:px-8">
         <aside className="min-w-0">
-          <div className="grid gap-4 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-            <div className="relative">
+          <div className="flex flex-col gap-4 rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)]">
+            <div className="relative shrink-0">
               <Search aria-hidden="true" className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--ui-muted)]" />
               <input
                 aria-label="Search documentation"
@@ -643,7 +643,7 @@ function askShipping() {
               />
             </div>
 
-            <nav className="space-y-5 pr-1" aria-label="Documentation sections">
+            <nav className="min-h-0 flex-1 overflow-y-auto space-y-5 pr-1" aria-label="Documentation sections">
               {categories.map((category) => {
                 const categorySections = filteredSections.filter((section) => section.category === category.id);
                 const Icon = category.icon;
