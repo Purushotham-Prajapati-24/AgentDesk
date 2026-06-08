@@ -40,9 +40,11 @@ The screenshots below are generated from the current UI and stored in `public/re
 
 | Area | Capability |
 | --- | --- |
-| AI support agents | Create tenant-scoped bots with identity, instructions, fallback behavior, and WebChat settings. |
+| AI support agents | Create tenant-scoped bots with identity, instructions, fallback behavior, and advanced WebChat configuration settings. |
+| WebChat customization | Customize widget surface, headers, input boxes, typography, colors, custom CSS overrides, and custom launcher icon settings in the visual customizer dashboard. |
+| Safe Markdown parsing | Cleanly format headings, lists, links, emphasis, and inline code in chat responses using an in-house safe compiler to avoid formatting leakage and raw asterisks. |
 | Retrieval grounded answers | Upload documents or ingest URLs, chunk source material, embed content, and retrieve context from Qdrant before generation. |
-| WebChat deployment | Ship a Shadow DOM widget with a single script tag or embed a full chat surface with an iframe. |
+| WebChat deployment | Ship a Shadow DOM widget with a single script tag or embed a full chat surface with an iframe (with custom guide snippets for React and Vue). |
 | Live handoff | Route active sessions into a Socket.IO powered operator inbox, pause automation, and reply as a human agent. |
 | Monitoring | Review users, conversations, active sessions, escalation pressure, and persisted transcripts. |
 | Usage control | Track credits, token spend, ledger activity, message volume, and tenant balances. |
