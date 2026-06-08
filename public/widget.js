@@ -32,6 +32,11 @@
             this.isSending = false;
             this.sessionToken = getSessionToken(botId);
             this.socket = null;
+            this.messageListRef = null;
+            this.typingRowRef = null;
+            this.composerInputRef = null;
+            this.sendButtonRef = null;
+            this.quickActionButtons = [];
             this.shadowRootRef = this.attachShadow({ mode: "open" });
         }
         connectedCallback() {
@@ -119,13 +124,14 @@
                 this.socket = socket;
                 if (socket) {
                     socket.on("agent-message", (message) => {
-                        this.messages.push({
+                        const chatMessage = {
                             id: message.message_id,
                             sender: "bot",
                             content: message.content,
-                        });
+                        };
+                        this.messages.push(chatMessage);
                         saveMessages(this.messages);
-                        this.renderShell();
+                        this.appendMessageRow(chatMessage);
                     });
                 }
             }
@@ -136,6 +142,11 @@
         renderShell() {
             var _a;
             const config = (_a = this.config) !== null && _a !== void 0 ? _a : buildFallbackConfig(botId);
+            this.messageListRef = null;
+            this.typingRowRef = null;
+            this.composerInputRef = null;
+            this.sendButtonRef = null;
+            this.quickActionButtons = [];
             this.shadowRootRef.replaceChildren(createStyles(config.theme), this.createWidget(config));
         }
         createWidget(config) {
@@ -184,9 +195,9 @@
             }
             const copy = createElement("div", "ad-title-wrap");
             const title = createElement("strong", "ad-title");
-            title.textContent = config.botName;
+            title.textContent = config.headerTitle || config.botName;
             const status = createElement("span", "ad-status");
-            status.textContent = config.bannerText;
+            status.textContent = config.headerSubtitle || config.bannerText;
             copy.append(title, status);
             identity.append(avatar, copy);
             header.append(identity);
@@ -210,35 +221,105 @@
         }
         createMessageList() {
             const list = createElement("div", "ad-messages");
+            this.messageListRef = list;
             for (const message of this.messages) {
-                const row = createElement("div", `ad-message-row ${message.sender}`);
-                const bubble = createElement("div", `ad-message ${message.sender}`);
-                appendMarkdown(bubble, message.content);
-                row.append(bubble);
-                list.append(row);
+                list.append(this.createMessageRow(message));
             }
             if (this.isSending) {
-                const row = createElement("div", "ad-message-row bot");
-                const typing = createElement("div", "ad-message bot ad-typing");
-                for (let index = 0; index < 3; index += 1) {
-                    typing.append(createElement("span", "ad-typing-dot"));
-                }
-                row.append(typing);
-                list.append(row);
+                this.appendTypingIndicator(list);
             }
             queueMicrotask(() => {
                 list.scrollTop = list.scrollHeight;
             });
             return list;
         }
+        createMessageRow(message) {
+            const row = createElement("div", `ad-message-row ${message.sender}`);
+            row.dataset.messageId = message.id;
+            const bubble = createElement("div", `ad-message ${message.sender}`);
+            appendMarkdown(bubble, message.content);
+            row.append(bubble);
+            return row;
+        }
+        appendMessageRow(message) {
+            if (!this.messageListRef) {
+                this.renderShell();
+                return null;
+            }
+            const row = this.createMessageRow(message);
+            this.messageListRef.append(row);
+            this.scrollMessagesToBottom();
+            return row;
+        }
+        updateMessageRow(message, row) {
+            var _a, _b, _c;
+            const targetRow = (_c = row !== null && row !== void 0 ? row : [...((_b = (_a = this.messageListRef) === null || _a === void 0 ? void 0 : _a.querySelectorAll("[data-message-id]")) !== null && _b !== void 0 ? _b : [])].find((item) => item.dataset.messageId === message.id)) !== null && _c !== void 0 ? _c : null;
+            const bubble = targetRow === null || targetRow === void 0 ? void 0 : targetRow.querySelector(".ad-message");
+            if (!bubble) {
+                return;
+            }
+            bubble.replaceChildren();
+            appendMarkdown(bubble, message.content);
+            this.scrollMessagesToBottom();
+        }
+        appendTypingIndicator(list = this.messageListRef) {
+            if (!list || this.typingRowRef) {
+                return;
+            }
+            const row = createElement("div", "ad-message-row bot");
+            row.dataset.typing = "true";
+            const typing = createElement("div", "ad-message bot ad-typing");
+            for (let index = 0; index < 3; index += 1) {
+                typing.append(createElement("span", "ad-typing-dot"));
+            }
+            row.append(typing);
+            list.append(row);
+            this.typingRowRef = row;
+            this.scrollMessagesToBottom();
+        }
+        removeTypingIndicator() {
+            if (this.typingRowRef) {
+                this.typingRowRef.remove();
+            }
+            this.typingRowRef = null;
+        }
+        setSendingState(isSending) {
+            this.isSending = isSending;
+            if (this.composerInputRef) {
+                this.composerInputRef.toggleAttribute("disabled", isSending);
+            }
+            if (this.sendButtonRef) {
+                this.sendButtonRef.disabled = isSending;
+            }
+            for (const button of this.quickActionButtons) {
+                button.disabled = isSending;
+            }
+            if (isSending) {
+                this.appendTypingIndicator();
+            }
+            else {
+                this.removeTypingIndicator();
+            }
+        }
+        scrollMessagesToBottom() {
+            const list = this.messageListRef;
+            if (!list) {
+                return;
+            }
+            queueMicrotask(() => {
+                list.scrollTop = list.scrollHeight;
+            });
+        }
         createQuickActions() {
             const actions = createElement("div", "ad-actions");
+            this.quickActionButtons = [];
             for (const label of ["Track order", "Return policy", "Talk to support"]) {
                 const button = createElement("button", "ad-action");
                 button.type = "button";
                 button.textContent = label;
                 button.disabled = this.isSending;
                 button.addEventListener("click", () => void this.sendMessage(label));
+                this.quickActionButtons.push(button);
                 actions.append(button);
             }
             return actions;
@@ -248,11 +329,13 @@
             const input = document.createElement("textarea");
             input.className = "ad-input";
             input.name = "message";
-            input.placeholder = "Write your message here...";
+            input.placeholder = config.inputPlaceholder || "Write your message here...";
             input.maxLength = MAX_MESSAGE_LENGTH;
             input.rows = 1;
             input.disabled = this.isSending;
+            this.composerInputRef = input;
             input.addEventListener("keydown", (event) => {
+                event.stopPropagation();
                 if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
                     form.requestSubmit();
@@ -262,6 +345,7 @@
             send.type = "submit";
             send.disabled = this.isSending;
             send.textContent = "Send";
+            this.sendButtonRef = send;
             const footer = createElement("p", "ad-footer");
             footer.textContent = "Powered by AgentDesk";
             form.addEventListener("submit", (event) => {
@@ -285,10 +369,11 @@
             }
             const config = (_a = explicitConfig !== null && explicitConfig !== void 0 ? explicitConfig : this.config) !== null && _a !== void 0 ? _a : buildFallbackConfig(botId);
             const content = text.slice(0, MAX_MESSAGE_LENGTH);
-            this.messages.push({ id: createId(), sender: "user", content });
+            const userMessage = { id: createId(), sender: "user", content };
+            this.messages.push(userMessage);
             saveMessages(this.messages);
-            this.isSending = true;
-            this.renderShell();
+            this.appendMessageRow(userMessage);
+            this.setSendingState(true);
             if (this.socket && this.socket.connected) {
                 try {
                     this.socket.emit("customer-message", {
@@ -310,19 +395,20 @@
                 await this.typeBotMessage(config.fallbackMessage);
             }
             finally {
-                this.isSending = false;
-                this.renderShell();
+                this.setSendingState(false);
             }
         }
         async typeBotMessage(content) {
+            this.removeTypingIndicator();
             const message = { id: createId(), sender: "bot", content: "" };
             this.messages.push(message);
+            const row = this.appendMessageRow(message);
             const chars = Array.from(content);
             for (let index = 0; index < chars.length; index += 1) {
                 message.content += chars[index];
                 if (index % 3 === 0 || index === chars.length - 1) {
                     saveMessages(this.messages);
-                    this.renderShell();
+                    this.updateMessageRow(message, row);
                     await delay(12);
                 }
             }
@@ -384,84 +470,284 @@
         }
     }
     function appendMarkdown(target, text) {
-        const lines = text.split(/\n{2,}/);
-        for (const line of lines) {
-            const paragraph = createElement("p", "ad-paragraph");
-            appendInlineMarkdown(paragraph, line);
-            target.append(paragraph);
+        for (const block of parseMarkdownBlocks(text)) {
+            appendMarkdownBlock(target, block);
         }
+    }
+    function parseMarkdownBlocks(text) {
+        const blocks = [];
+        const lines = text.replace(/\r\n?/g, "\n").split("\n");
+        const paragraphLines = [];
+        let pendingList = null;
+        const flushParagraph = () => {
+            const paragraph = paragraphLines.join(" ").trim();
+            paragraphLines.length = 0;
+            if (paragraph) {
+                blocks.push({ kind: "paragraph", text: paragraph });
+            }
+        };
+        const flushList = () => {
+            if (pendingList === null || pendingList === void 0 ? void 0 : pendingList.items.length) {
+                blocks.push({ kind: "list", ordered: pendingList.kind === "ol", items: pendingList.items });
+            }
+            pendingList = null;
+        };
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                flushParagraph();
+                flushList();
+                continue;
+            }
+            const headingMatch = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+            if (headingMatch) {
+                flushParagraph();
+                flushList();
+                blocks.push({ kind: "heading", level: headingMatch[1].length, text: headingMatch[2].trim() });
+                continue;
+            }
+            const unorderedMatch = /^[-*]\s+(.+)$/.exec(trimmed);
+            const orderedMatch = /^\d+[.)]\s+(.+)$/.exec(trimmed);
+            const listMatch = unorderedMatch !== null && unorderedMatch !== void 0 ? unorderedMatch : orderedMatch;
+            if (listMatch) {
+                flushParagraph();
+                const listKind = orderedMatch ? "ol" : "ul";
+                if (!pendingList || pendingList.kind !== listKind) {
+                    flushList();
+                    pendingList = { kind: listKind, items: [] };
+                }
+                pendingList.items.push(listMatch[1].trim());
+                continue;
+            }
+            if (pendingList) {
+                const itemIndex = pendingList.items.length - 1;
+                if (itemIndex >= 0) {
+                    pendingList.items[itemIndex] = `${pendingList.items[itemIndex]} ${trimmed}`;
+                    continue;
+                }
+            }
+            paragraphLines.push(trimmed);
+        }
+        flushParagraph();
+        flushList();
+        return blocks;
+    }
+    function appendMarkdownBlock(target, block) {
+        if (block.kind === "heading") {
+            const heading = document.createElement(`h${block.level}`);
+            heading.className = `ad-heading ad-heading-${block.level}`;
+            appendInlineMarkdown(heading, block.text);
+            target.append(heading);
+            return;
+        }
+        if (block.kind === "list") {
+            const list = document.createElement(block.ordered ? "ol" : "ul");
+            list.className = block.ordered ? "ad-list-ol" : "ad-list-ul";
+            for (const item of block.items) {
+                const listItem = document.createElement("li");
+                listItem.className = "ad-list-item";
+                appendInlineMarkdown(listItem, item);
+                list.append(listItem);
+            }
+            target.append(list);
+            return;
+        }
+        const paragraph = createElement("p", "ad-paragraph");
+        appendInlineMarkdown(paragraph, block.text);
+        target.append(paragraph);
     }
     function appendInlineMarkdown(target, text) {
-        var _a;
-        const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g;
         let cursor = 0;
-        for (const match of text.matchAll(pattern)) {
-            const token = match[0];
-            const index = (_a = match.index) !== null && _a !== void 0 ? _a : 0;
-            if (index > cursor) {
-                target.append(document.createTextNode(text.slice(cursor, index)));
+        let textBuffer = "";
+        const flushText = () => {
+            if (textBuffer) {
+                target.append(document.createTextNode(textBuffer));
+                textBuffer = "";
             }
-            target.append(formatMarkdownToken(token));
-            cursor = index + token.length;
+        };
+        while (cursor < text.length) {
+            const code = readDelimitedToken(text, cursor, "`", "`");
+            if (code) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "code", text: code.text }));
+                cursor = code.end;
+                continue;
+            }
+            const markdownLink = readMarkdownLink(text, cursor);
+            if (markdownLink) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "link", text: markdownLink.text, href: markdownLink.href }));
+                cursor = markdownLink.end;
+                continue;
+            }
+            const strong = readDelimitedToken(text, cursor, "**", "**");
+            if (strong) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "strong", text: strong.text }));
+                cursor = strong.end;
+                continue;
+            }
+            const emphasis = text.startsWith("*", cursor) && !text.startsWith("**", cursor) ? readDelimitedToken(text, cursor, "*", "*") : null;
+            if (emphasis) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "emphasis", text: emphasis.text }));
+                cursor = emphasis.end;
+                continue;
+            }
+            const rawUrl = readRawUrl(text, cursor);
+            if (rawUrl) {
+                flushText();
+                target.append(formatMarkdownToken({ kind: "link", text: rawUrl.href, href: rawUrl.href }));
+                textBuffer += rawUrl.trailing;
+                cursor = rawUrl.end;
+                continue;
+            }
+            textBuffer += text[cursor];
+            cursor += 1;
         }
-        if (cursor < text.length) {
-            target.append(document.createTextNode(text.slice(cursor)));
-        }
+        flushText();
     }
     function formatMarkdownToken(token) {
-        if (token.startsWith("**")) {
+        if (token.kind === "strong") {
             const strong = document.createElement("strong");
-            strong.textContent = token.slice(2, -2);
+            appendInlineMarkdown(strong, token.text);
             return strong;
         }
-        if (token.startsWith("`")) {
+        if (token.kind === "emphasis") {
+            const emphasis = document.createElement("em");
+            appendInlineMarkdown(emphasis, token.text);
+            return emphasis;
+        }
+        if (token.kind === "code") {
             const code = document.createElement("code");
-            code.textContent = token.slice(1, -1);
+            code.textContent = token.text;
             return code;
         }
-        const linkMatch = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(token);
-        if (linkMatch) {
-            const anchor = document.createElement("a");
-            anchor.href = linkMatch[2];
-            anchor.textContent = linkMatch[1];
-            anchor.target = "_blank";
-            anchor.rel = "noopener noreferrer";
-            return anchor;
+        const anchor = document.createElement("a");
+        anchor.className = "ad-link";
+        anchor.href = token.href;
+        anchor.textContent = token.text;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        return anchor;
+    }
+    function readDelimitedToken(text, cursor, opener, closer) {
+        if (!text.startsWith(opener, cursor)) {
+            return null;
         }
-        return document.createTextNode(token);
+        const contentStart = cursor + opener.length;
+        const contentEnd = text.indexOf(closer, contentStart);
+        if (contentEnd <= contentStart) {
+            return null;
+        }
+        return {
+            text: text.slice(contentStart, contentEnd),
+            end: contentEnd + closer.length,
+        };
+    }
+    function readMarkdownLink(text, cursor) {
+        if (!text.startsWith("[", cursor)) {
+            return null;
+        }
+        const labelEnd = text.indexOf("](", cursor + 1);
+        if (labelEnd === -1) {
+            return null;
+        }
+        const hrefStart = labelEnd + 2;
+        const hrefEnd = text.indexOf(")", hrefStart);
+        if (hrefEnd === -1) {
+            return null;
+        }
+        const label = text.slice(cursor + 1, labelEnd);
+        const href = text.slice(hrefStart, hrefEnd);
+        if (!label.trim() || !isSafeHttpUrl(href)) {
+            return null;
+        }
+        return {
+            text: label,
+            href,
+            end: hrefEnd + 1,
+        };
+    }
+    function readRawUrl(text, cursor) {
+        const match = /^https?:\/\/[^\s<>"']+/i.exec(text.slice(cursor));
+        if (!match) {
+            return null;
+        }
+        const candidate = match[0];
+        const { href, trailing } = splitTrailingUrlPunctuation(candidate);
+        if (!isSafeHttpUrl(href)) {
+            return null;
+        }
+        return {
+            href,
+            trailing,
+            end: cursor + candidate.length,
+        };
+    }
+    function splitTrailingUrlPunctuation(value) {
+        let href = value;
+        let trailing = "";
+        while (href && /[.,!?;:)\]]/.test(href[href.length - 1])) {
+            trailing = `${href[href.length - 1]}${trailing}`;
+            href = href.slice(0, -1);
+        }
+        return { href, trailing };
+    }
+    function isSafeHttpUrl(value) {
+        return /^https?:\/\/[^\s]+$/i.test(value);
     }
     function normalizeConfig(config) {
+        const fallback = buildFallbackConfig(config.botId);
         return {
-            ...buildFallbackConfig(config.botId),
+            ...fallback,
             ...config,
-            theme: { ...buildFallbackConfig(config.botId).theme, ...config.theme },
+            headerTitle: stringValue(config.headerTitle, stringValue(config.botName, fallback.botName)),
+            headerSubtitle: stringValue(config.headerSubtitle, stringValue(config.bannerText, fallback.headerSubtitle)),
+            inputPlaceholder: stringValue(config.inputPlaceholder, fallback.inputPlaceholder),
+            theme: { ...fallback.theme, ...config.theme },
             logoUrl: config.logoUrl || null,
             useCustomIcon: config.useCustomIcon === true,
             widgetIconUrl: normalizeImageUrl(config.widgetIconUrl),
         };
+    }
+    function stringValue(value, fallback) {
+        return typeof value === "string" && value.trim() ? value.trim() : fallback;
     }
     function buildFallbackConfig(currentBotId) {
         return {
             botId: currentBotId,
             tenantId: "public-demo-tenant",
             botName: "AgentDesk Support",
+            headerTitle: "AgentDesk Support",
+            headerSubtitle: "Online - responds instantly",
             greeting: "Hello. I can help with orders, policies, and support questions.",
             fallbackMessage: "I could not reach the support engine. Please try again in a moment.",
             logoUrl: null,
             useCustomIcon: false,
             widgetIconUrl: null,
             bannerText: "Online - responds instantly",
+            inputPlaceholder: "Write your message here...",
             messageEndpoint: `${scriptOrigin}/api/chat/message`,
             websocketEndpoint: null,
             theme: {
-                headerHsl: "224 20% 18%",
-                backgroundHsl: "224 25% 12%",
-                textHsl: "210 40% 98%",
-                mutedTextHsl: "215 20% 75%",
-                userBubbleHsl: "250 85% 60%",
-                botBubbleHsl: "224 20% 18%",
-                accentHsl: "250 85% 60%",
+                headerHsl: "0 0% 11%",
+                headerTextHsl: "0 0% 100%",
+                headerSubtextHsl: "0 0% 84%",
+                headerCloseButtonHsl: "0 0% 100%",
+                headerFontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+                backgroundHsl: "43 38% 95%",
+                textHsl: "0 0% 11%",
+                mutedTextHsl: "60 1% 37%",
+                userBubbleHsl: "224 88% 51%",
+                botBubbleHsl: "40 50% 98%",
+                accentHsl: "204 100% 50%",
                 fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+                inputBackgroundHsl: "0 0% 100%",
+                inputTextHsl: "0 0% 11%",
+                inputPlaceholderHsl: "60 1% 37%",
+                inputBorderHsl: "40 34% 93%",
+                inputFontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
             },
         };
     }
@@ -469,18 +755,27 @@
         const style = document.createElement("style");
         style.textContent = `
       :host {
-        --ad-bg-primary: hsla(${theme.backgroundHsl} / 0.9);
-        --ad-bg-secondary: hsla(${theme.botBubbleHsl} / 0.96);
-        --ad-header-bg: hsla(${theme.headerHsl} / 0.96);
+        --ad-bg-primary: hsl(${theme.backgroundHsl});
+        --ad-bg-secondary: hsl(${theme.botBubbleHsl});
+        --ad-header-bg: hsl(${theme.headerHsl});
+        --ad-header-text: hsl(${theme.headerTextHsl});
+        --ad-header-subtext: hsl(${theme.headerSubtextHsl});
+        --ad-header-close: hsl(${theme.headerCloseButtonHsl});
         --ad-text-primary: hsl(${theme.textHsl});
         --ad-text-secondary: hsl(${theme.mutedTextHsl});
         --ad-accent-solid: hsl(${theme.accentHsl});
         --ad-user-bubble: hsl(${theme.userBubbleHsl});
-        --ad-border-color: hsla(224 20% 80% / 0.16);
-        --ad-accent-glow: hsla(${theme.accentHsl} / 0.25);
+        --ad-border-color: #eceae4;
+        --ad-accent-glow: hsla(${theme.accentHsl} / 0.18);
         --ad-font-body: ${theme.fontFamily};
+        --ad-font-header: ${theme.headerFontFamily};
+        --ad-font-input: ${theme.inputFontFamily};
+        --ad-input-bg: hsl(${theme.inputBackgroundHsl});
+        --ad-input-text: hsl(${theme.inputTextHsl});
+        --ad-input-placeholder: hsl(${theme.inputPlaceholderHsl});
+        --ad-input-border: hsl(${theme.inputBorderHsl});
         all: initial;
-        color-scheme: dark;
+        color-scheme: light;
         display: block;
         font-family: var(--ad-font-body);
       }
@@ -515,8 +810,8 @@
       .ad-chat-pane {
         background: var(--ad-bg-primary);
         border: 1px solid var(--ad-border-color);
-        border-radius: 18px;
-        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.38);
+        border-radius: 22px;
+        box-shadow: 0 18px 60px rgba(28, 28, 28, 0.16);
         color: var(--ad-text-primary);
         display: flex;
         flex-direction: column;
@@ -531,8 +826,6 @@
         transition: opacity 180ms ease, transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
         max-width: calc(100svw - 32px);
         width: min(380px, calc(100svw - 32px));
-        backdrop-filter: blur(16px) saturate(180%);
-        -webkit-backdrop-filter: blur(16px) saturate(180%);
       }
 
       .ad-widget.inline .ad-chat-pane {
@@ -556,10 +849,13 @@
         align-items: center;
         background: var(--ad-header-bg);
         border-bottom: 1px solid var(--ad-border-color);
+        border-radius: 999px;
         display: flex;
+        font-family: var(--ad-font-header);
         justify-content: space-between;
         min-height: 74px;
-        padding: 16px;
+        margin: 12px;
+        padding: 12px 14px;
       }
 
       .ad-identity {
@@ -597,7 +893,7 @@
       }
 
       .ad-title {
-        color: var(--ad-text-primary);
+        color: var(--ad-header-text);
         font-size: 15px;
         line-height: 1.2;
         overflow: hidden;
@@ -606,7 +902,7 @@
       }
 
       .ad-status {
-        color: var(--ad-text-secondary);
+        color: var(--ad-header-subtext);
         font-size: 12px;
         line-height: 1.3;
       }
@@ -614,7 +910,7 @@
       .ad-icon-button {
         background: transparent;
         border: 0;
-        color: var(--ad-text-secondary);
+        color: var(--ad-header-close);
         cursor: pointer;
         font-size: 24px;
         height: 34px;
@@ -641,7 +937,8 @@
       }
 
       .ad-message {
-        border-radius: 16px;
+        animation: stream-in 180ms ease-out both;
+        border-radius: 18px;
         font-size: 14px;
         line-height: 1.5;
         max-width: 88%;
@@ -668,9 +965,58 @@
         margin-top: 8px;
       }
 
+      .ad-heading {
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.35;
+        margin: 0;
+      }
+
+      .ad-heading-1 {
+        font-size: 15px;
+      }
+
+      .ad-paragraph + .ad-heading,
+      .ad-heading + .ad-paragraph,
+      .ad-heading + .ad-list-ul,
+      .ad-heading + .ad-list-ol,
+      .ad-list-ul + .ad-paragraph,
+      .ad-list-ol + .ad-paragraph,
+      .ad-list-ul + .ad-heading,
+      .ad-list-ol + .ad-heading {
+        margin-top: 8px;
+      }
+
+      .ad-list-ul,
+      .ad-list-ol {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .ad-list-ul + .ad-list-ul,
+      .ad-list-ul + .ad-list-ol,
+      .ad-list-ol + .ad-list-ul,
+      .ad-list-ol + .ad-list-ol,
+      .ad-paragraph + .ad-list-ul,
+      .ad-paragraph + .ad-list-ol {
+        margin-top: 8px;
+      }
+
+      .ad-list-item {
+        margin: 0;
+        padding-left: 2px;
+      }
+
+      .ad-list-item + .ad-list-item {
+        margin-top: 4px;
+      }
+
+      .ad-link,
       .ad-message a {
         color: inherit;
         font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
 
       .ad-message code {
@@ -706,7 +1052,7 @@
       }
 
       .ad-action {
-        background: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.68);
         border: 1px solid var(--ad-border-color);
         border-radius: 999px;
         color: var(--ad-text-primary);
@@ -734,10 +1080,11 @@
       }
 
       .ad-input {
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid var(--ad-border-color);
+        background: var(--ad-input-bg);
+        border: 1px solid var(--ad-input-border);
         border-radius: 14px;
-        color: var(--ad-text-primary);
+        color: var(--ad-input-text);
+        font-family: var(--ad-font-input);
         max-height: 96px;
         min-width: 0;
         min-height: 42px;
@@ -748,12 +1095,12 @@
       }
 
       .ad-input::placeholder {
-        color: var(--ad-text-secondary);
+        color: var(--ad-input-placeholder);
       }
 
       .ad-input:focus {
         border-color: var(--ad-accent-solid);
-        box-shadow: 0 0 0 3px var(--ad-accent-glow);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
       }
 
       .ad-send {
@@ -781,7 +1128,7 @@
         border: 0;
         border-radius: 50%;
         bottom: 0;
-        box-shadow: 0 10px 30px var(--ad-accent-glow);
+        box-shadow: 0 12px 32px var(--ad-accent-glow);
         color: white;
         cursor: pointer;
         display: flex;
@@ -815,6 +1162,11 @@
       @keyframes ad-bubble-breath {
         0%, 100% { box-shadow: 0 10px 30px var(--ad-accent-glow), 0 0 0 0 hsla(${theme.accentHsl} / 0.38); }
         70% { box-shadow: 0 12px 36px var(--ad-accent-glow), 0 0 0 12px hsla(${theme.accentHsl} / 0); }
+      }
+
+      @keyframes stream-in {
+        0% { opacity: 0; transform: translateY(4px); }
+        100% { opacity: 1; transform: translateY(0); }
       }
 
       @media (max-width: 480px) {

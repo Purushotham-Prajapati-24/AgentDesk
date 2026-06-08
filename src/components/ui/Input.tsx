@@ -21,7 +21,7 @@ export const Input: React.FC<InputProps> = ({ label, error, hint, id, className,
       <input
         id={inputId}
         className={cn(
-          "block min-h-11 w-full rounded-md border border-input bg-card-elevated px-3 py-2 text-sm font-medium text-foreground placeholder:text-muted transition duration-200 ease-out focus:border-primary focus:bg-card disabled:cursor-not-allowed disabled:opacity-60",
+          "block min-h-11 w-full rounded-md border border-input bg-card-elevated px-3 py-2 text-sm font-medium text-foreground placeholder:text-muted transition duration-200 ease-out focus:border-[#0099ff] focus:bg-card disabled:cursor-not-allowed disabled:opacity-60",
           error && "border-destructive text-destructive",
           className,
         )}

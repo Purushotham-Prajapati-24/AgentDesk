@@ -18,15 +18,26 @@ interface TenantContextType {
 }
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
+const VISUAL_AUDIT_ENABLED = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_VISUAL_AUDIT_MODE === "true";
+const VISUAL_AUDIT_TENANT: TenantDetails = {
+  $id: "tenant_visual_audit",
+  name: "Visual Audit Tenant",
+  plan: "Pro",
+  balance: 1240,
+};
 
 export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [tenant, setTenant] = useState<TenantDetails | null>(null);
-  const [role, setRole] = useState<"admin" | "agent" | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [tenant, setTenant] = useState<TenantDetails | null>(VISUAL_AUDIT_ENABLED ? VISUAL_AUDIT_TENANT : null);
+  const [role, setRole] = useState<"admin" | "agent" | null>(VISUAL_AUDIT_ENABLED ? "admin" : null);
+  const [loading, setLoading] = useState(!VISUAL_AUDIT_ENABLED);
 
   useEffect(() => {
     const fetchTenantData = async () => {
+      if (VISUAL_AUDIT_ENABLED) {
+        return;
+      }
+
       if (!user) {
         setTenant(null);
         setRole(null);

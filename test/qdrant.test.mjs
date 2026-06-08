@@ -86,6 +86,44 @@ test("invalid tenant or bot inputs do not call Qdrant search", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("knowledge point IDs are deterministic per file and chunk", () => {
+  const first = qdrant.knowledgePointId("file-1", 0);
+  const second = qdrant.knowledgePointId("file-1", 0);
+  const differentChunk = qdrant.knowledgePointId("file-1", 1);
+  const differentFile = qdrant.knowledgePointId("file-2", 0);
+
+  assert.equal(first, second);
+  assert.notEqual(first, differentChunk);
+  assert.notEqual(first, differentFile);
+  assert.match(first, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+});
+
+test("upsertKnowledgePoints uses deterministic IDs to overwrite retried chunks", async () => {
+  const calls = mockFetch([{ ok: true, json: async () => ({}) }]);
+  const chunks = [
+    { content: "Refund policy", chunkIndex: 0 },
+    { content: "Shipping policy", chunkIndex: 1 },
+  ];
+
+  await qdrant.upsertKnowledgePoints({
+    chunks,
+    embeddings: [
+      [0.1, 0.2],
+      [0.3, 0.4],
+    ],
+    tenantId: "tenant-1",
+    botId: "bot-1",
+    fileId: "file-1",
+    fileName: "file-name",
+  });
+
+  const body = JSON.parse(calls[0].init.body);
+  assert.deepEqual(
+    body.points.map((point) => point.id),
+    [qdrant.knowledgePointId("file-1", 0), qdrant.knowledgePointId("file-1", 1)],
+  );
+});
+
 test("hybrid collection setup creates tenant-aware and bot keyword payload indexes", async () => {
   const calls = mockFetch([
     { ok: true, json: async () => ({}) },

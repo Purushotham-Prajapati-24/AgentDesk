@@ -1,5 +1,6 @@
 import { ID, type Users } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
+import { discoverSitemapUrls, looksLikeSitemapUrl, normalizeHttpUrl } from "@/lib/server/crawler";
 
 type UrlIngestRequest = {
   tenant_id: string;
@@ -8,7 +9,7 @@ type UrlIngestRequest = {
   url: string;
 };
 
-const MAX_FETCH_BYTES = 2 * 1024 * 1024;
+const SITEMAP_PAGE_LIMIT = 30;
 
 export async function POST(request: Request) {
   let body: Partial<UrlIngestRequest>;
@@ -36,9 +37,31 @@ export async function POST(request: Request) {
     const { users, databases } = await createAdminClient();
     await assertTenantAccess(users, userId, tenantId);
 
-    const parsedText = await fetchUrlAsMarkdown(url);
-    if (!parsedText.trim()) {
-      return jsonError("EMPTY_URL", "No readable text could be extracted from this URL.", 422);
+    if (looksLikeSitemapUrl(url)) {
+      const pageUrls = await discoverSitemapUrls(url, SITEMAP_PAGE_LIMIT);
+      if (pageUrls.length === 0) {
+        return jsonError("EMPTY_SITEMAP", "No valid page URLs were found in this sitemap.", 422);
+      }
+
+      const createdDocuments = [];
+      for (const pageUrl of pageUrls) {
+        const document = await databases.createDocument(databaseId(), documentsCollectionId(), ID.unique(), {
+          tenant_id: tenantId,
+          bot_id: botId,
+          file_name: getUrlFileName(pageUrl),
+          file_type: "url",
+          storage_path: pageUrl,
+          file_size: 0,
+          status: "queued",
+          created: new Date().toISOString(),
+        });
+        createdDocuments.push({ document_id: document.$id, url: pageUrl });
+      }
+
+      return Response.json(
+        { success: true, data: { sitemap: true, queued: createdDocuments, count: createdDocuments.length } },
+        { status: 201 },
+      );
     }
 
     const document = await databases.createDocument(databaseId(), documentsCollectionId(), ID.unique(), {
@@ -47,56 +70,15 @@ export async function POST(request: Request) {
       file_name: getUrlFileName(url),
       file_type: "url",
       storage_path: url,
-      file_size: parsedText.length,
-      status: "processing",
-      parsed_text: parsedText.slice(0, 500000),
+      file_size: 0,
+      status: "queued",
       created: new Date().toISOString(),
     });
 
-    return Response.json({ success: true, data: { document_id: document.$id, url } }, { status: 201 });
+    return Response.json({ success: true, data: { document_id: document.$id, url, status: "queued" } }, { status: 201 });
   } catch (error: unknown) {
     return jsonError("URL_INGEST_FAILED", error instanceof Error ? error.message : "URL ingestion failed.", 500);
   }
-}
-
-async function fetchUrlAsMarkdown(url: string) {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "text/html,text/plain,application/xhtml+xml",
-      "User-Agent": "AgentDeskBot/1.0",
-    },
-    signal: AbortSignal.timeout(10000),
-  });
-
-  if (!response.ok) {
-    throw new Error("URL could not be fetched.");
-  }
-
-  const contentLength = Number(response.headers.get("content-length") ?? "0");
-  if (contentLength > MAX_FETCH_BYTES) {
-    throw new Error("URL content is too large to ingest.");
-  }
-
-  const contentType = response.headers.get("content-type") ?? "";
-  const text = (await response.text()).slice(0, MAX_FETCH_BYTES);
-  return contentType.includes("html") ? htmlToMarkdownishText(text) : normalizeText(text);
-}
-
-function htmlToMarkdownishText(html: string) {
-  return normalizeText(
-    html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<\/(h[1-6]|p|li|tr|section|article|div)>/gi, "\n")
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, "\"")
-      .replace(/&#39;/g, "'"),
-  );
 }
 
 async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
@@ -107,30 +89,9 @@ async function assertTenantAccess(users: Users, userId: string, tenantId: string
   }
 }
 
-function normalizeHttpUrl(value: unknown) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  try {
-    const url = new URL(value.trim());
-    if (!["http:", "https:"].includes(url.protocol)) {
-      return null;
-    }
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
 function getUrlFileName(url: string) {
   const parsed = new URL(url);
   return `${parsed.hostname}${parsed.pathname}`.replace(/[^\w.\- ]+/g, "-").slice(0, 180) || parsed.hostname;
-}
-
-function normalizeText(text: string) {
-  return text.replace(/\u0000/g, "").replace(/\r\n/g, "\n").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function databaseId() {

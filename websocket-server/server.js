@@ -13,7 +13,7 @@ import {
 } from "./session-store.js";
 
 const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
-const DEFAULT_CORS_ORIGIN = "https://agentdeskbot.vercel.app,http://localhost:3000,http://127.0.0.1:3000";
+const DEFAULT_CORS_ORIGIN = "*";
 const MAX_MESSAGE_LENGTH = 4000;
 const SESSION_STATUSES = new Set(["active", "paused_by_human", "closed"]);
 

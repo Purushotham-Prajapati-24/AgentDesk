@@ -134,6 +134,7 @@ export async function saveWebChatBotConfig({
 function webChatConfigFromBot(bot: Omit<WebChatBotSummary, "config">): WebChatConfig {
   const themeConfig = parseThemeConfig(bot.themeConfig);
   const theme = safeRecord(themeConfig.theme);
+  const baseFontFamily = stringValue(theme.fontFamily, fontStack(DEFAULT_WEBCHAT_CONFIG.appearance.fontFamily));
 
   return WebChatConfigSchema.parse({
     ...DEFAULT_WEBCHAT_CONFIG,
@@ -145,13 +146,25 @@ function webChatConfigFromBot(bot: Omit<WebChatBotSummary, "config">): WebChatCo
     },
     appearance: {
       ...DEFAULT_WEBCHAT_CONFIG.appearance,
+      headerTitle: stringValue(themeConfig.headerTitle, ""),
+      headerSubtitle: stringValue(themeConfig.headerSubtitle, stringValue(themeConfig.bannerText, DEFAULT_WEBCHAT_CONFIG.appearance.headerSubtitle)),
       headerColor: hslToHex(stringValue(theme.headerHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerColor,
+      headerTextColor: hslToHex(stringValue(theme.headerTextHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerTextColor,
+      headerSubtextColor: hslToHex(stringValue(theme.headerSubtextHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerSubtextColor,
+      headerCloseButtonColor: hslToHex(stringValue(theme.headerCloseButtonHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerCloseButtonColor,
+      headerFontFamily: fontChoiceFromStack(stringValue(theme.headerFontFamily, baseFontFamily)),
       backgroundColor: hslToHex(stringValue(theme.backgroundHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.backgroundColor,
       textColor: hslToHex(stringValue(theme.textHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.textColor,
       userBubbleColor: hslToHex(stringValue(theme.userBubbleHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.userBubbleColor,
       botBubbleColor: hslToHex(stringValue(theme.botBubbleHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.botBubbleColor,
       accentColor: hslToHex(stringValue(theme.accentHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.accentColor,
-      fontFamily: fontChoiceFromStack(stringValue(theme.fontFamily, "")),
+      fontFamily: fontChoiceFromStack(baseFontFamily),
+      inputPlaceholder: stringValue(themeConfig.inputPlaceholder, DEFAULT_WEBCHAT_CONFIG.appearance.inputPlaceholder),
+      inputBackgroundColor: hslToHex(stringValue(theme.inputBackgroundHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputBackgroundColor,
+      inputTextColor: hslToHex(stringValue(theme.inputTextHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputTextColor,
+      inputPlaceholderColor: hslToHex(stringValue(theme.inputPlaceholderHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputPlaceholderColor,
+      inputBorderColor: hslToHex(stringValue(theme.inputBorderHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputBorderColor,
+      inputFontFamily: fontChoiceFromStack(stringValue(theme.inputFontFamily, baseFontFamily)),
       useCustomIcon: booleanValue(themeConfig.useCustomIcon, DEFAULT_WEBCHAT_CONFIG.appearance.useCustomIcon),
       widgetIconUrl: stringValue(themeConfig.widgetIconUrl, ""),
       customCss: stringValue(themeConfig.customCss, ""),
@@ -170,6 +183,8 @@ function webChatConfigFromBot(bot: Omit<WebChatBotSummary, "config">): WebChatCo
 
 function webChatConfigFromDocument(document: WebChatConfigDocument, botThemeConfig = "{}"): WebChatConfig {
   const themeConfig = parseThemeConfig(botThemeConfig);
+  const theme = safeRecord(themeConfig.theme);
+  const documentFontFamily = fontStack(fontChoiceFromValue(document.font_family));
 
   return WebChatConfigSchema.parse({
     ...DEFAULT_WEBCHAT_CONFIG,
@@ -179,13 +194,26 @@ function webChatConfigFromDocument(document: WebChatConfigDocument, botThemeConf
       description: stringValue(document.description, DEFAULT_WEBCHAT_CONFIG.identity.description),
     },
     appearance: {
+      ...DEFAULT_WEBCHAT_CONFIG.appearance,
+      headerTitle: stringValue(themeConfig.headerTitle, ""),
+      headerSubtitle: stringValue(themeConfig.headerSubtitle, stringValue(themeConfig.bannerText, DEFAULT_WEBCHAT_CONFIG.appearance.headerSubtitle)),
       headerColor: stringValue(document.header_color, DEFAULT_WEBCHAT_CONFIG.appearance.headerColor),
+      headerTextColor: hslToHex(stringValue(theme.headerTextHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerTextColor,
+      headerSubtextColor: hslToHex(stringValue(theme.headerSubtextHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerSubtextColor,
+      headerCloseButtonColor: hslToHex(stringValue(theme.headerCloseButtonHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.headerCloseButtonColor,
+      headerFontFamily: fontChoiceFromStack(stringValue(theme.headerFontFamily, stringValue(theme.fontFamily, documentFontFamily))),
       backgroundColor: stringValue(document.background_color, DEFAULT_WEBCHAT_CONFIG.appearance.backgroundColor),
       textColor: stringValue(document.text_color, DEFAULT_WEBCHAT_CONFIG.appearance.textColor),
       userBubbleColor: stringValue(document.user_bubble_color, DEFAULT_WEBCHAT_CONFIG.appearance.userBubbleColor),
       botBubbleColor: stringValue(document.bot_bubble_color, DEFAULT_WEBCHAT_CONFIG.appearance.botBubbleColor),
       accentColor: stringValue(document.accent_color, DEFAULT_WEBCHAT_CONFIG.appearance.accentColor),
       fontFamily: fontChoiceFromValue(document.font_family),
+      inputPlaceholder: stringValue(themeConfig.inputPlaceholder, DEFAULT_WEBCHAT_CONFIG.appearance.inputPlaceholder),
+      inputBackgroundColor: hslToHex(stringValue(theme.inputBackgroundHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputBackgroundColor,
+      inputTextColor: hslToHex(stringValue(theme.inputTextHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputTextColor,
+      inputPlaceholderColor: hslToHex(stringValue(theme.inputPlaceholderHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputPlaceholderColor,
+      inputBorderColor: hslToHex(stringValue(theme.inputBorderHsl, "")) ?? DEFAULT_WEBCHAT_CONFIG.appearance.inputBorderColor,
+      inputFontFamily: fontChoiceFromStack(stringValue(theme.inputFontFamily, stringValue(theme.fontFamily, documentFontFamily))),
       useCustomIcon: booleanValue(themeConfig.useCustomIcon, DEFAULT_WEBCHAT_CONFIG.appearance.useCustomIcon),
       widgetIconUrl: stringValue(themeConfig.widgetIconUrl, ""),
       customCss: stringValue(document.custom_css, ""),
@@ -279,7 +307,10 @@ function webChatConfigToThemeConfig(config: WebChatConfig) {
   return {
     greeting: config.identity.description,
     logoUrl: config.identity.avatarUrl || null,
-    bannerText: "Online - responds instantly",
+    headerTitle: config.appearance.headerTitle,
+    headerSubtitle: config.appearance.headerSubtitle,
+    bannerText: config.appearance.headerSubtitle || DEFAULT_WEBCHAT_CONFIG.appearance.headerSubtitle,
+    inputPlaceholder: config.appearance.inputPlaceholder,
     useCustomIcon: config.appearance.useCustomIcon,
     widgetIconUrl: config.appearance.widgetIconUrl || null,
     customCss: config.appearance.customCss,
@@ -294,6 +325,10 @@ function webChatConfigToThemeConfig(config: WebChatConfig) {
     features: config.features,
     theme: {
       headerHsl: hexToHsl(config.appearance.headerColor),
+      headerTextHsl: hexToHsl(config.appearance.headerTextColor),
+      headerSubtextHsl: hexToHsl(config.appearance.headerSubtextColor),
+      headerCloseButtonHsl: hexToHsl(config.appearance.headerCloseButtonColor),
+      headerFontFamily: fontStack(config.appearance.headerFontFamily),
       backgroundHsl: hexToHsl(config.appearance.backgroundColor),
       textHsl: hexToHsl(config.appearance.textColor),
       mutedTextHsl: "215 20% 75%",
@@ -301,6 +336,11 @@ function webChatConfigToThemeConfig(config: WebChatConfig) {
       botBubbleHsl: hexToHsl(config.appearance.botBubbleColor),
       accentHsl: hexToHsl(config.appearance.accentColor),
       fontFamily: fontStack(config.appearance.fontFamily),
+      inputBackgroundHsl: hexToHsl(config.appearance.inputBackgroundColor),
+      inputTextHsl: hexToHsl(config.appearance.inputTextColor),
+      inputPlaceholderHsl: hexToHsl(config.appearance.inputPlaceholderColor),
+      inputBorderHsl: hexToHsl(config.appearance.inputBorderColor),
+      inputFontFamily: fontStack(config.appearance.inputFontFamily),
     },
   };
 }
@@ -410,7 +450,7 @@ function fontStack(font: WebChatConfig["appearance"]["fontFamily"]) {
   if (font === "Outfit") return "Outfit, system-ui, sans-serif";
   if (font === "System") return "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
   if (font === "Mono") return "Fira Code, Consolas, ui-monospace, monospace";
-  return "Fira Sans, system-ui, sans-serif";
+  return "Inter, system-ui, sans-serif";
 }
 
 function fontChoiceFromStack(value: string): WebChatConfig["appearance"]["fontFamily"] {
