@@ -5,6 +5,10 @@ import { getPublicServerWebSocketUrl } from "@/lib/server/websocket-url";
 
 type WidgetTheme = {
   headerHsl: string;
+  headerTextHsl: string;
+  headerSubtextHsl: string;
+  headerCloseButtonHsl: string;
+  headerFontFamily: string;
   backgroundHsl: string;
   textHsl: string;
   mutedTextHsl: string;
@@ -12,18 +16,26 @@ type WidgetTheme = {
   botBubbleHsl: string;
   accentHsl: string;
   fontFamily: string;
+  inputBackgroundHsl: string;
+  inputTextHsl: string;
+  inputPlaceholderHsl: string;
+  inputBorderHsl: string;
+  inputFontFamily: string;
 };
 
 type WidgetConfig = {
   botId: string;
   tenantId: string;
   botName: string;
+  headerTitle: string;
+  headerSubtitle: string;
   greeting: string;
   fallbackMessage: string;
   logoUrl: string | null;
   useCustomIcon: boolean;
   widgetIconUrl: string | null;
   bannerText: string;
+  inputPlaceholder: string;
   messageEndpoint: string;
   websocketEndpoint: string | null;
   theme: WidgetTheme;
@@ -71,6 +83,10 @@ const HSL_PATTERN = /^\d{1,3}\s+\d{1,3}%\s+\d{1,3}%$/;
 
 const DEFAULT_THEME: WidgetTheme = {
   headerHsl: "0 0% 11%",
+  headerTextHsl: "0 0% 100%",
+  headerSubtextHsl: "0 0% 84%",
+  headerCloseButtonHsl: "0 0% 100%",
+  headerFontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
   backgroundHsl: "43 38% 95%",
   textHsl: "0 0% 11%",
   mutedTextHsl: "60 1% 37%",
@@ -78,6 +94,11 @@ const DEFAULT_THEME: WidgetTheme = {
   botBubbleHsl: "40 50% 98%",
   accentHsl: "204 100% 50%",
   fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  inputBackgroundHsl: "0 0% 100%",
+  inputTextHsl: "0 0% 11%",
+  inputPlaceholderHsl: "60 1% 37%",
+  inputBorderHsl: "40 34% 93%",
+  inputFontFamily: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
 };
 
 const DEMO_CONFIGS: Record<string, WidgetConfig> = {
@@ -85,12 +106,15 @@ const DEMO_CONFIGS: Record<string, WidgetConfig> = {
     botId: "test-id",
     tenantId: "tenant-demo",
     botName: "AgentDesk Support",
+    headerTitle: "",
+    headerSubtitle: "Online - responds instantly",
     greeting: "Hello. I can help with orders, returns, and product questions.",
     fallbackMessage: "I do not have indexed support context for this demo bot yet. Upload a document for this bot, then ask again.",
     logoUrl: null,
     useCustomIcon: false,
     widgetIconUrl: null,
     bannerText: "Online - responds instantly",
+    inputPlaceholder: "Write your message here...",
     messageEndpoint: "/api/chat/message",
     websocketEndpoint: null,
     theme: DEFAULT_THEME,
@@ -165,12 +189,15 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
       botId,
       tenantId: cleanText(stringValue(bot.tenant_id, ""), 80),
       botName: cleanText(stringValue(bot.name, "AgentDesk Support"), 80),
+      headerTitle: cleanText(stringValue(themeConfig.headerTitle, ""), 80),
+      headerSubtitle: cleanText(stringValue(themeConfig.headerSubtitle, stringValue(themeConfig.bannerText, "Online - responds instantly")), 100),
       greeting: cleanText(stringValue(themeConfig.greeting, "Hello. I can help with orders, returns, and product questions."), 300),
       fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
       logoUrl: sanitizeUrl(themeConfig.logoUrl ?? null),
       useCustomIcon: themeConfig.useCustomIcon === true,
       widgetIconUrl: sanitizeUrl(themeConfig.widgetIconUrl ?? null),
       bannerText: cleanText(stringValue(themeConfig.bannerText, "Online - responds instantly"), 80),
+      inputPlaceholder: cleanText(stringValue(themeConfig.inputPlaceholder, "Write your message here..."), 120),
       messageEndpoint: "/api/chat/message",
       websocketEndpoint: null,
       theme,
@@ -204,29 +231,34 @@ async function getWebChatConfigDocument(
 
 function widgetConfigFromWebChatDocument(botId: string, bot: BotDocument, config: WebChatConfigDocument): WidgetConfig {
   const themeConfig = parseThemeConfig(bot.theme_config);
+  const theme = {
+    ...DEFAULT_THEME,
+    ...themeConfig.theme,
+    headerHsl: hexToHsl(stringValue(config.header_color, "#1F2937")),
+    backgroundHsl: hexToHsl(stringValue(config.background_color, "#111827")),
+    textHsl: hexToHsl(stringValue(config.text_color, "#F9FAFB")),
+    userBubbleHsl: hexToHsl(stringValue(config.user_bubble_color, "#7C3AED")),
+    botBubbleHsl: hexToHsl(stringValue(config.bot_bubble_color, "#1F2937")),
+    accentHsl: hexToHsl(stringValue(config.accent_color, "#7C3AED")),
+    fontFamily: fontStack(stringValue(config.font_family, "Fira")),
+  };
 
   return {
     botId,
     tenantId: cleanText(stringValue(bot.tenant_id, ""), 80),
     botName: cleanText(stringValue(config.bot_name, stringValue(bot.name, "AgentDesk Support")), 80),
+    headerTitle: cleanText(stringValue(themeConfig.headerTitle, ""), 80),
+    headerSubtitle: cleanText(stringValue(themeConfig.headerSubtitle, stringValue(themeConfig.bannerText, "Online - responds instantly")), 100),
     greeting: cleanText(stringValue(config.description, "Hello. I can help with orders, returns, and product questions."), 300),
     fallbackMessage: cleanText(stringValue(bot.fallback_message, "I could not reach the support engine. Please try again in a moment."), 300),
     logoUrl: sanitizeUrl(stringValue(config.avatar_url, "") || null),
     useCustomIcon: themeConfig.useCustomIcon === true,
     widgetIconUrl: sanitizeUrl(themeConfig.widgetIconUrl ?? null),
     bannerText: "Online - responds instantly",
+    inputPlaceholder: cleanText(stringValue(themeConfig.inputPlaceholder, "Write your message here..."), 120),
     messageEndpoint: "/api/chat/message",
     websocketEndpoint: null,
-    theme: {
-      headerHsl: hexToHsl(stringValue(config.header_color, "#1F2937")),
-      backgroundHsl: hexToHsl(stringValue(config.background_color, "#111827")),
-      textHsl: hexToHsl(stringValue(config.text_color, "#F9FAFB")),
-      mutedTextHsl: DEFAULT_THEME.mutedTextHsl,
-      userBubbleHsl: hexToHsl(stringValue(config.user_bubble_color, "#7C3AED")),
-      botBubbleHsl: hexToHsl(stringValue(config.bot_bubble_color, "#1F2937")),
-      accentHsl: hexToHsl(stringValue(config.accent_color, "#7C3AED")),
-      fontFamily: fontStack(stringValue(config.font_family, "Fira")),
-    },
+    theme,
   };
 }
 
@@ -262,33 +294,45 @@ function sanitizeConfig(config: WidgetConfig): WidgetConfig {
     botId: cleanText(config.botId, 80),
     tenantId: cleanText(config.tenantId, 80),
     botName: cleanText(config.botName, 80),
+    headerTitle: cleanText(stringValue(config.headerTitle, config.botName), 80),
+    headerSubtitle: cleanText(stringValue(config.headerSubtitle, config.bannerText), 100),
     greeting: cleanText(config.greeting, 300),
     fallbackMessage: cleanText(config.fallbackMessage, 300),
     logoUrl: sanitizeUrl(config.logoUrl),
     useCustomIcon: config.useCustomIcon === true,
     widgetIconUrl: sanitizeUrl(config.widgetIconUrl),
     bannerText: cleanText(config.bannerText, 80),
+    inputPlaceholder: cleanText(stringValue(config.inputPlaceholder, "Write your message here..."), 120),
     messageEndpoint: sanitizeEndpoint(config.messageEndpoint),
     websocketEndpoint: sanitizeWebSocketEndpoint(config.websocketEndpoint) ?? getPublicServerWebSocketUrl(),
     theme: sanitizeTheme(config.theme),
   };
 }
 
-function sanitizeTheme(theme: WidgetTheme): WidgetTheme {
+function sanitizeTheme(theme: Partial<WidgetTheme> = DEFAULT_THEME): WidgetTheme {
   return {
     headerHsl: sanitizeHsl(theme.headerHsl, DEFAULT_THEME.headerHsl),
+    headerTextHsl: sanitizeHsl(theme.headerTextHsl, DEFAULT_THEME.headerTextHsl),
+    headerSubtextHsl: sanitizeHsl(theme.headerSubtextHsl, DEFAULT_THEME.headerSubtextHsl),
+    headerCloseButtonHsl: sanitizeHsl(theme.headerCloseButtonHsl, DEFAULT_THEME.headerCloseButtonHsl),
+    headerFontFamily: cleanText(stringValue(theme.headerFontFamily, DEFAULT_THEME.headerFontFamily), 180),
     backgroundHsl: sanitizeHsl(theme.backgroundHsl, DEFAULT_THEME.backgroundHsl),
     textHsl: sanitizeHsl(theme.textHsl, DEFAULT_THEME.textHsl),
     mutedTextHsl: sanitizeHsl(theme.mutedTextHsl, DEFAULT_THEME.mutedTextHsl),
     userBubbleHsl: sanitizeHsl(theme.userBubbleHsl, DEFAULT_THEME.userBubbleHsl),
     botBubbleHsl: sanitizeHsl(theme.botBubbleHsl, DEFAULT_THEME.botBubbleHsl),
     accentHsl: sanitizeHsl(theme.accentHsl, DEFAULT_THEME.accentHsl),
-    fontFamily: cleanText(theme.fontFamily, 180),
+    fontFamily: cleanText(stringValue(theme.fontFamily, DEFAULT_THEME.fontFamily), 180),
+    inputBackgroundHsl: sanitizeHsl(theme.inputBackgroundHsl, DEFAULT_THEME.inputBackgroundHsl),
+    inputTextHsl: sanitizeHsl(theme.inputTextHsl, DEFAULT_THEME.inputTextHsl),
+    inputPlaceholderHsl: sanitizeHsl(theme.inputPlaceholderHsl, DEFAULT_THEME.inputPlaceholderHsl),
+    inputBorderHsl: sanitizeHsl(theme.inputBorderHsl, DEFAULT_THEME.inputBorderHsl),
+    inputFontFamily: cleanText(stringValue(theme.inputFontFamily, DEFAULT_THEME.inputFontFamily), 180),
   };
 }
 
-function sanitizeHsl(value: string, fallback: string) {
-  return HSL_PATTERN.test(value) ? value : fallback;
+function sanitizeHsl(value: string | undefined, fallback: string) {
+  return typeof value === "string" && HSL_PATTERN.test(value) ? value : fallback;
 }
 
 function sanitizeEndpoint(value: string) {

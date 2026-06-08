@@ -135,9 +135,10 @@ npm install
 
 Create `.env.local` in the repository root. Keep real secrets out of version control.
 
-```env
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+Fill in your credentials:
 
+```env
+# ── Appwrite ────────────────────────────────────────────────────────
 NEXT_PUBLIC_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
 NEXT_PUBLIC_APPWRITE_PROJECT_ID=your-project-id
 APPWRITE_API_KEY=your-server-api-key
@@ -160,6 +161,7 @@ NEXT_PUBLIC_APPWRITE_SESSIONS_COLLECTION_ID=sessions
 APPWRITE_MESSAGES_COLLECTION_ID=messages
 NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID=messages
 NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID=ledger
+NEXT_PUBLIC_APPWRITE_STORAGE_BUCKET_ID=<your-bucket-id>
 
 QDRANT_URL=https://your-cluster.qdrant.io
 QDRANT_API_KEY=your-qdrant-api-key
@@ -200,12 +202,10 @@ node --env-file=.env.local scripts/setup-webchat-configs.mjs
 Start the Next.js app:
 
 ```bash
+# Terminal 1 — Next.js app
 npm run dev
-```
 
-Start the realtime handoff service in a second terminal:
-
-```bash
+# Terminal 2 — Socket.IO WebSocket server (for live inbox)
 npm run dev:ws
 ```
 
@@ -218,7 +218,9 @@ $env:NEXT_PUBLIC_VISUAL_AUDIT_MODE = "true"
 npm run dev
 ```
 
-## WebChat Embeds
+---
+
+## 🧩 Embedding the Widget
 
 Script launcher:
 
@@ -250,7 +252,7 @@ npm run build:widget
 
 Do not edit `public/widget.js` directly; it is generated from `widget/`.
 
-## API Surface
+## 🔌 API Reference
 
 | Method | Route | Purpose |
 | --- | --- | --- |
@@ -265,49 +267,60 @@ Do not edit `public/widget.js` directly; it is generated from `widget/`.
 | `GET` | `/api/webchat/config` | Read dashboard WebChat configuration. |
 | `POST` | `/api/webchat/config/update` | Persist WebChat configuration changes. |
 
-Example chat request:
+Streams a bot response via Server-Sent Events.
 
+**Request body**
 ```json
 {
-  "bot_id": "bot_123",
-  "tenant_id": "tenant_123",
-  "session_token": "session_123",
-  "message": "How can I update my billing email?"
+  "bot_id": "string",
+  "tenant_id": "string",
+  "session_token": "string",
+  "message": "string (max 1200 chars)"
 }
 ```
 
-Successful chat responses stream as `text/event-stream`.
+**Response** — `text/event-stream`
+```
+data: {"token":"Hello"}
+data: {"token":", how"}
+data: [DONE]
+```
+
+---
 
 ## WebSocket Handoff Service
 
 The realtime service lives in `websocket-server/` and can run independently from the Next.js app.
 
-```bash
-cd websocket-server
-npm install
-npm start
+**Response**
+```json
+{
+  "name": "Support Bot",
+  "systemPrompt": "...",
+  "fallbackMessage": "...",
+  "widgetColor": "#0f172a",
+  "widgetIconUrl": "https://..."
+}
 ```
 
 Default port: `4000`.
 
 Key websocket environment variables:
 
-```env
-PORT=4000
-CORS_ORIGIN=http://localhost:3000
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-SOCKET_IO_REDIS_URL=
-APPWRITE_ENDPOINT=
-APPWRITE_PROJECT_ID=
-APPWRITE_API_KEY=
-APPWRITE_DATABASE_ID=agentdesk
-APPWRITE_SESSIONS_COLLECTION_ID=sessions
-```
+## 🏛️ Appwrite Schema
+
+| Collection | Key Attributes |
+|---|---|
+| `tenants` | `name`, `plan`, `credits` |
+| `bots` | `tenant_id`, `name`, `system_prompt`, `fallback_message`, `widget_color`, `widget_icon_url` |
+| `sessions` | `tenant_id`, `bot_id`, `session_token`, `status`, `created`, `updated` |
+| `messages` | `tenant_id`, `session_id`, `sender`, `content`, `tokens_used`, `created` |
+| `document_files` | `tenant_id`, `bot_id`, `file_name`, `file_size`, `status` |
+| `ledger` | `tenant_id`, `amount`, `transaction_type`, `description`, `created` |
 
 Without Redis, session state is stored in memory and is suitable only for local development or single-instance deployments. See [websocket-server/README.md](websocket-server/README.md) for event details.
 
-## Scripts
+## 🛠️ Available Scripts
 
 | Command | Description |
 | --- | --- |

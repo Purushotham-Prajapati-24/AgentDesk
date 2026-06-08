@@ -5,9 +5,16 @@ import { Paintbrush, Save } from "lucide-react";
 import { databases } from "@/lib/appwrite";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
+import { SelectMenu, type SelectMenuOption } from "@/components/ui/SelectMenu";
 import { PageHeader, Panel, StatusPill } from "@/components/ui/Signal";
 
 type FontChoice = "Fira" | "Outfit" | "System";
+
+const fontOptions: SelectMenuOption<FontChoice>[] = [
+  { label: "Fira", value: "Fira", description: "Technical mono-style interface" },
+  { label: "Outfit", value: "Outfit", description: "Rounded product UI" },
+  { label: "System", value: "System", description: "Use the visitor's default UI font" },
+];
 
 type CustomizerState = {
   botId: string;
@@ -161,18 +168,10 @@ export default function WidgetCustomizerPage() {
               <ColorField label="Accent" value={config.accentColor} onChange={(accentColor) => setConfig({ ...config, accentColor })} />
             </section>
 
-            <label className="block">
+            <div className="block">
               <span className="studio-kicker mb-2 block text-muted-foreground">Font</span>
-              <select
-                className="min-h-11 w-full border border-border bg-card px-3 text-sm font-bold focus:bg-secondary/60"
-                value={config.fontFamily}
-                onChange={(event) => setConfig({ ...config, fontFamily: event.target.value as FontChoice })}
-              >
-                <option value="Fira">Fira</option>
-                <option value="Outfit">Outfit</option>
-                <option value="System">System</option>
-              </select>
-            </label>
+              <SelectMenu ariaLabel="Font" options={fontOptions} value={config.fontFamily} onChange={(fontFamily) => setConfig({ ...config, fontFamily })} />
+            </div>
 
             <section className="grid gap-3 border-t border-border pt-4">
               <label className="flex items-center gap-3">
