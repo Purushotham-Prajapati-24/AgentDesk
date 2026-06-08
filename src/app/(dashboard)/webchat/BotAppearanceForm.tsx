@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { useState } from "react";
 import { useWebChatConfig } from "@/context/WebChatConfigContext";
 import type { WebChatConfig } from "@/lib/webchat-config";
 import { WebChatColorField, WebChatSelect, WebChatSwitch, WebChatTextarea, WebChatTextField } from "./form-controls";
@@ -15,6 +16,7 @@ const fontOptions: Array<{ label: string; value: WebChatConfig["appearance"]["fo
 export function BotAppearanceForm() {
   const { config, updateSection } = useWebChatConfig();
   const appearance = config.appearance;
+  const [launcherUrlAttention, setLauncherUrlAttention] = useState(false);
 
   return (
     <div className="grid gap-4">
@@ -75,11 +77,26 @@ export function BotAppearanceForm() {
           checked={appearance.useCustomIcon}
           description="Show a custom image inside the closed floating launcher button."
           label="Use custom launcher icon"
-          onChange={(useCustomIcon) => updateSection("appearance", { useCustomIcon })}
+          onChange={(useCustomIcon) => {
+            updateSection("appearance", { useCustomIcon });
+            if (useCustomIcon) {
+              setLauncherUrlAttention(false);
+            }
+          }}
         />
         <WebChatTextField
+          blocked={!appearance.useCustomIcon}
+          helperText={
+            appearance.useCustomIcon
+              ? "Paste any hosted image URL for the launcher icon."
+              : launcherUrlAttention
+                ? "Needs attention: turn on custom launcher icon before adding a URL."
+                : "Turn on custom launcher icon to edit this URL."
+          }
+          helperTone={!appearance.useCustomIcon && launcherUrlAttention ? "warning" : "muted"}
           label="Custom launcher icon URL"
           maxLength={500}
+          onBlockedAttempt={() => setLauncherUrlAttention(true)}
           placeholder="https://example.com/support-icon.png"
           type="url"
           value={appearance.widgetIconUrl}

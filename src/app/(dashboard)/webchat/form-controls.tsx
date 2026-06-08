@@ -9,6 +9,11 @@ export function WebChatTextField({
   placeholder,
   maxLength,
   readOnly = false,
+  disabled = false,
+  blocked = false,
+  helperText,
+  helperTone = "muted",
+  onBlockedAttempt,
   type = "text",
 }: {
   label: string;
@@ -17,20 +22,55 @@ export function WebChatTextField({
   placeholder?: string;
   maxLength?: number;
   readOnly?: boolean;
+  disabled?: boolean;
+  blocked?: boolean;
+  helperText?: string;
+  helperTone?: "muted" | "warning";
+  onBlockedAttempt?: () => void;
   type?: "text" | "url";
 }) {
+  const isBlocked = blocked && !disabled;
+
+  function reportBlockedAttempt() {
+    if (isBlocked) {
+      onBlockedAttempt?.();
+    }
+  }
+
   return (
     <label className="block">
       <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">{label}</span>
       <input
-        className="min-h-12 w-full rounded-xl border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 text-sm font-semibold text-[var(--ui-text)] outline-none placeholder:text-[var(--ui-muted)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]"
+        aria-disabled={isBlocked || undefined}
+        className={cn(
+          "min-h-12 w-full rounded-xl border px-3 text-sm font-semibold outline-none transition placeholder:text-[var(--ui-muted)]",
+          disabled
+            ? "cursor-not-allowed border-[var(--ui-border)] bg-[var(--ui-panel)]/55 text-[var(--ui-muted)] opacity-70"
+            : isBlocked
+              ? "cursor-not-allowed border-[#f59e0b]/55 bg-[#f59e0b]/10 text-[#fcd34d] placeholder:text-[#fbbf24]/55 focus:border-[#f59e0b] focus:bg-[#f59e0b]/15"
+            : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel-2)]",
+        )}
+        disabled={disabled}
         maxLength={maxLength}
         placeholder={placeholder}
-        readOnly={readOnly}
+        readOnly={readOnly || isBlocked}
         type={type}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          if (!isBlocked) {
+            onChange(event.target.value);
+          }
+        }}
+        onFocus={reportBlockedAttempt}
+        onKeyDown={(event) => {
+          if (isBlocked && event.key !== "Tab") {
+            event.preventDefault();
+            reportBlockedAttempt();
+          }
+        }}
+        onMouseDown={reportBlockedAttempt}
       />
+      {helperText ? <span className={cn("mt-2 block text-xs font-semibold leading-5 transition-colors", helperTone === "warning" ? "text-[#f59e0b]" : "text-[var(--ui-muted)]")}>{helperText}</span> : null}
     </label>
   );
 }

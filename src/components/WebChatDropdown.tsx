@@ -42,7 +42,7 @@ export function WebChatDropdown({
           <span className="block text-base font-semibold">{title}</span>
           <span className={cn("mt-1 block text-sm font-medium leading-5", open ? "text-white/80" : "text-[var(--ui-muted)]")}>{description}</span>
         </span>
-        <ChevronDown aria-hidden="true" className={cn("h-5 w-5 shrink-0 transition-transform", open && "rotate-180")} />
+        <ChevronDown aria-hidden="true" className={cn("pointer-events-none h-5 w-5 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       <div className={cn("grid transition-[grid-template-rows] duration-200 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")} id={`${id}-panel`}>
         <div className="overflow-hidden">

@@ -16,7 +16,7 @@ import { DeploySettingsForm } from "./DeploySettingsForm";
 import { FeatureToggleForm } from "./FeatureToggleForm";
 
 type SectionId = "identity" | "appearance" | "deploy" | "features";
-type DeploymentTypeId = "embed" | "hosted" | "api";
+type DeploymentTabId = "script" | "iframe" | "react" | "vue";
 
 const sections: Array<{
   id: SectionId;
@@ -55,41 +55,49 @@ const sections: Array<{
   },
 ];
 
-const deploymentOptions: Array<{
-  id: DeploymentTypeId;
-  title: string;
-  description: string;
+const deploymentTabs: Array<{
+  id: DeploymentTabId;
+  label: string;
 }> = [
   {
-    id: "embed",
-    title: "Website embed",
-    description: "Install the script snippet on your site.",
+    id: "script",
+    label: "Script",
   },
   {
-    id: "hosted",
-    title: "Hosted chat page",
-    description: "Publish a shareable standalone chat link.",
+    id: "iframe",
+    label: "Iframe embedded",
   },
   {
-    id: "api",
-    title: "API handoff",
-    description: "Connect chat through your backend route.",
+    id: "react",
+    label: "React/Next.js",
+  },
+  {
+    id: "vue",
+    label: "Vue",
   },
 ];
 
 export function WebChatWorkspace() {
   const { tenant } = useTenant();
   const { config, error, replaceConfig, resetConfig } = useWebChatConfig();
-  const [openSection, setOpenSection] = useState<SectionId>("identity");
+  const [openSection, setOpenSection] = useState<SectionId | null>("identity");
   const [bots, setBots] = useState<WebChatBotSummary[]>([]);
   const [botLoading, setBotLoading] = useState(true);
   const [selectedBotId, setSelectedBotId] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
-  const [deployMenuOpen, setDeployMenuOpen] = useState(false);
-  const [selectedDeploymentType, setSelectedDeploymentType] = useState<DeploymentTypeId>("embed");
+  const [deployModalOpen, setDeployModalOpen] = useState(false);
+  const [deployTab, setDeployTab] = useState<DeploymentTabId>("script");
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<{ botId: string; botName: string } | null>(null);
   const snippets = useMemo(() => buildSnippets(config), [config]);
   const selectedBot = useMemo(() => bots.find((bot) => bot.id === selectedBotId) ?? null, [bots, selectedBotId]);
+  const hasUnsavedChanges = useMemo(() => (selectedBot ? serializeWebChatConfig(config) !== serializeWebChatConfig(selectedBot.config) : false), [config, selectedBot]);
+  const canSaveChanges = Boolean(selectedBotId && hasUnsavedChanges && saveState !== "saving");
+  const saveButtonActive = Boolean(selectedBotId && (hasUnsavedChanges || saveState === "saving"));
+  const saveButtonTitle = !selectedBotId ? "Choose a bot before saving." : hasUnsavedChanges ? "Save changes to this bot." : "No changes to save.";
+  const deployPreviewUrl = selectedBotId ? buildEmbedPreviewUrl(selectedBotId) : "";
+  const [previewCopied, setPreviewCopied] = useState(false);
 
   useEffect(() => {
     if (!tenant?.$id) {
@@ -122,6 +130,23 @@ export function WebChatWorkspace() {
     };
   }, [replaceConfig, tenant?.$id]);
 
+  useEffect(() => {
+    if (!deployModalOpen && !resetConfirmOpen && !saveSuccess) {
+      return;
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setDeployModalOpen(false);
+        setResetConfirmOpen(false);
+        setSaveSuccess(null);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [deployModalOpen, resetConfirmOpen, saveSuccess]);
+
   function selectBot(botId: string) {
     const bot = bots.find((item) => item.id === botId);
     setSelectedBotId(botId);
@@ -136,6 +161,10 @@ export function WebChatWorkspace() {
     if (!tenant?.$id || !selectedBotId) {
       setSaveState("error");
       setSaveError("Choose a bot before saving WebChat preferences.");
+      return;
+    }
+
+    if (!hasUnsavedChanges) {
       return;
     }
 
@@ -154,6 +183,7 @@ export function WebChatWorkspace() {
     }
 
     setSaveState("saved");
+    setSaveSuccess({ botId: selectedBotId, botName: response.config.identity.botName });
     replaceConfig(response.config);
     setBots((current) =>
       current.map((bot) =>
@@ -168,6 +198,27 @@ export function WebChatWorkspace() {
     );
   }
 
+  function confirmResetConfig() {
+    resetConfig();
+    setSaveState("idle");
+    setSaveError("");
+    setResetConfirmOpen(false);
+  }
+
+  function openLivePreview(botId: string) {
+    window.open(buildEmbedPreviewUrl(botId), "_blank", "noopener,noreferrer");
+  }
+
+  async function copyLivePreviewUrl() {
+    if (!deployPreviewUrl) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(deployPreviewUrl);
+    setPreviewCopied(true);
+    setTimeout(() => setPreviewCopied(false), 1600);
+  }
+
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <section className="px-4 py-3 sm:px-6 lg:px-8">
@@ -177,7 +228,7 @@ export function WebChatWorkspace() {
               <p className="inline-flex rounded-full border border-[#0f766e]/20 bg-white/55 px-2.5 py-1 studio-kicker text-[#0f766e] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
                 WebChat control room
               </p>
-              <h1 className="mt-1.5 max-w-4xl text-2xl font-semibold leading-[1.08] tracking-[-0.02em] text-current sm:text-3xl lg:text-4xl">
+              <h1 className="mt-1.5 max-w-4xl text-3xl font-semibold leading-[1.05] tracking-[-0.02em] text-current sm:text-4xl lg:text-[2.75rem]">
                 Shape the customer chat surface.
               </h1>
             </div>
@@ -196,95 +247,268 @@ export function WebChatWorkspace() {
                 <p className="mt-0.5 break-all font-mono text-xs font-semibold opacity-70">{selectedBotId || tenant?.$id || "No target selected"}</p>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button
-                  className="h-9 w-full rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
-                  leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
-                  onClick={resetConfig}
-                  type="button"
-                  variant="outline"
-                >
-                  Reset
-                </Button>
-                <Button
-                  className="h-9 w-full rounded-full border-[#22c55e]/60 bg-[linear-gradient(135deg,#86efac_0%,#22c55e_45%,#15803d_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(21,128,61,0.24)] hover:border-[#86efac]/80 hover:brightness-[1.06] disabled:shadow-none"
-                  disabled={!selectedBotId}
-                  leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
-                  loading={saveState === "saving"}
-                  onClick={() => void saveSelectedBotConfig()}
-                  type="button"
-                >
-                  Save changes
-                </Button>
-                <Button
-                  aria-controls="webchat-deploy-options"
-                  aria-expanded={deployMenuOpen}
-                  className="h-9 w-full rounded-full border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] hover:border-[#c4b5fd]/80 hover:brightness-[1.06] sm:col-span-2"
-                  leftIcon={<CloudUpload aria-hidden="true" className="h-4 w-4" />}
-                  onClick={() => setDeployMenuOpen((open) => !open)}
-                  type="button"
-                >
-                  Deploy
-                </Button>
-                {deployMenuOpen ? (
-                  <div
-                    className="grid gap-2 rounded-2xl border border-white/20 bg-[#0f172a]/95 p-2 text-white shadow-[0_18px_45px_rgba(15,23,42,0.38)] sm:col-span-2"
-                    id="webchat-deploy-options"
-                    role="dialog"
-                    aria-label="Choose deployment type"
-                  >
-                    <div className="flex items-center justify-between gap-3 px-1 py-0.5">
-                      <p className="font-mono text-xs font-semibold uppercase text-white/65">Deployment type</p>
-                      <button
-                        aria-label="Close deployment options"
-                        className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
-                        onClick={() => setDeployMenuOpen(false)}
-                        type="button"
-                      >
-                        <X aria-hidden="true" className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    {deploymentOptions.map((option) => {
-                      const selected = selectedDeploymentType === option.id;
-
-                      return (
-                        <button
-                          aria-pressed={selected}
-                          className={cn(
-                            "flex w-full items-start gap-3 rounded-xl border p-2.5 text-left transition",
-                            selected ? "border-[#a78bfa]/70 bg-white/[0.14]" : "border-white/10 bg-white/[0.06] hover:border-white/25 hover:bg-white/10",
-                          )}
-                          key={option.id}
-                          onClick={() => {
-                            setSelectedDeploymentType(option.id);
-                            setOpenSection("deploy");
-                          }}
-                          type="button"
-                        >
-                          <span
-                            className={cn(
-                              "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px]",
-                              selected ? "border-[#a7f3d0] bg-[#22c55e] text-white" : "border-white/20 text-transparent",
-                            )}
-                          >
-                            <Check aria-hidden="true" className="h-3 w-3" />
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold leading-5">{option.title}</span>
-                            <span className="block text-xs leading-5 text-white/60">{option.description}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
+      {deployModalOpen ? (
+        <div
+          aria-labelledby="webchat-deploy-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 shadow-[inset_0_0_160px_rgba(0,0,0,0.72)] backdrop-blur-sm"
+          id="webchat-deploy-modal"
+          onClick={() => setDeployModalOpen(false)}
+          role="dialog"
+        >
+          <div
+            className="max-h-[min(720px,calc(100svh-48px))] w-full max-w-3xl overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#0b1020] text-white shadow-[0_34px_120px_rgba(0,0,0,0.62)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+              <div className="min-w-0">
+                <p className="font-mono text-xs font-semibold uppercase text-[#93c5fd]">Deployment</p>
+                <h2 className="mt-1 truncate text-2xl font-semibold tracking-[-0.03em]" id="webchat-deploy-title">
+                  Choose deployment type
+                </h2>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  className="h-10 rounded-full border-white/10 bg-white/[0.08] px-3 !text-white hover:bg-white/[0.12] disabled:bg-white/[0.04]"
+                  disabled={!selectedBotId}
+                  leftIcon={<Eye aria-hidden="true" className="h-4 w-4" />}
+                  onClick={() => selectedBotId && openLivePreview(selectedBotId)}
+                  size="sm"
+                  title={selectedBotId ? "Open live preview in a new tab." : "Choose a bot to open the live preview."}
+                  type="button"
+                  variant="outline"
+                >
+                  Live preview
+                </Button>
+                <button
+                  aria-label="Close deployment window"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
+                  onClick={() => setDeployModalOpen(false)}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 p-4 sm:p-5">
+              <div className="grid gap-2 rounded-2xl border border-white/10 bg-white/[0.06] p-1.5 sm:grid-cols-4" role="tablist" aria-label="Deployment formats">
+                {deploymentTabs.map((tab) => {
+                  const selected = deployTab === tab.id;
+
+                  return (
+                    <button
+                      aria-controls={`webchat-deploy-panel-${tab.id}`}
+                      aria-selected={selected}
+                      className={cn(
+                        "h-10 rounded-xl px-3 text-sm font-semibold transition",
+                        selected ? "bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_50%,#7c3aed_100%)] text-white shadow-[0_10px_24px_rgba(99,102,241,0.24)]" : "text-white/70 hover:bg-white/10 hover:text-white",
+                      )}
+                      id={`webchat-deploy-tab-${tab.id}`}
+                      key={tab.id}
+                      onClick={() => setDeployTab(tab.id)}
+                      role="tab"
+                      type="button"
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div
+                aria-labelledby={`webchat-deploy-tab-${deployTab}`}
+                className="grid gap-3"
+                id={`webchat-deploy-panel-${deployTab}`}
+                role="tabpanel"
+              >
+                <CodeBlock label={`${deploymentTabs.find((tab) => tab.id === deployTab)?.label ?? "Deploy"} snippet`} value={snippets[deployTab]} />
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3 sm:flex-row sm:items-center">
+                {deployPreviewUrl ? (
+                  <a
+                    className="min-w-0 flex-1 truncate rounded-xl border border-white/10 bg-black/20 px-3 py-2 font-mono text-xs font-semibold text-white/80 transition hover:border-[#60a5fa]/40 hover:text-white"
+                    href={deployPreviewUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {deployPreviewUrl}
+                  </a>
+                ) : (
+                  <p className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm font-medium text-white/45">
+                    Choose a bot to generate a live preview link.
+                  </p>
+                )}
+                <Button
+                  className="h-10 rounded-full border-white/10 bg-white/[0.08] px-4 !text-white hover:bg-white/[0.12] disabled:bg-white/[0.04]"
+                  disabled={!deployPreviewUrl}
+                  leftIcon={previewCopied ? <Check aria-hidden="true" className="h-4 w-4" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
+                  onClick={copyLivePreviewUrl}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {previewCopied ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {resetConfirmOpen ? (
+        <div
+          aria-labelledby="webchat-reset-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 shadow-[inset_0_0_160px_rgba(0,0,0,0.72)] backdrop-blur-sm"
+          onClick={() => setResetConfirmOpen(false)}
+          role="dialog"
+        >
+          <div
+            className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b1020] text-white shadow-[0_34px_120px_rgba(0,0,0,0.62)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_20%_0%,rgba(249,115,22,0.28)_0%,transparent_42%),linear-gradient(90deg,rgba(251,191,36,0.14)_0%,rgba(194,65,12,0.12)_100%)]" />
+            <button
+              aria-label="Close reset confirmation"
+              className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
+              onClick={() => setResetConfirmOpen(false)}
+              type="button"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+
+            <div className="relative grid gap-6 p-6 sm:p-8">
+              <div className="grid gap-4 pr-12">
+                <div className="flex items-center gap-5">
+                  <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-[#fdba74]/30 bg-[#f97316]/20 text-[#fdba74] shadow-[0_18px_45px_rgba(249,115,22,0.2)]">
+                    <AlertTriangle aria-hidden="true" className="h-8 w-8" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-3xl font-semibold leading-[1.05] tracking-[-0.03em]" id="webchat-reset-title">
+                      Reset customizations?
+                    </h2>
+                  </div>
+                </div>
+                <div>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-white/70">
+                    This returns the current WebChat draft to the default identity, appearance, deployment settings, and feature toggles.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#f97316]/25 bg-[#f97316]/10 p-4">
+                <p className="text-sm font-semibold text-[#fdba74]">Saved agent settings will not change yet.</p>
+                <p className="mt-1 text-sm leading-6 text-white/60">The reset affects this editor draft. Nothing is written to the selected bot until you click Save changes.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-t border-white/10 bg-[#070b14] p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-6">
+              <p className="text-sm font-medium text-white/60">Keep editing, or reset the draft back to defaults.</p>
+              <Button
+                className="h-10 rounded-full border-white/10 bg-white/[0.08] px-4 !text-white hover:bg-white/[0.12]"
+                onClick={() => setResetConfirmOpen(false)}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="h-10 rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-4 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
+                leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
+                onClick={confirmResetConfig}
+                type="button"
+              >
+                Reset to defaults
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {saveSuccess ? (
+        <div
+          aria-labelledby="webchat-save-success-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/70 px-4 py-6 shadow-[inset_0_0_160px_rgba(0,0,0,0.72)] backdrop-blur-sm"
+          onClick={() => setSaveSuccess(null)}
+          role="dialog"
+        >
+          <div
+            className="relative w-full max-w-3xl overflow-hidden rounded-[2rem] border border-white/10 bg-[#0b1020] text-white shadow-[0_34px_120px_rgba(0,0,0,0.62)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_24%_0%,rgba(34,197,94,0.24)_0%,transparent_42%),linear-gradient(90deg,rgba(56,189,248,0.12)_0%,rgba(124,58,237,0.12)_100%)]" />
+            <button
+              aria-label="Close save confirmation"
+              className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.08] text-white/70 transition hover:bg-white/[0.12] hover:text-white"
+              onClick={() => setSaveSuccess(null)}
+              type="button"
+            >
+              <X aria-hidden="true" className="h-5 w-5" />
+            </button>
+
+            <div className="relative grid gap-6 p-6 sm:p-8">
+              <div className="flex items-start gap-5 pr-12">
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-[#86efac]/30 bg-[#22c55e]/20 text-[#86efac] shadow-[0_18px_45px_rgba(34,197,94,0.18)]">
+                  <CheckCircle2 aria-hidden="true" className="h-8 w-8" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-semibold uppercase text-[#86efac]">Saved</p>
+                  <h2 className="mt-2 text-3xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-4xl" id="webchat-save-success-title">
+                    Changes saved successfully.
+                  </h2>
+                  <p className="mt-3 max-w-xl text-sm leading-6 text-white/70">
+                    Your WebChat configuration is saved for this agent. Preview the live embed now or open deployment snippets.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.06] p-4 sm:grid-cols-[minmax(0,1fr)_minmax(180px,auto)] sm:items-center">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs font-semibold uppercase text-white/50">Agent</p>
+                  <p className="mt-1 truncate text-xl font-semibold tracking-[-0.02em]">{saveSuccess.botName}</p>
+                </div>
+                <div className="min-w-0 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                  <p className="font-mono text-[10px] font-semibold uppercase text-white/40">ID</p>
+                  <p className="mt-1 break-all font-mono text-xs font-semibold text-white/70">{saveSuccess.botId}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3 border-t border-white/10 bg-[#070b14] p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-6">
+              <p className="text-sm font-medium text-white/60">Open the live embed or continue to deployment snippets.</p>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#38bdf8]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#2563eb_52%,#1d4ed8_100%)] px-4 text-sm font-semibold !text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] transition hover:border-[#93c5fd]/80 hover:brightness-[1.06]"
+                onClick={() => openLivePreview(saveSuccess.botId)}
+                type="button"
+              >
+                <Eye aria-hidden="true" className="h-4 w-4" />
+                Live preview
+              </button>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-4 text-sm font-semibold !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] transition hover:border-[#c4b5fd]/80 hover:brightness-[1.06]"
+                onClick={() => {
+                  setSaveSuccess(null);
+                  setDeployModalOpen(true);
+                }}
+                type="button"
+              >
+                <CloudUpload aria-hidden="true" className="h-4 w-4" />
+                Deploy
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mx-auto grid max-w-7xl items-start gap-5 px-4 pb-8 sm:px-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
         <aside className="grid min-w-0 content-start gap-4">
           <BotSelector
             bots={bots}
@@ -299,7 +523,7 @@ export function WebChatWorkspace() {
               icon={section.icon}
               id={section.id}
               key={section.id}
-              onToggle={(id) => setOpenSection(id as SectionId)}
+              onToggle={(id) => setOpenSection((current) => (current === id ? null : (id as SectionId)))}
               open={openSection === section.id}
               title={section.title}
             >
@@ -308,14 +532,46 @@ export function WebChatWorkspace() {
           ))}
         </aside>
 
-        <main className="grid min-w-0 gap-5">
-          <WidgetPreview config={config} />
-          <section className="grid gap-4 lg:grid-cols-2">
-            <CodeBlock label="Script embed" value={snippets.script} />
-            <CodeBlock label="Iframe embed" value={snippets.iframe} />
-            <CodeBlock label="React" value={snippets.react} />
-            <CodeBlock label="Vue" value={snippets.vue} />
+        <main className="grid min-w-0 content-start gap-3">
+          <section className="grid gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-2 sm:grid-cols-3">
+            <Button
+              className="h-9 w-full rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
+              leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
+              onClick={() => setResetConfirmOpen(true)}
+              type="button"
+              variant="outline"
+            >
+              Reset
+            </Button>
+            <Button
+              className={cn(
+                "h-9 w-full rounded-full px-3 !text-white disabled:shadow-none",
+                saveButtonActive
+                  ? "border-[#22c55e]/60 bg-[linear-gradient(135deg,#86efac_0%,#22c55e_45%,#15803d_100%)] shadow-[0_10px_24px_rgba(21,128,61,0.24)] hover:border-[#86efac]/80 hover:brightness-[1.06]"
+                  : "border-white/10 bg-[linear-gradient(135deg,#334155_0%,#1f2937_55%,#111827_100%)] !text-white/55 shadow-none",
+              )}
+              disabled={!canSaveChanges}
+              leftIcon={<Save aria-hidden="true" className="h-4 w-4" />}
+              loading={saveState === "saving"}
+              onClick={() => void saveSelectedBotConfig()}
+              title={saveButtonTitle}
+              type="button"
+            >
+              Save changes
+            </Button>
+            <Button
+              aria-controls="webchat-deploy-modal"
+              aria-expanded={deployModalOpen}
+              aria-haspopup="dialog"
+              className="h-9 w-full rounded-full border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] hover:border-[#c4b5fd]/80 hover:brightness-[1.06]"
+              leftIcon={<CloudUpload aria-hidden="true" className="h-4 w-4" />}
+              onClick={() => setDeployModalOpen(true)}
+              type="button"
+            >
+              Deploy
+            </Button>
           </section>
+          <WidgetPreview config={config} />
         </main>
       </div>
     </div>
@@ -405,10 +661,10 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
         </span>
       </div>
 
-      <div className="flex min-h-[540px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-4 sm:p-6 lg:min-h-[640px]">
-        <div className="relative w-full max-w-[410px]">
+      <div className="flex min-h-[560px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-4 sm:p-5 lg:min-h-[620px]">
+        <div className="relative w-full max-w-[410px] pb-14 sm:pb-16">
           <div
-            className="flex h-[min(590px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
+            className="flex h-[min(570px,calc(100svh-190px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
             style={{
               background: config.appearance.backgroundColor,
               color: config.appearance.textColor,
@@ -488,7 +744,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
           <button
             aria-label="Launcher preview"
-            className="absolute bottom-[-50px] right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:bottom-[-52px] sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
+            className="absolute bottom-0 right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"
             style={{ background: config.appearance.accentColor }}
             type="button"
           >
@@ -566,6 +822,15 @@ function buildSnippets(config: WebChatConfig) {
     react: `import { AgentDeskWidget } from "@agentdesk/widget/react";\n\n<AgentDeskWidget botId="${botId}" theme="${theme}" />`,
     vue: `<AgentDeskWidget bot-id="${botId}" theme="${theme}" />`,
   };
+}
+
+function buildEmbedPreviewUrl(botId: string) {
+  const origin = typeof window === "undefined" ? "http://agentdeskbot.vercel.app" : window.location.origin;
+  return `${origin}/embed/${encodeURIComponent(botId)}`;
+}
+
+function serializeWebChatConfig(config: WebChatConfig) {
+  return JSON.stringify(config);
 }
 
 function fontStack(font: WebChatConfig["appearance"]["fontFamily"]) {
