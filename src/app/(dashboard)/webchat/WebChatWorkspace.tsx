@@ -16,6 +16,7 @@ import { DeploySettingsForm } from "./DeploySettingsForm";
 import { FeatureToggleForm } from "./FeatureToggleForm";
 
 type SectionId = "identity" | "appearance" | "deploy" | "features";
+type DeploymentTypeId = "embed" | "hosted" | "api";
 
 const sections: Array<{
   id: SectionId;
@@ -54,6 +55,28 @@ const sections: Array<{
   },
 ];
 
+const deploymentOptions: Array<{
+  id: DeploymentTypeId;
+  title: string;
+  description: string;
+}> = [
+  {
+    id: "embed",
+    title: "Website embed",
+    description: "Install the script snippet on your site.",
+  },
+  {
+    id: "hosted",
+    title: "Hosted chat page",
+    description: "Publish a shareable standalone chat link.",
+  },
+  {
+    id: "api",
+    title: "API handoff",
+    description: "Connect chat through your backend route.",
+  },
+];
+
 export function WebChatWorkspace() {
   const { tenant } = useTenant();
   const { config, error, replaceConfig, resetConfig } = useWebChatConfig();
@@ -63,6 +86,8 @@ export function WebChatWorkspace() {
   const [selectedBotId, setSelectedBotId] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState("");
+  const [deployMenuOpen, setDeployMenuOpen] = useState(false);
+  const [selectedDeploymentType, setSelectedDeploymentType] = useState<DeploymentTypeId>("embed");
   const snippets = useMemo(() => buildSnippets(config), [config]);
   const selectedBot = useMemo(() => bots.find((bot) => bot.id === selectedBotId) ?? null, [bots, selectedBotId]);
 
@@ -191,6 +216,68 @@ export function WebChatWorkspace() {
                 >
                   Save changes
                 </Button>
+                <Button
+                  aria-controls="webchat-deploy-options"
+                  aria-expanded={deployMenuOpen}
+                  className="h-9 w-full rounded-full border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] hover:border-[#c4b5fd]/80 hover:brightness-[1.06] sm:col-span-2"
+                  leftIcon={<CloudUpload aria-hidden="true" className="h-4 w-4" />}
+                  onClick={() => setDeployMenuOpen((open) => !open)}
+                  type="button"
+                >
+                  Deploy
+                </Button>
+                {deployMenuOpen ? (
+                  <div
+                    className="grid gap-2 rounded-2xl border border-white/20 bg-[#0f172a]/95 p-2 text-white shadow-[0_18px_45px_rgba(15,23,42,0.38)] sm:col-span-2"
+                    id="webchat-deploy-options"
+                    role="dialog"
+                    aria-label="Choose deployment type"
+                  >
+                    <div className="flex items-center justify-between gap-3 px-1 py-0.5">
+                      <p className="font-mono text-xs font-semibold uppercase text-white/65">Deployment type</p>
+                      <button
+                        aria-label="Close deployment options"
+                        className="grid h-7 w-7 place-items-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+                        onClick={() => setDeployMenuOpen(false)}
+                        type="button"
+                      >
+                        <X aria-hidden="true" className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {deploymentOptions.map((option) => {
+                      const selected = selectedDeploymentType === option.id;
+
+                      return (
+                        <button
+                          aria-pressed={selected}
+                          className={cn(
+                            "flex w-full items-start gap-3 rounded-xl border p-2.5 text-left transition",
+                            selected ? "border-[#a78bfa]/70 bg-white/[0.14]" : "border-white/10 bg-white/[0.06] hover:border-white/25 hover:bg-white/10",
+                          )}
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedDeploymentType(option.id);
+                            setOpenSection("deploy");
+                          }}
+                          type="button"
+                        >
+                          <span
+                            className={cn(
+                              "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px]",
+                              selected ? "border-[#a7f3d0] bg-[#22c55e] text-white" : "border-white/20 text-transparent",
+                            )}
+                          >
+                            <Check aria-hidden="true" className="h-3 w-3" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold leading-5">{option.title}</span>
+                            <span className="block text-xs leading-5 text-white/60">{option.description}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
