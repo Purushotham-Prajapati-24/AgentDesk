@@ -46,6 +46,12 @@ type WebChatConfigDocument = Models.Document & {
   proactive_message_show_once?: unknown;
   proactive_message_sound?: unknown;
   proactive_message_autoclose?: unknown;
+  proactive_message_trigger_type?: unknown;
+  proactive_message_idle_delay?: unknown;
+  proactive_message_url_rules?: unknown;
+  proactive_message_frequency_cap?: unknown;
+  proactive_message_ctas?: unknown;
+  proactive_message_variant_id?: unknown;
 };
 
 export type WebChatBotSummary = {
@@ -244,6 +250,12 @@ function webChatConfigFromDocument(document: WebChatConfigDocument, botThemeConf
       proactiveMessageShowOnce: booleanValue(document.proactive_message_show_once, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageShowOnce),
       proactiveMessageSound: booleanValue(document.proactive_message_sound, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageSound),
       proactiveMessageAutoclose: typeof document.proactive_message_autoclose === "number" ? document.proactive_message_autoclose : DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageAutoclose,
+      proactiveMessageTriggerType: proactiveTriggerType(document.proactive_message_trigger_type),
+      proactiveMessageIdleDelay: typeof document.proactive_message_idle_delay === "number" ? document.proactive_message_idle_delay : DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageIdleDelay,
+      proactiveMessageUrlRules: parseJsonArray(document.proactive_message_url_rules, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageUrlRules),
+      proactiveMessageFrequencyCap: proactiveFrequencyCap(document.proactive_message_frequency_cap),
+      proactiveMessageCtas: parseJsonArray(document.proactive_message_ctas, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageCtas),
+      proactiveMessageVariantId: stringValue(document.proactive_message_variant_id, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageVariantId),
     },
   });
 }
@@ -317,6 +329,12 @@ function webChatConfigToDocumentPayload(tenantId: string, botId: string, config:
     proactive_message_show_once: config.features.proactiveMessageShowOnce,
     proactive_message_sound: config.features.proactiveMessageSound,
     proactive_message_autoclose: config.features.proactiveMessageAutoclose,
+    proactive_message_trigger_type: config.features.proactiveMessageTriggerType,
+    proactive_message_idle_delay: config.features.proactiveMessageIdleDelay,
+    proactive_message_url_rules: JSON.stringify(config.features.proactiveMessageUrlRules),
+    proactive_message_frequency_cap: config.features.proactiveMessageFrequencyCap,
+    proactive_message_ctas: JSON.stringify(config.features.proactiveMessageCtas),
+    proactive_message_variant_id: config.features.proactiveMessageVariantId,
     updated: new Date().toISOString(),
   };
 }
@@ -488,6 +506,31 @@ function deployEnvironment(value: unknown): WebChatConfig["deploy"]["environment
 
 function rolloutStrategy(value: unknown): WebChatConfig["deploy"]["rolloutStrategy"] {
   return value === "manual" || value === "canary" || value === "progressive" || value === "full" ? value : "manual";
+}
+
+function proactiveTriggerType(value: unknown): WebChatConfig["features"]["proactiveMessageTriggerType"] {
+  return value === "idle" ? "idle" : "delay";
+}
+
+function proactiveFrequencyCap(value: unknown): WebChatConfig["features"]["proactiveMessageFrequencyCap"] {
+  return value === "daily" || value === "weekly" || value === "always" || value === "session" ? value : "session";
+}
+
+function parseJsonArray<T>(value: unknown, fallback: T[]): T[] {
+  if (Array.isArray(value)) {
+    return value as T[];
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function booleanValue(value: unknown, fallback: boolean) {

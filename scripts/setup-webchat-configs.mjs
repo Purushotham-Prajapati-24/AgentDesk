@@ -35,6 +35,11 @@ const stringAttributes = [
   ["created", 50, true],
   ["updated", 50, true],
   ["proactive_message_text", 500, false],
+  ["proactive_message_trigger_type", 20, false],
+  ["proactive_message_url_rules", 4000, false],
+  ["proactive_message_frequency_cap", 20, false],
+  ["proactive_message_ctas", 4000, false],
+  ["proactive_message_variant_id", 60, false],
 ];
 
 const booleanAttributes = [
@@ -51,6 +56,7 @@ const booleanAttributes = [
 const integerAttributes = [
   ["proactive_message_delay", 5],
   ["proactive_message_autoclose", 0],
+  ["proactive_message_idle_delay", 20],
 ];
 
 async function ensureCollection() {

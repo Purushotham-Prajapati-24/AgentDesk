@@ -1217,7 +1217,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
 
           {config.features.proactiveMessage && (
             <div
-              className="absolute bottom-16 right-[-8px] z-20 flex w-72 flex-col gap-1 rounded-2xl border border-[#eceae4] bg-white p-3.5 text-slate-800 shadow-xl sm:right-[-18px] transition-all animate-fade-in"
+              className="absolute bottom-16 right-[-8px] z-20 flex w-72 flex-col gap-1 rounded-2xl border border-[#eceae4] bg-white p-3.5 text-slate-800 shadow-xl transition-all animate-fade-in sm:right-[-18px]"
               style={{
                 fontFamily,
               }}
@@ -1225,17 +1225,26 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
               <div className="absolute bottom-[-6px] right-6 h-3 w-3 rotate-45 border-b border-r border-[#eceae4] bg-white" />
               <button
                 aria-label="Dismiss preview"
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 font-bold text-sm"
+                className="absolute right-2.5 top-2.5 text-sm font-bold text-slate-400 hover:text-slate-600"
                 type="button"
               >
-                ×
+                x
               </button>
               <p className="pr-4 text-xs font-semibold leading-snug text-slate-900">
                 {config.features.proactiveMessageText}
               </p>
               <p className="text-[10px] font-medium text-slate-400">
-                {config.identity.botName} · a few moments ago
+                {config.identity.botName} - a few moments ago
               </p>
+              {config.features.proactiveMessageCtas.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {config.features.proactiveMessageCtas.map((cta) => (
+                    <button className="rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700" key={cta.id} type="button">
+                      {cta.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
 

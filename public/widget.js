@@ -40,6 +40,7 @@
             this.proactiveTimer = null;
             this.proactiveAutocloseTimer = null;
             this.proactiveBubbleRef = null;
+            this.proactiveIdleListeners = [];
             this.shadowRootRef = this.attachShadow({ mode: "open" });
         }
         connectedCallback() {
@@ -429,27 +430,28 @@
                 window.clearTimeout(this.proactiveTimer);
             if (this.proactiveAutocloseTimer)
                 window.clearTimeout(this.proactiveAutocloseTimer);
+            this.stopProactiveIdleTracking();
             const config = this.config;
-            if (!config || !config.proactiveMessage || embedMode === "inline" || this.isOpen) {
+            if (!config || !this.canShowProactiveBubble(config)) {
                 return;
             }
-            const storageKey = `agentdesk:proactive-dismissed:${config.botId}`;
-            const isDismissed = window.sessionStorage.getItem(storageKey) === "true";
-            if (config.proactiveMessageShowOnce && isDismissed) {
+            if (config.proactiveMessageTriggerType === "idle") {
+                this.startProactiveIdleTracking(config);
                 return;
             }
             const delayMs = (config.proactiveMessageDelay || 5) * 1000;
             this.proactiveTimer = window.setTimeout(() => {
-                if (this.isOpen)
+                if (!this.canShowProactiveBubble(config))
                     return;
-                this.showProactiveBubble();
+                this.showProactiveBubble("delay");
             }, delayMs);
         }
-        showProactiveBubble() {
+        showProactiveBubble(trigger) {
             var _a, _b;
             if (!this.proactiveBubbleRef)
                 return;
             this.proactiveBubbleRef.classList.add("active");
+            this.trackProactiveEvent("proactive_shown", { trigger });
             if ((_a = this.config) === null || _a === void 0 ? void 0 : _a.proactiveMessageSound) {
                 this.playProactiveSound();
             }
@@ -460,7 +462,7 @@
                 }, autocloseSec * 1000);
             }
         }
-        hideProactiveBubble(dismiss = false) {
+        hideProactiveBubble(dismiss = false, eventName = "proactive_dismissed") {
             if (this.proactiveBubbleRef) {
                 this.proactiveBubbleRef.classList.remove("active");
             }
@@ -469,13 +471,105 @@
                 this.proactiveAutocloseTimer = null;
             }
             if (dismiss && this.config) {
-                const storageKey = `agentdesk:proactive-dismissed:${this.config.botId}`;
-                window.sessionStorage.setItem(storageKey, "true");
+                this.storeProactiveSuppression(this.config);
+                this.trackProactiveEvent(eventName);
             }
+        }
+        canShowProactiveBubble(config) {
+            if (!config.proactiveMessage || embedMode === "inline" || this.isOpen) {
+                return false;
+            }
+            if (!matchesUrlRules(config.proactiveMessageUrlRules, window.location.pathname)) {
+                return false;
+            }
+            if (config.proactiveMessageShowOnce && window.sessionStorage.getItem(legacyProactiveKey(config)) === "true") {
+                return false;
+            }
+            return !isProactiveSuppressed(config);
+        }
+        startProactiveIdleTracking(config) {
+            const resetIdleTimer = () => {
+                if (this.proactiveTimer)
+                    window.clearTimeout(this.proactiveTimer);
+                this.proactiveTimer = window.setTimeout(() => {
+                    if (!this.canShowProactiveBubble(config))
+                        return;
+                    this.stopProactiveIdleTracking();
+                    this.showProactiveBubble("idle");
+                }, (config.proactiveMessageIdleDelay || 20) * 1000);
+            };
+            for (const eventName of ["mousemove", "keydown", "scroll", "touchstart", "click"]) {
+                window.addEventListener(eventName, resetIdleTimer, { passive: true });
+                this.proactiveIdleListeners.push(() => window.removeEventListener(eventName, resetIdleTimer));
+            }
+            resetIdleTimer();
+        }
+        stopProactiveIdleTracking() {
+            for (const removeListener of this.proactiveIdleListeners) {
+                removeListener();
+            }
+            this.proactiveIdleListeners = [];
+        }
+        storeProactiveSuppression(config) {
+            try {
+                window.sessionStorage.setItem(legacyProactiveKey(config), "true");
+                if (config.proactiveMessageFrequencyCap === "always") {
+                    return;
+                }
+                const expiresAt = proactiveSuppressionExpiry(config.proactiveMessageFrequencyCap);
+                const value = JSON.stringify({ expiresAt });
+                const key = proactiveSuppressionKey(config);
+                if (config.proactiveMessageFrequencyCap === "session") {
+                    window.sessionStorage.setItem(key, value);
+                }
+                else {
+                    window.localStorage.setItem(key, value);
+                }
+            }
+            catch {
+            }
+        }
+        trackProactiveEvent(eventName, metadata = {}) {
+            const config = this.config;
+            if (!config) {
+                return;
+            }
+            emitWidgetEvent(config, this.sessionToken, {
+                eventName,
+                variantId: config.proactiveMessageVariantId,
+                metadata,
+            });
+        }
+        openChatFromProactive(eventName, prefill = "") {
+            this.isOpen = true;
+            this.hideProactiveBubble(true, eventName);
+            this.renderShell();
+            if (prefill) {
+                queueMicrotask(() => {
+                    if (this.composerInputRef) {
+                        this.composerInputRef.value = prefill.slice(0, MAX_MESSAGE_LENGTH);
+                        this.composerInputRef.focus();
+                    }
+                });
+            }
+        }
+        handleProactiveCta(cta) {
+            if (cta.action === "open_url") {
+                const url = normalizeHttpUrl(cta.value);
+                if (url) {
+                    window.open(url, "_blank", "noopener,noreferrer");
+                }
+                this.hideProactiveBubble(true, "proactive_cta_clicked");
+                return;
+            }
+            this.openChatFromProactive("proactive_cta_clicked", cta.action === "prefill_message" ? cta.value : "");
         }
         createProactiveBubble(config) {
             const bubble = createElement("div", "ad-proactive-bubble");
             this.proactiveBubbleRef = bubble;
+            bubble.tabIndex = 0;
+            bubble.setAttribute("role", "button");
+            bubble.setAttribute("aria-label", "Open support chat");
             const closeBtn = createElement("button", "ad-proactive-close");
             closeBtn.type = "button";
             closeBtn.setAttribute("aria-label", "Dismiss greeting");
@@ -490,11 +584,29 @@
             const meta = createElement("p", "ad-proactive-meta");
             meta.textContent = `${config.botName} · a few moments ago`;
             body.append(text, meta);
+            if (config.proactiveMessageCtas.length > 0) {
+                const actions = createElement("div", "ad-proactive-actions");
+                for (const cta of config.proactiveMessageCtas) {
+                    const button = createElement("button", "ad-proactive-action");
+                    button.type = "button";
+                    button.textContent = cta.label;
+                    button.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        this.handleProactiveCta(cta);
+                    });
+                    actions.append(button);
+                }
+                body.append(actions);
+            }
             bubble.append(closeBtn, body);
             bubble.addEventListener("click", () => {
-                this.isOpen = true;
-                this.hideProactiveBubble(true);
-                this.renderShell();
+                this.openChatFromProactive("proactive_opened_chat");
+            });
+            bubble.addEventListener("keydown", (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    this.openChatFromProactive("proactive_opened_chat");
+                }
             });
             return bubble;
         }
@@ -823,10 +935,56 @@
             proactiveMessageShowOnce: config.proactiveMessageShowOnce === true,
             proactiveMessageSound: config.proactiveMessageSound === true,
             proactiveMessageAutoclose: typeof config.proactiveMessageAutoclose === "number" ? config.proactiveMessageAutoclose : fallback.proactiveMessageAutoclose,
+            proactiveMessageTriggerType: config.proactiveMessageTriggerType === "idle" ? "idle" : fallback.proactiveMessageTriggerType,
+            proactiveMessageIdleDelay: typeof config.proactiveMessageIdleDelay === "number" ? config.proactiveMessageIdleDelay : fallback.proactiveMessageIdleDelay,
+            proactiveMessageUrlRules: normalizeStringArray(config.proactiveMessageUrlRules, 20, 160),
+            proactiveMessageFrequencyCap: normalizeFrequencyCap(config.proactiveMessageFrequencyCap),
+            proactiveMessageCtas: normalizeProactiveCtas(config.proactiveMessageCtas),
+            proactiveMessageVariantId: stringValue(config.proactiveMessageVariantId, fallback.proactiveMessageVariantId).slice(0, 60),
         };
     }
     function stringValue(value, fallback) {
         return typeof value === "string" && value.trim() ? value.trim() : fallback;
+    }
+    function normalizeStringArray(value, maxItems, maxLength) {
+        if (!Array.isArray(value)) {
+            return [];
+        }
+        return value
+            .filter((item) => typeof item === "string")
+            .map((item) => item.trim().slice(0, maxLength))
+            .filter(Boolean)
+            .slice(0, maxItems);
+    }
+    function normalizeFrequencyCap(value) {
+        return value === "daily" || value === "weekly" || value === "always" || value === "session" ? value : "session";
+    }
+    function normalizeProactiveCtas(value) {
+        if (!Array.isArray(value)) {
+            return [];
+        }
+        return value
+            .map((item, index) => {
+            if (!item || typeof item !== "object") {
+                return null;
+            }
+            const record = item;
+            const action = record.action === "prefill_message" || record.action === "open_url" || record.action === "open_chat" ? record.action : "open_chat";
+            const label = stringValue(record.label, "").slice(0, 40);
+            const rawValue = stringValue(record.value, "").slice(0, 500);
+            const normalizedValue = action === "open_url" ? normalizeHttpUrl(rawValue) : rawValue;
+            if (!label || (action !== "open_chat" && !normalizedValue)) {
+                return null;
+            }
+            return {
+                id: stringValue(record.id, `cta-${index + 1}`).slice(0, 60),
+                label,
+                action,
+                value: normalizedValue,
+            };
+        })
+            .filter((item) => Boolean(item))
+            .slice(0, 3);
     }
     function buildFallbackConfig(currentBotId) {
         return {
@@ -850,6 +1008,12 @@
             proactiveMessageShowOnce: true,
             proactiveMessageSound: false,
             proactiveMessageAutoclose: 0,
+            proactiveMessageTriggerType: "delay",
+            proactiveMessageIdleDelay: 20,
+            proactiveMessageUrlRules: [],
+            proactiveMessageFrequencyCap: "session",
+            proactiveMessageCtas: [],
+            proactiveMessageVariantId: "default",
             theme: {
                 headerHsl: "0 0% 11%",
                 headerTextHsl: "0 0% 100%",
@@ -1354,6 +1518,39 @@
         margin: 0;
       }
 
+      .ad-proactive-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .ad-proactive-action {
+        background: rgba(28, 28, 28, 0.04);
+        border: 1px solid var(--ad-border-color);
+        border-radius: 999px;
+        color: #1c1c1c;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 6px 9px;
+      }
+
+      .ad-proactive-action:hover {
+        background: rgba(28, 28, 28, 0.08);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ad-chat-pane,
+        .ad-message,
+        .ad-launcher-button,
+        .ad-proactive-bubble,
+        .ad-typing-dot {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+
       @media (max-width: 480px) {
         .ad-widget {
           bottom: 0;
@@ -1472,6 +1669,110 @@
         }
         catch {
             return null;
+        }
+    }
+    function normalizeHttpUrl(value) {
+        if (!value) {
+            return "";
+        }
+        try {
+            const url = new URL(value, window.location.href);
+            return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+        }
+        catch {
+            return "";
+        }
+    }
+    function matchesUrlRules(rules, pathname) {
+        const normalizedPath = pathname || "/";
+        if (rules.length === 0) {
+            return true;
+        }
+        const includes = rules.filter((rule) => !rule.startsWith("!"));
+        const excludes = rules.filter((rule) => rule.startsWith("!")).map((rule) => rule.slice(1));
+        const included = includes.length === 0 || includes.some((rule) => matchesPathRule(rule, normalizedPath));
+        const excluded = excludes.some((rule) => matchesPathRule(rule, normalizedPath));
+        return included && !excluded;
+    }
+    function matchesPathRule(rule, pathname) {
+        const normalizedRule = rule.trim();
+        if (!normalizedRule || normalizedRule === "*") {
+            return true;
+        }
+        if (normalizedRule.endsWith("/*")) {
+            const prefix = normalizedRule.slice(0, -1);
+            return pathname.startsWith(prefix);
+        }
+        return pathname === normalizedRule;
+    }
+    function legacyProactiveKey(config) {
+        return `agentdesk:proactive-dismissed:${config.botId}`;
+    }
+    function proactiveSuppressionKey(config) {
+        const signature = `${config.botId}:${config.proactiveMessageVariantId}:${config.proactiveMessageText}`;
+        return `agentdesk:proactive:${STORAGE_VERSION}:${simpleHash(signature)}`;
+    }
+    function isProactiveSuppressed(config) {
+        if (config.proactiveMessageFrequencyCap === "always") {
+            return false;
+        }
+        try {
+            const key = proactiveSuppressionKey(config);
+            const raw = config.proactiveMessageFrequencyCap === "session" ? window.sessionStorage.getItem(key) : window.localStorage.getItem(key);
+            if (!raw) {
+                return false;
+            }
+            const parsed = JSON.parse(raw);
+            if (!parsed.expiresAt || Date.now() > parsed.expiresAt) {
+                window.sessionStorage.removeItem(key);
+                window.localStorage.removeItem(key);
+                return false;
+            }
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    function proactiveSuppressionExpiry(cap) {
+        const now = Date.now();
+        if (cap === "daily")
+            return now + 24 * 60 * 60 * 1000;
+        if (cap === "weekly")
+            return now + 7 * 24 * 60 * 60 * 1000;
+        return now + 12 * 60 * 60 * 1000;
+    }
+    function simpleHash(value) {
+        let hash = 0;
+        for (let index = 0; index < value.length; index += 1) {
+            hash = (hash << 5) - hash + value.charCodeAt(index);
+            hash |= 0;
+        }
+        return Math.abs(hash).toString(36);
+    }
+    function emitWidgetEvent(config, sessionToken, payload) {
+        const body = JSON.stringify({
+            botId: config.botId,
+            tenantId: config.tenantId,
+            sessionToken,
+            ...payload,
+        });
+        const endpoint = `${scriptOrigin}/api/widget/events`;
+        try {
+            if (navigator.sendBeacon) {
+                const sent = navigator.sendBeacon(endpoint, new Blob([body], { type: "application/json" }));
+                if (sent) {
+                    return;
+                }
+            }
+            void fetch(endpoint, {
+                body,
+                headers: { "Content-Type": "application/json" },
+                keepalive: true,
+                method: "POST",
+            });
+        }
+        catch {
         }
     }
     async function checkLiveHandoffHealth(baseUrl) {

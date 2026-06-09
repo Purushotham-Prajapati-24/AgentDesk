@@ -84,6 +84,7 @@ export function WebChatTextarea({
   placeholder,
   maxLength,
   rows = 4,
+  helperText,
 }: {
   label: string;
   value: string;
@@ -91,6 +92,7 @@ export function WebChatTextarea({
   placeholder?: string;
   maxLength?: number;
   rows?: number;
+  helperText?: string;
 }) {
   return (
     <label className="block">
@@ -103,6 +105,7 @@ export function WebChatTextarea({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {helperText ? <span className="mt-2 block text-xs font-semibold leading-5 text-[var(--ui-muted)]">{helperText}</span> : null}
     </label>
   );
 }

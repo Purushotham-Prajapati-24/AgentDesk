@@ -45,6 +45,19 @@ type WidgetConfig = {
   proactiveMessageShowOnce: boolean;
   proactiveMessageSound: boolean;
   proactiveMessageAutoclose: number;
+  proactiveMessageTriggerType: "delay" | "idle";
+  proactiveMessageIdleDelay: number;
+  proactiveMessageUrlRules: string[];
+  proactiveMessageFrequencyCap: "session" | "daily" | "weekly" | "always";
+  proactiveMessageCtas: ProactiveMessageCta[];
+  proactiveMessageVariantId: string;
+};
+
+type ProactiveMessageCta = {
+  id: string;
+  label: string;
+  action: "open_chat" | "prefill_message" | "open_url";
+  value: string;
 };
 
 type WidgetConfigResponse = {
@@ -79,6 +92,12 @@ type WebChatConfigDocument = Models.Document & {
   proactive_message_show_once?: unknown;
   proactive_message_sound?: unknown;
   proactive_message_autoclose?: unknown;
+  proactive_message_trigger_type?: unknown;
+  proactive_message_idle_delay?: unknown;
+  proactive_message_url_rules?: unknown;
+  proactive_message_frequency_cap?: unknown;
+  proactive_message_ctas?: unknown;
+  proactive_message_variant_id?: unknown;
 };
 
 type ErrorResponse = {
@@ -136,6 +155,12 @@ const DEMO_CONFIGS: Record<string, WidgetConfig> = {
     proactiveMessageShowOnce: true,
     proactiveMessageSound: false,
     proactiveMessageAutoclose: 0,
+    proactiveMessageTriggerType: "delay",
+    proactiveMessageIdleDelay: 20,
+    proactiveMessageUrlRules: [],
+    proactiveMessageFrequencyCap: "session",
+    proactiveMessageCtas: [],
+    proactiveMessageVariantId: "default",
   },
 };
 
@@ -226,6 +251,12 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
       proactiveMessageShowOnce: typeof features.proactiveMessageShowOnce === "boolean" ? features.proactiveMessageShowOnce : true,
       proactiveMessageSound: typeof features.proactiveMessageSound === "boolean" ? features.proactiveMessageSound : false,
       proactiveMessageAutoclose: typeof features.proactiveMessageAutoclose === "number" ? features.proactiveMessageAutoclose : 0,
+      proactiveMessageTriggerType: proactiveTriggerType(features.proactiveMessageTriggerType),
+      proactiveMessageIdleDelay: typeof features.proactiveMessageIdleDelay === "number" ? features.proactiveMessageIdleDelay : 20,
+      proactiveMessageUrlRules: sanitizeStringArray(features.proactiveMessageUrlRules, 20, 160),
+      proactiveMessageFrequencyCap: proactiveFrequencyCap(features.proactiveMessageFrequencyCap),
+      proactiveMessageCtas: sanitizeCtas(features.proactiveMessageCtas),
+      proactiveMessageVariantId: cleanText(stringValue(features.proactiveMessageVariantId, "default"), 60),
     };
   } catch {
     return null;
@@ -290,6 +321,12 @@ function widgetConfigFromWebChatDocument(botId: string, bot: BotDocument, config
     proactiveMessageShowOnce: typeof config.proactive_message_show_once === "boolean" ? config.proactive_message_show_once : true,
     proactiveMessageSound: typeof config.proactive_message_sound === "boolean" ? config.proactive_message_sound : false,
     proactiveMessageAutoclose: typeof config.proactive_message_autoclose === "number" ? config.proactive_message_autoclose : 0,
+    proactiveMessageTriggerType: proactiveTriggerType(config.proactive_message_trigger_type),
+    proactiveMessageIdleDelay: typeof config.proactive_message_idle_delay === "number" ? config.proactive_message_idle_delay : 20,
+    proactiveMessageUrlRules: sanitizeStringArray(parseJsonArray(config.proactive_message_url_rules), 20, 160),
+    proactiveMessageFrequencyCap: proactiveFrequencyCap(config.proactive_message_frequency_cap),
+    proactiveMessageCtas: sanitizeCtas(parseJsonArray(config.proactive_message_ctas)),
+    proactiveMessageVariantId: cleanText(stringValue(config.proactive_message_variant_id, "default"), 60),
   };
 }
 
@@ -343,6 +380,12 @@ function sanitizeConfig(config: WidgetConfig): WidgetConfig {
     proactiveMessageShowOnce: config.proactiveMessageShowOnce === true,
     proactiveMessageSound: config.proactiveMessageSound === true,
     proactiveMessageAutoclose: typeof config.proactiveMessageAutoclose === "number" ? config.proactiveMessageAutoclose : 0,
+    proactiveMessageTriggerType: proactiveTriggerType(config.proactiveMessageTriggerType),
+    proactiveMessageIdleDelay: clampInteger(config.proactiveMessageIdleDelay, 0, 300, 20),
+    proactiveMessageUrlRules: sanitizeStringArray(config.proactiveMessageUrlRules, 20, 160),
+    proactiveMessageFrequencyCap: proactiveFrequencyCap(config.proactiveMessageFrequencyCap),
+    proactiveMessageCtas: sanitizeCtas(config.proactiveMessageCtas),
+    proactiveMessageVariantId: cleanText(stringValue(config.proactiveMessageVariantId, "default"), 60),
   };
 }
 
@@ -409,6 +452,95 @@ function sanitizeUrl(value: string | null) {
   } catch {
     return null;
   }
+}
+
+function sanitizeCtaUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function sanitizeCtas(value: unknown): ProactiveMessageCta[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const record = item as Record<string, unknown>;
+      const action = proactiveCtaAction(record.action);
+      const label = cleanText(stringValue(record.label, ""), 40);
+      const valueText = action === "open_url" ? sanitizeCtaUrl(stringValue(record.value, "")) : cleanText(stringValue(record.value, ""), 500);
+
+      if (!label || (action !== "open_chat" && !valueText)) {
+        return null;
+      }
+
+      return {
+        id: cleanText(stringValue(record.id, `cta-${index + 1}`), 60),
+        label,
+        action,
+        value: valueText,
+      } satisfies ProactiveMessageCta;
+    })
+    .filter((item): item is ProactiveMessageCta => Boolean(item))
+    .slice(0, 3);
+}
+
+function sanitizeStringArray(value: unknown, maxItems: number, maxLength: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => cleanText(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function parseJsonArray(value: unknown) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function proactiveTriggerType(value: unknown): WidgetConfig["proactiveMessageTriggerType"] {
+  return value === "idle" ? "idle" : "delay";
+}
+
+function proactiveFrequencyCap(value: unknown): WidgetConfig["proactiveMessageFrequencyCap"] {
+  return value === "daily" || value === "weekly" || value === "always" || value === "session" ? value : "session";
+}
+
+function proactiveCtaAction(value: unknown): ProactiveMessageCta["action"] {
+  return value === "prefill_message" || value === "open_url" || value === "open_chat" ? value : "open_chat";
+}
+
+function clampInteger(value: unknown, min: number, max: number, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
 function cleanText(value: string, maxLength: number) {

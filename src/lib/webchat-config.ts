@@ -2,6 +2,14 @@ import { z } from "zod";
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Use a 6-digit hex color.");
 const fontChoice = z.enum(["Fira", "Outfit", "System", "Mono"]);
+const proactiveTriggerType = z.enum(["delay", "idle"]);
+const proactiveFrequencyCap = z.enum(["session", "daily", "weekly", "always"]);
+const proactiveCta = z.object({
+  id: z.string().trim().min(1).max(60),
+  label: z.string().trim().min(1).max(40),
+  action: z.enum(["open_chat", "prefill_message", "open_url"]),
+  value: z.string().trim().max(500),
+});
 const optionalUrl = z.string().trim().max(500).refine((value) => {
   if (!value) {
     return true;
@@ -65,6 +73,12 @@ export const WebChatConfigSchema = z.object({
     proactiveMessageShowOnce: z.boolean(),
     proactiveMessageSound: z.boolean(),
     proactiveMessageAutoclose: z.number().int().min(0).max(300),
+    proactiveMessageTriggerType: proactiveTriggerType.default("delay"),
+    proactiveMessageIdleDelay: z.number().int().min(0).max(300).default(20),
+    proactiveMessageUrlRules: z.array(z.string().trim().max(160)).max(20).default([]),
+    proactiveMessageFrequencyCap: proactiveFrequencyCap.default("session"),
+    proactiveMessageCtas: z.array(proactiveCta).max(3).default([]),
+    proactiveMessageVariantId: z.string().trim().max(60).default("default"),
   }),
 });
 
@@ -131,6 +145,12 @@ export const DEFAULT_WEBCHAT_CONFIG: WebChatConfig = {
     proactiveMessageShowOnce: true,
     proactiveMessageSound: false,
     proactiveMessageAutoclose: 0,
+    proactiveMessageTriggerType: "delay",
+    proactiveMessageIdleDelay: 20,
+    proactiveMessageUrlRules: [],
+    proactiveMessageFrequencyCap: "session",
+    proactiveMessageCtas: [],
+    proactiveMessageVariantId: "default",
   },
 };
 
