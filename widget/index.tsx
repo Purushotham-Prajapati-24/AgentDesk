@@ -1071,7 +1071,7 @@
         width: 40px;
       }
 
-      .ad-avatar img {
+      ad-avatar img {
         height: 100%;
         object-fit: cover;
         width: 100%;
