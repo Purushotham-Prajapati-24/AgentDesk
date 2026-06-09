@@ -58,13 +58,14 @@ async function upsert(collectionId, documentId, data) {
 }
 
 async function updateSessionSummary(session, messages) {
+  const sortedMessages = sortMessagesByCreated(messages);
   const counts = {
-    message_count: messages.length,
-    customer_message_count: messages.filter((message) => message.sender === "customer").length,
-    bot_message_count: messages.filter((message) => message.sender === "bot").length,
-    agent_message_count: messages.filter((message) => message.sender === "agent").length,
+    message_count: sortedMessages.length,
+    customer_message_count: sortedMessages.filter((message) => message.sender === "customer").length,
+    bot_message_count: sortedMessages.filter((message) => message.sender === "bot").length,
+    agent_message_count: sortedMessages.filter((message) => message.sender === "agent").length,
   };
-  const lastMessage = messages.at(-1);
+  const lastMessage = sortedMessages.at(-1);
 
   await databases.updateDocument(databaseId, sessionsCollectionId, session.$id, {
     ...counts,
@@ -106,17 +107,17 @@ async function run() {
       continue;
     }
 
-    const messages = await listAll(messagesCollectionId, [
+    const messages = sortMessagesByCreated(await listAll(messagesCollectionId, [
       Query.equal("tenant_id", tenantId),
       Query.equal("session_id", session.$id),
-      Query.orderAsc("created"),
-    ]);
+    ]));
+    const knownMessages = messages.filter((message) => senderValue(message.sender) !== "unknown");
     await updateSessionSummary(session, messages);
 
     const tenant = getOrCreate(tenantRollups, tenantId, () => zeroTenantRollup(tenantId));
     tenant.conversations += 1;
     tenant[statusCounterKey(session.status)] += 1;
-    tenant.messages += messages.length;
+    tenant.messages += knownMessages.length;
 
     const botId = stringValue(session.bot_id, "unassigned");
     const bot = getOrCreate(botRollups, `${tenantId}:${botId}`, () => ({
@@ -127,25 +128,23 @@ async function run() {
       updated: new Date().toISOString(),
     }));
     bot.conversations += 1;
-    bot.messages += messages.length;
+    bot.messages += knownMessages.length;
 
-    for (const message of messages) {
+    for (const message of knownMessages) {
       const sender = senderValue(message.sender);
-      if (sender !== "unknown") {
-        tenant[`${sender}_messages`] += 1;
-        const date = stringValue(message.created, message.$createdAt).slice(0, 10);
-        const daily = getOrCreate(dailyRollups, `${tenantId}:${date}`, () => ({
-          tenant_id: tenantId,
-          date,
-          messages: 0,
-          customer_messages: 0,
-          bot_messages: 0,
-          agent_messages: 0,
-          updated: new Date().toISOString(),
-        }));
-        daily.messages += 1;
-        daily[`${sender}_messages`] += 1;
-      }
+      tenant[`${sender}_messages`] += 1;
+      const date = stringValue(message.created, message.$createdAt).slice(0, 10);
+      const daily = getOrCreate(dailyRollups, `${tenantId}:${date}`, () => ({
+        tenant_id: tenantId,
+        date,
+        messages: 0,
+        customer_messages: 0,
+        bot_messages: 0,
+        agent_messages: 0,
+        updated: new Date().toISOString(),
+      }));
+      daily.messages += 1;
+      daily[`${sender}_messages`] += 1;
     }
   }
 
@@ -199,6 +198,12 @@ function stringValue(value, fallback) {
 
 function numberValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function sortMessagesByCreated(messages) {
+  return [...messages].sort((a, b) =>
+    stringValue(a.created, a.$createdAt).localeCompare(stringValue(b.created, b.$createdAt)),
+  );
 }
 
 function stableId(value) {

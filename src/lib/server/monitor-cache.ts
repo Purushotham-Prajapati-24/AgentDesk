@@ -3,6 +3,7 @@ type CacheEntry = {
   expiresAt: number;
 };
 
+const MAX_MEMORY_CACHE_ENTRIES = 1000;
 const memoryCache = new Map<string, CacheEntry>();
 
 export async function getCachedJson<T>(key: string): Promise<T | null> {
@@ -35,13 +36,15 @@ export async function setCachedJson(key: string, value: unknown, ttlSeconds: num
     value,
     expiresAt: Date.now() + ttl * 1000,
   });
+  pruneMemoryCache();
 }
 
 export async function deleteCachedPrefix(prefix: string) {
   if (hasRedisConfig()) {
-    const keys = (await redisCommand<string[] | null>(["KEYS", `${prefix}*`])) ?? [];
-    if (keys.length > 0) {
-      await redisCommand(["DEL", ...keys]);
+    for await (const keys of scanKeys(`${prefix}*`)) {
+      if (keys.length > 0) {
+        await redisCommand(["DEL", ...keys]);
+      }
     }
     return;
   }
@@ -80,4 +83,30 @@ async function redisCommand<T>(command: Array<string | number>): Promise<T> {
   }
 
   return payload.result as T;
+}
+
+async function* scanKeys(pattern: string) {
+  let cursor = "0";
+  do {
+    const result = await redisCommand<[string, string[]]>(["SCAN", cursor, "MATCH", pattern, "COUNT", 100]);
+    cursor = String(result[0]);
+    yield result[1] ?? [];
+  } while (cursor !== "0");
+}
+
+function pruneMemoryCache() {
+  const now = Date.now();
+  for (const [key, entry] of memoryCache) {
+    if (entry.expiresAt <= now) {
+      memoryCache.delete(key);
+    }
+  }
+
+  while (memoryCache.size > MAX_MEMORY_CACHE_ENTRIES) {
+    const oldestKey = memoryCache.keys().next().value as string | undefined;
+    if (!oldestKey) {
+      return;
+    }
+    memoryCache.delete(oldestKey);
+  }
 }

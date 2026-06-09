@@ -446,11 +446,19 @@ async function fetchAttentionConversations(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   tenantId: string,
 ) {
-  const sessions = await fetchSessions(databases, tenantId, {
-    limit: 5,
-    status: "paused_by_human",
-  });
-  return (sessions.documents as SessionDocument[]).map((session) => mapSessionSummary(session) as MonitorConversation);
+  const [paused, active] = await Promise.all([
+    fetchSessions(databases, tenantId, {
+      limit: 5,
+      status: "paused_by_human",
+    }),
+    fetchSessions(databases, tenantId, {
+      limit: 5,
+      status: "active",
+    }),
+  ]);
+  return [...(paused.documents as SessionDocument[]), ...(active.documents as SessionDocument[])]
+    .slice(0, 5)
+    .map((session) => mapSessionSummary(session) as MonitorConversation);
 }
 
 function buildRecentActivity(messages: MessageDocument[]) {

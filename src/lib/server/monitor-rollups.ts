@@ -1,5 +1,6 @@
 import { ID, Operator, Query, type Models } from "node-appwrite";
 import { createHash } from "node:crypto";
+import { deleteCachedPrefix } from "./monitor-cache.ts";
 
 export type MonitorSessionStatus = "active" | "paused_by_human" | "closed";
 export type MonitorSender = "customer" | "bot" | "agent" | "unknown";
@@ -98,7 +99,6 @@ export async function recordSessionCreated(databases: RollupDatabases, session: 
     stringValue(session.bot_id, "")
       ? incrementBotRollup(databases, tenantId, stringValue(session.bot_id, ""), { conversations: 1 })
       : Promise.resolve(),
-    invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]),
   ]);
 
   await updateDocumentCompat(databases, sessionsCollectionId(), session.$id, {
@@ -111,6 +111,7 @@ export async function recordSessionCreated(databases: RollupDatabases, session: 
     last_message_at: "",
     updated: stringValue(session.updated, now),
   });
+  await invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]);
 }
 
 export async function recordSessionStatusChanged(
@@ -130,14 +131,12 @@ export async function recordSessionStatusChanged(
     return;
   }
 
-  await Promise.all([
-    incrementTenantRollup(databases, tenantId, {
-      [statusCounterKey(previous)]: -1,
-      [statusCounterKey(next)]: 1,
-      handoffs: next === "paused_by_human" ? 1 : 0,
-    }),
-    invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]),
-  ]);
+  await incrementTenantRollup(databases, tenantId, {
+    [statusCounterKey(previous)]: -1,
+    [statusCounterKey(next)]: 1,
+    handoffs: next === "paused_by_human" ? 1 : 0,
+  });
+  await invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]);
 }
 
 export async function recordMessageCreated(
@@ -169,8 +168,8 @@ export async function recordMessageCreated(
     }),
     incrementDailyRollup(databases, tenantId, dateKey(new Date(createdAt)), { messages: 1 }),
     botId ? incrementBotRollup(databases, tenantId, botId, { messages: 1 }) : Promise.resolve(),
-    invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]),
   ]);
+  await invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]);
 }
 
 export async function recordDocumentStorageAdded(databases: RollupDatabases, tenantId: string, bytes: number) {
@@ -178,10 +177,8 @@ export async function recordDocumentStorageAdded(databases: RollupDatabases, ten
     return;
   }
 
-  await Promise.all([
-    incrementTenantRollup(databases, tenantId, { document_storage_bytes: Math.round(bytes) }),
-    invalidateMonitorCache(tenantId, ["analytics"]),
-  ]);
+  await incrementTenantRollup(databases, tenantId, { document_storage_bytes: Math.round(bytes) });
+  await invalidateMonitorCache(tenantId, ["analytics"]);
 }
 
 export async function recordCreditLedgerEntry(databases: RollupDatabases, tenantId: string, amount: number) {
@@ -189,10 +186,8 @@ export async function recordCreditLedgerEntry(databases: RollupDatabases, tenant
     return;
   }
 
-  await Promise.all([
-    incrementTenantRollup(databases, tenantId, { credit_balance: amount }),
-    invalidateMonitorCache(tenantId, ["analytics"]),
-  ]);
+  await incrementTenantRollup(databases, tenantId, { credit_balance: amount });
+  await invalidateMonitorCache(tenantId, ["analytics"]);
 }
 
 export async function getMonitorSnapshotFromRollups(databases: RollupDatabases, tenantId: string) {
@@ -460,38 +455,6 @@ function numberValue(value: unknown) {
 
 function errorCode(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error ? Number((error as { code?: unknown }).code) : 0;
-}
-
-async function deleteCachedPrefix(prefix: string) {
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    return;
-  }
-
-  const keys = (await redisCommand<string[] | null>(["KEYS", `${prefix}*`])) ?? [];
-  if (keys.length > 0) {
-    await redisCommand(["DEL", ...keys]);
-  }
-}
-
-async function redisCommand<T>(command: Array<string | number>): Promise<T> {
-  const response = await fetch(process.env.UPSTASH_REDIS_REST_URL ?? "", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN ?? ""}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(command),
-  });
-  if (!response.ok) {
-    throw new Error(`Upstash Redis command failed with ${response.status}.`);
-  }
-
-  const payload = (await response.json()) as { result?: T; error?: string };
-  if (payload.error) {
-    throw new Error(payload.error);
-  }
-
-  return payload.result as T;
 }
 
 function getUnknownAttribute(error: unknown) {

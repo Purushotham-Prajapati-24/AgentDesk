@@ -164,20 +164,22 @@ async function crawlQueuedDocument(
     if (!markdown.trim()) {
       throw new Error("No readable text could be extracted from this URL.");
     }
+    const markdownBytes = Buffer.byteLength(markdown, "utf8");
+    const storageDelta = Math.max(0, markdownBytes - numberValue(document.file_size, 0));
 
     await updateDocumentCompat(databases, document.$id, {
       parsed_text: markdown,
-      file_size: markdown.length,
+      file_size: markdownBytes,
       status: "processing",
       last_error: "",
       updated: new Date().toISOString(),
     });
     await recordBestEffort("document storage rollup", () =>
-      recordDocumentStorageAdded(databases, stringValue(document.tenant_id, ""), markdown.length - numberValue(document.file_size, 0)),
+      recordDocumentStorageAdded(databases, stringValue(document.tenant_id, ""), storageDelta),
     );
 
     document.parsed_text = markdown;
-    document.file_size = markdown.length;
+    document.file_size = markdownBytes;
     document.status = "processing";
     return { document_id: document.$id, status: "processing" };
   } catch (error) {

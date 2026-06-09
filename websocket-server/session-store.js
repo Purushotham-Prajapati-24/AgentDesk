@@ -148,12 +148,15 @@ async function updateStatusRollupBestEffort(databases, session, previousStatus, 
     const documentId = stableId(`tenant_${session.tenant_id}`);
     await ensureTenantRollup(databases, session.tenant_id, documentId);
     const now = new Date().toISOString();
-    await databases.updateDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
+    const update = {
       [statusCounterKey(previousStatus)]: Operator.increment(-1),
       [statusCounterKey(nextStatus)]: Operator.increment(1),
-      handoffs: nextStatus === "paused_by_human" ? Operator.increment(1) : Operator.increment(0),
       updated: now,
-    });
+    };
+    if (nextStatus === "paused_by_human") {
+      update.handoffs = Operator.increment(1);
+    }
+    await databases.updateDocument(databaseId(), tenantRollupsCollectionId(), documentId, update);
     await invalidateMonitorCache(session.tenant_id);
   } catch (error) {
     console.warn("[session-store] status rollup update failed", error);
@@ -202,11 +205,21 @@ async function invalidateMonitorCache(tenantId) {
     token: process.env.UPSTASH_REDIS_REST_TOKEN,
   });
   for (const scope of ["conversations", "users", "analytics"]) {
-    const keys = await redis.keys(`monitor:${tenantId}:${scope}:*`);
-    if (keys.length > 0) {
-      await redis.del(...keys);
+    for await (const keys of scanKeys(redis, `monitor:${tenantId}:${scope}:*`)) {
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
     }
   }
+}
+
+async function* scanKeys(redis, pattern) {
+  let cursor = "0";
+  do {
+    const result = await redis.scan(cursor, { match: pattern, count: 100 });
+    cursor = String(result[0]);
+    yield result[1] ?? [];
+  } while (cursor !== "0");
 }
 
 function statusCounterKey(status) {
