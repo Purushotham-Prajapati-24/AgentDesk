@@ -1,0 +1,29 @@
+name: Gemini PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Fetches the commit diff accurately
+
+      - name: Gemini AI Reviewer
+        uses: google-gemini/gemini-pr-review-action@v1
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          github_token: ${{ github.token }}
+          model: 'gemini-2.5-flash' # Free tier optimized model
+          system_instruction: |
+            You are an expert code reviewer. Analyze the pull request diff.
+            Point out critical logical bugs, security gaps, performance bottlenecks, or syntax formatting issues.
+            Keep your responses highly constructive and conversational. Give clear code examples if suggesting fixes.
