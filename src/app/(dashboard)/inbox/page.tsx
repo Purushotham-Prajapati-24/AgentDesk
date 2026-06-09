@@ -51,6 +51,8 @@ type SessionState = {
   updated_at: string;
 };
 
+type MobileInboxPanel = "queue" | "transcript" | "context";
+
 type SocketEventMessage = {
   message_id: string;
   sender: Sender;
@@ -98,6 +100,7 @@ export default function InboxPage() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [history, setHistory] = useState<ConversationSummary[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [mobilePanel, setMobilePanel] = useState<MobileInboxPanel>("queue");
   const socketRef = useRef<Socket | null>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
 
@@ -188,12 +191,10 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
-      setHistoryLoading(false);
       return;
     }
 
     let isActive = true;
-    setHistoryLoading(true);
     listConversationSessions({
       tenantId: tenant.$id,
       search: historySearch,
@@ -231,6 +232,7 @@ export default function InboxPage() {
     }
     setMessages([]);
     setSelectedConversationId(null);
+    setMobilePanel("transcript");
     setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
@@ -282,6 +284,7 @@ export default function InboxPage() {
     setRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
     setMessages([]);
     setMessageLoading(true);
+    setMobilePanel("transcript");
     setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
 
@@ -375,7 +378,8 @@ export default function InboxPage() {
   const activeHandoffs = history.filter((conversation) => conversation.status === "paused_by_human").length;
   const totalMessages = history.reduce((total, conversation) => total + conversation.messageCount, 0);
   const selectedConversation = history.find((conversation) => conversation.id === selectedConversationId) ?? null;
-  const initialLoading = tenantLoading || (historyLoading && history.length === 0 && !error);
+  const hasTenant = Boolean(tenant?.$id);
+  const initialLoading = tenantLoading || (hasTenant && historyLoading && history.length === 0 && !error);
 
   if (initialLoading) {
     return <InboxPageSkeleton />;
@@ -392,14 +396,25 @@ export default function InboxPage() {
           tenantId={tenant?.$id}
         />
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3">
           <InboxMetric label="Queue window" value={String(history.length)} detail={historyLoading ? "loading sessions" : "visible conversations"} tone="blue" />
           <InboxMetric label="Human control" value={String(activeHandoffs)} detail="sessions paused by operators" tone="coral" />
           <InboxMetric label="Messages" value={String(totalMessages)} detail="in visible history rows" tone="green" />
         </section>
 
-        <div className="grid min-w-0 gap-5 xl:h-[calc(100vh-8rem)] xl:min-h-[720px] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
+        <MobilePanelTabs
+          activePanel={mobilePanel}
+          items={[
+            { id: "queue", label: "Queue" },
+            { id: "transcript", label: "Transcript" },
+            { id: "context", label: "Context" },
+          ]}
+          onChange={setMobilePanel}
+        />
+
+        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[720px] lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
           <ConversationHistoryPanel
+            className={mobilePanel === "queue" ? "flex" : "hidden lg:flex"}
             history={history}
             historyCursorStack={historyCursorStack}
             historyLoading={historyLoading}
@@ -414,12 +429,14 @@ export default function InboxPage() {
           />
 
           <LiveTranscriptPanel
+            className={mobilePanel === "transcript" ? "flex" : "hidden lg:flex"}
             agentDraft={agentDraft}
             error={error}
             feedRef={feedRef}
             messageLoading={messageLoading}
             messages={messages}
             onAgentDraftChange={setAgentDraft}
+            onBackToQueue={() => setMobilePanel("queue")}
             onSendAgentMessage={sendAgentMessage}
             onToggleTakeover={toggleTakeover}
             room={room}
@@ -430,6 +447,7 @@ export default function InboxPage() {
           />
 
           <OperatorContextPanel
+            className={mobilePanel === "context" ? "grid lg:hidden xl:grid" : "hidden xl:grid"}
             canConnect={canConnect}
             draftRoom={draftRoom}
             messages={messages}
@@ -451,7 +469,7 @@ function InboxPageSkeleton() {
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
         <InboxHeroSkeleton />
         <InboxMetricGridSkeleton />
-        <div className="grid min-w-0 gap-5 xl:h-[calc(100vh-8rem)] xl:min-h-[720px] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
+        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[720px] lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
           <ConversationHistoryPanelSkeleton />
           <LiveTranscriptPanelSkeleton />
           <OperatorContextPanelSkeleton />
@@ -537,7 +555,7 @@ function ConversationHistoryPanelSkeleton() {
 
 function LiveTranscriptPanelSkeleton() {
   return (
-    <section className="flex h-[640px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[760px] xl:h-full">
+    <section className="flex min-h-[50vh] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:min-h-0 xl:h-full">
       <div className="flex flex-col gap-3 border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <Skeleton className="h-3 w-28 bg-[var(--ui-bg)]" />
@@ -681,7 +699,7 @@ function InboxHero({
           <ConnectionBadge status={socketStatus} />
           <SessionStatusPill status={selectedConversation?.status ?? "active"} />
         </div>
-        <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl">
+        <h1 className="mt-3 max-w-4xl text-2xl font-semibold leading-[1.1] tracking-[-0.03em] text-current sm:text-3xl lg:text-5xl">
           Take over customer conversations with the full context in view.
         </h1>
       </div>
@@ -700,7 +718,38 @@ function InboxHero({
   );
 }
 
+function MobilePanelTabs({
+  activePanel,
+  items,
+  onChange,
+}: {
+  activePanel: MobileInboxPanel;
+  items: Array<{ id: MobileInboxPanel; label: string }>;
+  onChange: (panel: MobileInboxPanel) => void;
+}) {
+  return (
+    <nav aria-label="Inbox mobile workspace" className="grid grid-cols-3 gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-1.5 lg:hidden">
+      {items.map((item) => (
+        <button
+          className={cn(
+            "min-h-11 rounded-full px-2 font-mono text-[11px] font-semibold uppercase transition",
+            activePanel === item.id
+              ? "bg-[var(--ui-blue)] text-white"
+              : "text-[var(--ui-muted)] hover:bg-[var(--ui-panel-2)] hover:text-[var(--ui-text)]",
+          )}
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 function ConversationHistoryPanel({
+  className,
   history,
   historyCursorStack,
   historyLoading,
@@ -724,9 +773,10 @@ function ConversationHistoryPanel({
   onSearchInputChange: (value: string) => void;
   onSelectConversation: (conversation: ConversationSummary) => void;
   selectedConversationId: string | null;
+  className?: string;
 }) {
   return (
-    <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+    <section className={cn("min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]", className)}>
       <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
@@ -739,13 +789,16 @@ function ConversationHistoryPanel({
         </div>
 
         <form className="flex gap-2" onSubmit={onSearch}>
-          <input
-            className="min-h-10 min-w-0 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
-            placeholder="Search session, bot, status"
-            value={historySearchInput}
-            onChange={(event) => onSearchInputChange(event.target.value)}
-          />
-          <Button aria-label="Search history" className="rounded-full" disabled={!historySearchInput.trim()} size="icon" type="submit" variant="secondary">
+          <div className="relative min-w-0 flex-1">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ui-muted)]" />
+            <input
+              className="min-h-10 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] pl-10 pr-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
+              placeholder="Search session, bot, status"
+              value={historySearchInput}
+              onChange={(event) => onSearchInputChange(event.target.value)}
+            />
+          </div>
+          <Button aria-label="Search history" className="hidden rounded-full sm:inline-flex" disabled={!historySearchInput.trim()} size="icon" type="submit" variant="secondary">
             <Search aria-hidden="true" className="h-4 w-4" />
           </Button>
         </form>
@@ -802,12 +855,14 @@ function ConversationHistoryPanel({
 }
 
 function LiveTranscriptPanel({
+  className,
   agentDraft,
   error,
   feedRef,
   messageLoading,
   messages,
   onAgentDraftChange,
+  onBackToQueue,
   onSendAgentMessage,
   onToggleTakeover,
   room,
@@ -822,6 +877,7 @@ function LiveTranscriptPanel({
   messageLoading: boolean;
   messages: ChatMessage[];
   onAgentDraftChange: (value: string) => void;
+  onBackToQueue: () => void;
   onSendAgentMessage: (event: FormEvent<HTMLFormElement>) => void;
   onToggleTakeover: () => void;
   room: Room;
@@ -829,16 +885,30 @@ function LiveTranscriptPanel({
   sessionStatus: SessionStatus;
   socketStatus: "connecting" | "connected" | "disconnected";
   wakingUp: boolean;
+  className?: string;
 }) {
   const canReply = sessionStatus === "paused_by_human" && socketStatus === "connected";
 
   return (
-    <section className="flex h-[640px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[760px] xl:h-full">
+    <section className={cn("min-h-[58svh] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:min-h-0 xl:h-full", className)}>
       <div className="flex flex-col gap-3 border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <p className="studio-kicker text-[var(--ui-blue)]">Primary transcript</p>
-          <h2 className="mt-1 break-all text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">{selectedConversation?.sessionToken ?? room.sessionId}</h2>
-          <p className="mt-1 break-all font-mono text-xs font-semibold text-[var(--ui-muted)]">{room.tenantId}</p>
+        <div className="flex min-w-0 items-start gap-2">
+          <Button
+            aria-label="Back to conversation queue"
+            className="mt-0.5 min-h-11 rounded-full lg:hidden"
+            leftIcon={<ChevronLeft aria-hidden="true" className="h-4 w-4" />}
+            onClick={onBackToQueue}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Queue
+          </Button>
+          <div className="min-w-0">
+            <p className="studio-kicker text-[var(--ui-blue)]">Primary transcript</p>
+            <h2 className="mt-1 break-all text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">{selectedConversation?.sessionToken ?? room.sessionId}</h2>
+            <p className="mt-1 break-all font-mono text-xs font-semibold text-[var(--ui-muted)]">{room.tenantId}</p>
+          </div>
         </div>
 
         <Button
@@ -871,7 +941,7 @@ function LiveTranscriptPanel({
         )}
       </div>
 
-      <form className="border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3" onSubmit={(event) => void onSendAgentMessage(event)}>
+      <form className="sticky bottom-0 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3 safe-bottom-padding" onSubmit={(event) => void onSendAgentMessage(event)}>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             className="min-h-12 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -891,6 +961,7 @@ function LiveTranscriptPanel({
 }
 
 function OperatorContextPanel({
+  className,
   canConnect,
   draftRoom,
   messages,
@@ -908,11 +979,12 @@ function OperatorContextPanel({
   room: Room;
   selectedConversation: ConversationSummary | null;
   socketStatus: "connecting" | "connected" | "disconnected";
+  className?: string;
 }) {
   const ragLabel = messages.some((message) => message.shouldCallRag) ? "Source lookup requested" : "No source flag yet";
 
   return (
-    <aside className="grid min-h-0 content-start gap-5">
+    <aside className={cn("min-h-0 content-start gap-5", className)}>
       <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
         <p className="studio-kicker text-[var(--ui-blue)]">Manual room connect</p>
         <form className="mt-4 grid gap-3" onSubmit={onUpdateRoom}>
@@ -1006,7 +1078,7 @@ function ConnectionBadge({ status }: { status: "connecting" | "connected" | "dis
   return (
     <span className={connectionBadgeClass(status)}>
       <Radio aria-hidden="true" className="h-3.5 w-3.5" />
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </span>
   );
 }

@@ -14,12 +14,10 @@ export default function MonitorAnalyticsPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
-      setLoading(false);
       return;
     }
 
     let isActive = true;
-    setLoading(true);
     getMonitorAnalyticsSnapshot(tenant.$id).then((response) => {
       if (!isActive) {
         return;
@@ -42,7 +40,9 @@ export default function MonitorAnalyticsPage() {
   }, [tenant?.$id]);
 
   const totals = snapshot?.totals;
-  const initialLoading = tenantLoading || loading;
+  const hasTenant = Boolean(tenant?.$id);
+  const isSnapshotLoading = hasTenant && loading;
+  const initialLoading = tenantLoading || (isSnapshotLoading && !snapshot && !error);
 
   if (initialLoading) {
     return <MonitorAnalyticsPageSkeleton />;
@@ -63,7 +63,7 @@ export default function MonitorAnalyticsPage() {
           </div>
           <div className="grid min-w-0 content-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#fff7ed_0%,#fdba74_48%,#ff5530_100%)] p-5 text-[#431407]">
             <div>
-              <p className="font-mono text-xs font-semibold uppercase opacity-70">{loading ? "Refreshing" : "Snapshot ready"}</p>
+              <p className="font-mono text-xs font-semibold uppercase opacity-70">{isSnapshotLoading ? "Refreshing" : "Snapshot ready"}</p>
               <p className="mt-3 min-w-0 break-all font-mono text-xl font-semibold tracking-[-0.03em]">{tenant?.$id ?? "Unavailable"}</p>
             </div>
             <p className="text-sm font-medium leading-6 opacity-70">Aggregates are sampled from sessions, messages, indexed files, and ledger activity.</p>
@@ -79,7 +79,7 @@ export default function MonitorAnalyticsPage() {
           <AnalyticsMetric icon={<BarChart3 aria-hidden="true" className="h-5 w-5" />} label="Avg messages" value={String(totals?.averageMessagesPerConversation ?? 0)} detail="per conversation" tone="dark" />
         </section>
 
-        {!snapshot && !loading ? (
+        {!snapshot && !isSnapshotLoading ? (
           <MonitorEmpty title="No analytics available" description="Conversation and message activity will appear once this tenant has customer sessions." />
         ) : null}
 
