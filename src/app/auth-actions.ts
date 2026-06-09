@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
+import { mapTenantDocument, type TenantDocument } from "@/lib/server/auth-tenants";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -21,13 +22,6 @@ export type AuthTenant = {
   plan: string;
   balance: number;
   role: "admin" | "agent";
-};
-
-type TenantDocument = Models.Document & {
-  name?: unknown;
-  plan?: unknown;
-  credits?: unknown;
-  balance?: unknown;
 };
 
 export async function loginWithMagicLink(email: string) {
@@ -95,8 +89,17 @@ export async function getCurrentUser(): Promise<{ success: true; user: AuthUser 
 
 export async function getCurrentTenant(): Promise<{ success: true; tenant: AuthTenant } | { success: false; error: string }> {
   try {
-    const { account } = await createSessionClient();
+    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
     const user = await account.get();
+    const prefs = user.prefs as AuthUser["prefs"];
+    const tenantId = typeof prefs.tenant_id === "string" ? prefs.tenant_id : "";
+    const role = prefs.role === "admin" || prefs.role === "agent" ? prefs.role : "agent";
+
+    if (tenantId) {
+      const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
+      return { success: true, tenant: mapTenantDocument(tenant, role) };
+    }
+
     const tenantResult = await ensureTenantForUser(user.$id);
 
     if (!tenantResult.success) {
@@ -192,13 +195,7 @@ async function ensureTenantForUser(userId: string): Promise<{ success: true; ten
     const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
     return {
       success: true,
-      tenant: {
-        $id: tenant.$id,
-        name: stringValue(tenant.name, "Workspace"),
-        plan: stringValue(tenant.plan, "free"),
-        balance: numberValue(tenant.credits ?? tenant.balance),
-        role,
-      },
+      tenant: mapTenantDocument(tenant, role),
     };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
@@ -225,14 +222,6 @@ function databaseId() {
 
 function tenantsCollectionId() {
   return process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID || process.env.APPWRITE_TENANTS_COLLECTION_ID || "tenants";
-}
-
-function stringValue(value: unknown, fallback: string) {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-function numberValue(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function getErrorMessage(error: unknown) {

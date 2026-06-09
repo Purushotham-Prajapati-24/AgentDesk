@@ -4,6 +4,7 @@ import { createChunks } from "@/lib/server/chunking";
 import { WebsiteCrawler } from "@/lib/server/crawler";
 import { createEmbeddings } from "@/lib/server/embeddings";
 import { claimIngestionLock, createWorkerId, releaseIngestionLock } from "@/lib/server/ingestion-locks";
+import { recordDocumentStorageAdded } from "@/lib/server/monitor-rollups";
 import { upsertKnowledgePoints } from "@/lib/server/qdrant";
 
 type IngestRequest = {
@@ -22,6 +23,7 @@ type DocumentFile = Models.Document & {
   attempts?: unknown;
   parsed_text?: unknown;
   storage_path?: unknown;
+  file_size?: unknown;
   status?: unknown;
 };
 
@@ -170,8 +172,12 @@ async function crawlQueuedDocument(
       last_error: "",
       updated: new Date().toISOString(),
     });
+    await recordBestEffort("document storage rollup", () =>
+      recordDocumentStorageAdded(databases, stringValue(document.tenant_id, ""), markdown.length - numberValue(document.file_size, 0)),
+    );
 
     document.parsed_text = markdown;
+    document.file_size = markdown.length;
     document.status = "processing";
     return { document_id: document.$id, status: "processing" };
   } catch (error) {
@@ -300,4 +306,12 @@ function getUnknownAttribute(error: unknown) {
   }
 
   return error.message.match(/Unknown attribute: "([^"]+)"/)?.[1] ?? null;
+}
+
+async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
+  try {
+    await callback();
+  } catch (error) {
+    console.warn(`[documents/ingest] ${label} update failed`, error);
+  }
 }

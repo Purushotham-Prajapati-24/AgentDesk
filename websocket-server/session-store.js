@@ -1,5 +1,6 @@
-import { Client, Databases, Query } from "node-appwrite";
+import { Client, Databases, Operator, Query } from "node-appwrite";
 import { Redis as UpstashRedis } from "@upstash/redis";
+import { createHash } from "node:crypto";
 
 const SESSION_STATUSES = new Set(["active", "paused_by_human", "closed"]);
 const KEY_PREFIX = "agentdesk:session";
@@ -77,10 +78,12 @@ export async function persistAppwriteSessionStatus(room, status) {
     return null;
   }
 
+  const previousStatus = normalizeSessionStatus(session.status) ?? "active";
   await databases.updateDocument(databaseId(), sessionsCollectionId(), session.$id, {
     status,
     updated: new Date().toISOString(),
   });
+  await updateStatusRollupBestEffort(databases, session, previousStatus, status);
 
   return session.$id;
 }
@@ -136,10 +139,94 @@ function normalizeSessionStatus(value) {
   return value === "paused_by_human" || value === "closed" ? value : value === "active" ? "active" : null;
 }
 
+async function updateStatusRollupBestEffort(databases, session, previousStatus, nextStatus) {
+  if (previousStatus === nextStatus || typeof session.tenant_id !== "string") {
+    return;
+  }
+
+  try {
+    const documentId = stableId(`tenant_${session.tenant_id}`);
+    await ensureTenantRollup(databases, session.tenant_id, documentId);
+    const now = new Date().toISOString();
+    await databases.updateDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
+      [statusCounterKey(previousStatus)]: Operator.increment(-1),
+      [statusCounterKey(nextStatus)]: Operator.increment(1),
+      handoffs: nextStatus === "paused_by_human" ? Operator.increment(1) : Operator.increment(0),
+      updated: now,
+    });
+    await invalidateMonitorCache(session.tenant_id);
+  } catch (error) {
+    console.warn("[session-store] status rollup update failed", error);
+  }
+}
+
+async function ensureTenantRollup(databases, tenantId, documentId) {
+  try {
+    await databases.getDocument(databaseId(), tenantRollupsCollectionId(), documentId);
+  } catch (error) {
+    if (error.code !== 404) {
+      throw error;
+    }
+
+    try {
+      await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
+        tenant_id: tenantId,
+        conversations: 0,
+        active_sessions: 0,
+        paused_sessions: 0,
+        closed_sessions: 0,
+        messages: 0,
+        customer_messages: 0,
+        bot_messages: 0,
+        agent_messages: 0,
+        handoffs: 0,
+        document_storage_bytes: 0,
+        credit_balance: 0,
+        updated: new Date().toISOString(),
+      });
+    } catch (createError) {
+      if (createError.code !== 409) {
+        throw createError;
+      }
+    }
+  }
+}
+
+async function invalidateMonitorCache(tenantId) {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return;
+  }
+
+  const redis = new UpstashRedis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+  for (const scope of ["conversations", "users", "analytics"]) {
+    const keys = await redis.keys(`monitor:${tenantId}:${scope}:*`);
+    if (keys.length > 0) {
+      await redis.del(...keys);
+    }
+  }
+}
+
+function statusCounterKey(status) {
+  return status === "paused_by_human" ? "paused_sessions" : `${status}_sessions`;
+}
+
+function stableId(value) {
+  const clean = value.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const hash = createHash("sha1").update(value).digest("hex").slice(0, 10);
+  return `${clean.slice(0, 25)}_${hash}`.slice(0, 36);
+}
+
 function databaseId() {
   return process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "agentdesk";
 }
 
 function sessionsCollectionId() {
   return process.env.APPWRITE_SESSIONS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_SESSIONS_COLLECTION_ID ?? "sessions";
+}
+
+function tenantRollupsCollectionId() {
+  return process.env.APPWRITE_MONITOR_TENANT_ROLLUPS_COLLECTION_ID ?? "monitor_tenant_rollups";
 }

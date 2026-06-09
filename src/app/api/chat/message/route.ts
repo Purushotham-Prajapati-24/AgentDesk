@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/server/appwrite";
 import { getServerWebSocketUrl } from "@/lib/server/websocket-url";
 import { streamCompletionWithFallback } from "@/lib/server/llm-providers";
 import { retrieveContextChunks } from "@/lib/server/retrieval";
+import { recordCreditLedgerEntry, recordMessageCreated, recordSessionCreated } from "@/lib/server/monitor-rollups";
 
 type ChatRequest = {
   tenant_id: string;
@@ -277,6 +278,7 @@ async function debitCredits(
     description: `Chat debit for bot ${botId} session ${sessionToken}`,
     created: new Date().toISOString(),
   });
+  await recordBestEffort("credit ledger rollup", () => recordCreditLedgerEntry(databases, tenantId, debit));
 }
 
 async function persistCustomerMessage(
@@ -304,14 +306,16 @@ async function persistMessage(
 ) {
   try {
     const session = await ensureSession(databases, request);
+    const createdAt = new Date().toISOString();
     await databases.createDocument(databaseId(), messagesCollectionId(), ID.unique(), {
       tenant_id: request.tenant_id,
       session_id: session.$id,
       sender,
       content: content.slice(0, 4000),
       tokens_used: Math.max(0, tokenCount),
-      created: new Date().toISOString(),
+      created: createdAt,
     });
+    await recordBestEffort("message rollup", () => recordMessageCreated(databases, session, sender, content, createdAt));
   } catch (err) {
     // Log the error so silent failures are visible in dev, but never crash chat delivery.
     console.error("[persistMessage] Failed to persist message:", err);
@@ -330,14 +334,17 @@ async function ensureSession(
     return session;
   }
 
-  return (await databases.createDocument(databaseId(), sessionsCollectionId(), ID.unique(), {
+  const created = new Date().toISOString();
+  const createdSession = (await databases.createDocument(databaseId(), sessionsCollectionId(), ID.unique(), {
     tenant_id: request.tenant_id,
     bot_id: request.bot_id,
     session_token: request.session_token,
     status: "active",
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
+    created,
+    updated: created,
   })) as SessionDocument;
+  await recordBestEffort("session rollup", () => recordSessionCreated(databases, createdSession));
+  return createdSession;
 }
 
 async function findSession(
@@ -444,6 +451,14 @@ function mentionsSystemInternals(message: string) {
 
 function estimateTokens(text: string) {
   return Math.ceil(text.length / 4);
+}
+
+async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
+  try {
+    await callback();
+  } catch (error) {
+    console.warn(`[chat] ${label} update failed`, error);
+  }
 }
 
 function databaseId() {

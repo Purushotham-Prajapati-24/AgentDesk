@@ -43,6 +43,7 @@ export default function MonitorAnalyticsPage() {
   const hasTenant = Boolean(tenant?.$id);
   const isSnapshotLoading = hasTenant && loading;
   const initialLoading = tenantLoading || (isSnapshotLoading && !snapshot && !error);
+  const freshness = snapshot ? snapshotFreshness(snapshot) : "";
 
   if (initialLoading) {
     return <MonitorAnalyticsPageSkeleton />;
@@ -63,10 +64,14 @@ export default function MonitorAnalyticsPage() {
           </div>
           <div className="grid min-w-0 content-between gap-4 rounded-3xl bg-[linear-gradient(135deg,#fff7ed_0%,#fdba74_48%,#ff5530_100%)] p-5 text-[#431407]">
             <div>
-              <p className="font-mono text-xs font-semibold uppercase opacity-70">{isSnapshotLoading ? "Refreshing" : "Snapshot ready"}</p>
+              <p className="font-mono text-xs font-semibold uppercase opacity-70">{isSnapshotLoading ? "Refreshing" : freshness}</p>
               <p className="mt-3 min-w-0 break-all font-mono text-xl font-semibold tracking-[-0.03em]">{tenant?.$id ?? "Unavailable"}</p>
             </div>
-            <p className="text-sm font-medium leading-6 opacity-70">Aggregates are sampled from sessions, messages, indexed files, and ledger activity.</p>
+            <p className="text-sm font-medium leading-6 opacity-70">
+              {snapshot?.source === "raw"
+                ? "Optimizing metrics while rollups are backfilled."
+                : "Aggregates use durable rollups with short-lived cache."}
+            </p>
           </div>
         </section>
 
@@ -425,4 +430,20 @@ function ErrorNotice({ message }: { message: string }) {
 
 function maxValue(items: Array<{ value: number }>) {
   return Math.max(0, ...items.map((item) => item.value));
+}
+
+function snapshotFreshness(snapshot: MonitorAnalyticsSnapshot) {
+  if (snapshot.source === "raw") {
+    return "Optimizing metrics";
+  }
+
+  const updatedAt = snapshot.updatedAt ? new Date(snapshot.updatedAt).getTime() : Date.now();
+  const ageSeconds = Math.max(0, Math.round((Date.now() - updatedAt) / 1000));
+  if (ageSeconds < 5) {
+    return "Updated just now";
+  }
+  if (ageSeconds < 60) {
+    return `Updated ${ageSeconds}s ago`;
+  }
+  return `Updated ${Math.round(ageSeconds / 60)}m ago`;
 }
