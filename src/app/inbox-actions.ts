@@ -2,6 +2,7 @@
 
 import { Query, type Models } from "node-appwrite";
 import { createSessionClient } from "@/lib/server/appwrite";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { mapSessionSummary } from "@/lib/server/monitor-rollups";
 
 export type ConversationSummary = {
@@ -159,10 +160,7 @@ async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessi
   }
 
   const user = await account.get();
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await getAuthorizedTenantDocument(user.$id, tenantId);
 }
 
 function mapMessage(document: MessageDocument): ConversationMessage {

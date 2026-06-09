@@ -229,7 +229,7 @@ export async function getMonitorSnapshotFromRollups(databases: RollupDatabases, 
       activeSessions,
       conversations,
       messages,
-      handoffs: numberValue(tenantRollup.handoffs) || pausedSessions,
+      handoffs: numberValue(tenantRollup.handoffs),
       botReplies: botMessages,
       customerMessages,
       agentMessages,
@@ -258,6 +258,8 @@ export async function getMonitorSnapshotFromRollups(databases: RollupDatabases, 
 
 export function mapSessionSummary(session: SessionDocument): MonitorConversationSummary {
   const messageCount = numberValue(session.message_count);
+  const lastMessage = stringValue(session.last_message_content, "");
+  const lastSender = messageSender(session.last_sender);
   return {
     id: session.$id,
     tenantId: stringValue(session.tenant_id, ""),
@@ -266,8 +268,8 @@ export function mapSessionSummary(session: SessionDocument): MonitorConversation
     status: sessionStatus(session.status),
     createdAt: stringValue(session.created, session.$createdAt),
     updatedAt: stringValue(session.updated, session.$updatedAt),
-    lastMessage: stringValue(session.last_message_content, "No messages recorded yet."),
-    lastSender: messageCount > 0 ? messageSender(session.last_sender) : "unknown",
+    lastMessage: lastMessage || "No messages recorded yet.",
+    lastSender: messageCount > 0 || lastMessage ? lastSender : "unknown",
     messageCount,
   };
 }

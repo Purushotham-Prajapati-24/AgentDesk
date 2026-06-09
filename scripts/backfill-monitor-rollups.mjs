@@ -152,7 +152,7 @@ async function run() {
   for (const document of documents) {
     const tenantId = stringValue(document.tenant_id, "");
     if (tenantId) {
-      getOrCreate(tenantRollups, tenantId, () => zeroTenantRollup(tenantId)).document_storage_bytes += numberValue(document.file_size);
+      getOrCreate(tenantRollups, tenantId, () => zeroTenantRollup(tenantId)).document_storage_bytes += documentStorageBytes(document);
     }
   }
 
@@ -198,6 +198,14 @@ function stringValue(value, fallback) {
 
 function numberValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function documentStorageBytes(document) {
+  if (document.file_type === "url" && typeof document.parsed_text === "string" && document.parsed_text.trim()) {
+    return Buffer.byteLength(document.parsed_text, "utf8");
+  }
+
+  return numberValue(document.file_size);
 }
 
 function sortMessagesByCreated(messages) {

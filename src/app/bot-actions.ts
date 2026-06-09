@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { deleteKnowledgePointsForBot } from "@/lib/server/qdrant";
 import { ID, Query, type Models } from "node-appwrite";
 
@@ -178,10 +179,7 @@ async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessi
   }
 
   const user = await account.get();
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await getAuthorizedTenantDocument(user.$id, tenantId);
 }
 
 async function assertBotTenant(

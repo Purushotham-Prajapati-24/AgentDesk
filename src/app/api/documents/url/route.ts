@@ -1,5 +1,6 @@
 import { ID, type Users } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { discoverSitemapUrls, looksLikeSitemapUrl, normalizeHttpUrl } from "@/lib/server/crawler";
 
 type UrlIngestRequest = {
@@ -82,11 +83,8 @@ export async function POST(request: Request) {
 }
 
 async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
-  const user = await users.get(userId);
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await users.get(userId);
+  await getAuthorizedTenantDocument(userId, tenantId);
 }
 
 function getUrlFileName(url: string) {

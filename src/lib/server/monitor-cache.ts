@@ -9,7 +9,16 @@ const memoryCache = new Map<string, CacheEntry>();
 export async function getCachedJson<T>(key: string): Promise<T | null> {
   if (hasRedisConfig()) {
     const value = await redisCommand<string | null>(["GET", key]);
-    return value ? (JSON.parse(value) as T) : null;
+    if (!value) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      await redisCommand(["DEL", key]);
+      return null;
+    }
   }
 
   const entry = memoryCache.get(key);

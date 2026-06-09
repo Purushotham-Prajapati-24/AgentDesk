@@ -19,6 +19,14 @@ export function mapTenantDocument(tenant: TenantDocument, role: TenantRole) {
   };
 }
 
+export function tenantRoleForUser(tenant: TenantDocument, userId: string): TenantRole {
+  return tenantAllowsUser(tenant, userId, "update") || tenantAllowsUser(tenant, userId, "delete") ? "admin" : "agent";
+}
+
+export function tenantAllowsUser(tenant: TenantDocument, userId: string, action: "read" | "update" | "delete") {
+  return Array.isArray(tenant.$permissions) && tenant.$permissions.includes(`${action}("user:${userId}")`);
+}
+
 function stringValue(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
 }

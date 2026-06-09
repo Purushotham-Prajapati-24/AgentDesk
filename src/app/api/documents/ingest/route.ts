@@ -1,5 +1,6 @@
 import { Query, type Models, type Users } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { createChunks } from "@/lib/server/chunking";
 import { WebsiteCrawler } from "@/lib/server/crawler";
 import { createEmbeddings } from "@/lib/server/embeddings";
@@ -165,7 +166,7 @@ async function crawlQueuedDocument(
       throw new Error("No readable text could be extracted from this URL.");
     }
     const markdownBytes = Buffer.byteLength(markdown, "utf8");
-    const storageDelta = Math.max(0, markdownBytes - numberValue(document.file_size, 0));
+    const storageDelta = numberValue(document.file_size, 0) > 0 ? 0 : markdownBytes;
 
     await updateDocumentCompat(databases, document.$id, {
       parsed_text: markdown,
@@ -259,11 +260,8 @@ async function updateDocumentCompat(
 }
 
 async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
-  const user = await users.get(userId);
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await users.get(userId);
+  await getAuthorizedTenantDocument(userId, tenantId);
 }
 
 function databaseId() {
