@@ -11,7 +11,7 @@ const options: Array<{ value: ThemeMode; label: string; icon: React.ReactNode }>
   { value: "system", label: "System theme", icon: <Monitor aria-hidden="true" className="h-4 w-4" /> },
 ];
 
-export function ThemeToggle({ variant = "cream", compact = false }: { variant?: "cream" | "cockpit"; compact?: boolean }) {
+export function ThemeToggle({ variant = "cream" }: { variant?: "cream" | "cockpit" }) {
   const { theme, setTheme } = useTheme();
   const isCockpit = variant === "cockpit";
 
@@ -31,8 +31,7 @@ export function ThemeToggle({ variant = "cream", compact = false }: { variant?: 
             aria-label={option.label}
             title={option.label}
             className={cn(
-              "inline-flex h-8 items-center justify-center gap-2 rounded-full px-2.5 text-xs font-semibold transition active:scale-[0.98]",
-              compact && "w-8 px-0",
+              "inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition active:scale-[0.98]",
               active
                 ? isCockpit
                   ? "bg-[#0099ff] text-[#041018] shadow-[0_0_0_1px_rgba(0,153,255,0.24)]"
@@ -46,7 +45,7 @@ export function ThemeToggle({ variant = "cream", compact = false }: { variant?: 
             type="button"
           >
             {option.icon}
-            {compact ? <span className="sr-only">{option.label}</span> : <span className="hidden sm:inline">{option.value}</span>}
+            <span className="sr-only">{option.label}</span>
           </button>
         );
       })}
