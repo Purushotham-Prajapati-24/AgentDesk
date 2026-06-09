@@ -9,5 +9,5 @@ export function Dialog({ open, children }: { open: boolean; children: React.Reac
 }
 
 export function DialogContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("w-full max-w-lg rounded-lg border border-border bg-card p-5 shadow-2xl", className)} {...props} />;
+  return <div className={cn("mx-auto max-h-[calc(100svh-32px)] w-[min(calc(100vw-32px),48rem)] overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-2xl sm:p-5", className)} {...props} />;
 }

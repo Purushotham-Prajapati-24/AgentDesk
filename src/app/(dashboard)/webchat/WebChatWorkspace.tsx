@@ -674,7 +674,7 @@ export function WebChatWorkspace() {
         </div>
       ) : null}
 
-      <div className="mx-auto grid max-w-7xl items-start gap-4 px-4 pb-5 sm:px-6 sm:pb-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
+      <div className="mx-auto grid max-w-7xl items-start gap-5 px-4 pb-8 sm:px-6 lg:grid-cols-1 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
         <aside className="grid min-w-0 content-start gap-4">
           <BotSelector
             bots={bots}
@@ -699,9 +699,9 @@ export function WebChatWorkspace() {
         </aside>
 
         <main className="grid min-w-0 content-start gap-3">
-          <section className="grid gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-2 sm:grid-cols-3">
+          <section className="sticky bottom-2 z-20 grid gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[color-mix(in_srgb,var(--ui-panel)_92%,transparent)] p-2 safe-bottom-padding shadow-[0_18px_50px_rgba(0,0,0,0.26)] backdrop-blur sm:grid-cols-3 xl:static xl:shadow-none xl:backdrop-blur-0">
             <Button
-              className="h-9 w-full rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
+              className="min-h-11 w-full rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
               leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
               onClick={() => setResetConfirmOpen(true)}
               type="button"
@@ -711,7 +711,7 @@ export function WebChatWorkspace() {
             </Button>
             <Button
               className={cn(
-                "h-9 w-full rounded-full px-3 !text-white disabled:shadow-none",
+                "min-h-11 w-full rounded-full px-3 !text-white disabled:shadow-none",
                 saveButtonActive
                   ? "border-[#22c55e]/60 bg-[linear-gradient(135deg,#86efac_0%,#22c55e_45%,#15803d_100%)] shadow-[0_10px_24px_rgba(21,128,61,0.24)] hover:border-[#86efac]/80 hover:brightness-[1.06]"
                   : "border-white/10 bg-[linear-gradient(135deg,#334155_0%,#1f2937_55%,#111827_100%)] !text-white/55 shadow-none",
@@ -729,7 +729,7 @@ export function WebChatWorkspace() {
               aria-controls="webchat-deploy-modal"
               aria-expanded={deployModalOpen}
               aria-haspopup="dialog"
-              className="h-9 w-full rounded-full border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] hover:border-[#c4b5fd]/80 hover:brightness-[1.06]"
+              className="min-h-11 w-full rounded-full border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] hover:border-[#c4b5fd]/80 hover:brightness-[1.06]"
               leftIcon={<CloudUpload aria-hidden="true" className="h-4 w-4" />}
               onClick={() => setDeployModalOpen(true)}
               type="button"
@@ -1135,7 +1135,7 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
       </div>
 
       <div className="flex min-h-[560px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-4 sm:p-5 lg:min-h-[620px]">
-        <div className="relative w-full max-w-[410px] pb-14 sm:pb-16">
+        <div className="relative w-full max-w-[calc(100vw-32px)] pb-14 sm:max-w-[410px] sm:pb-16">
           <div
             className="flex h-[min(570px,calc(100svh-190px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
             style={{
@@ -1307,7 +1307,7 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
         </div>
         <button
           aria-label={`Copy ${label}`}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:border-[#60a5fa]/40 hover:bg-white/[0.1] hover:text-white"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:border-[#60a5fa]/40 hover:bg-white/[0.1] hover:text-white"
           onClick={() => void copySnippet()}
           title={`Copy ${label}`}
           type="button"

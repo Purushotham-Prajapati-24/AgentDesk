@@ -39,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} ${dmSans.variable} ${plusJakartaSans.variable} ${firaCode.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col safe-padding">
         <Providers>{children}</Providers>
       </body>
     </html>

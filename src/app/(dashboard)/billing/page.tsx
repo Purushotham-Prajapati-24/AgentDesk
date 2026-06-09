@@ -25,6 +25,8 @@ type BillingSnapshot = {
   };
 };
 
+type BillingTransaction = BillingSnapshot["transactions"][number];
+
 export default function BillingPage() {
   const { tenant, loading: tenantLoading } = useTenant();
   const [snapshot, setSnapshot] = useState<BillingSnapshot | null>(null);
@@ -33,13 +35,10 @@ export default function BillingPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
-      setIsBillingLoading(false);
       return;
     }
 
     let isActive = true;
-    setIsBillingLoading(true);
-    setError("");
     getTenantBillingSnapshot(tenant.$id).then((response) => {
       if (!isActive) {
         return;
@@ -68,6 +67,7 @@ export default function BillingPage() {
   const totalMessages = snapshot?.stats.totalMessages ?? 0;
   const storageBytes = snapshot?.stats.documentStorageBytes ?? 0;
   const transactions = snapshot?.transactions ?? [];
+  const isSnapshotLoading = Boolean(tenant?.$id) && isBillingLoading;
 
   return (
     <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
@@ -78,12 +78,12 @@ export default function BillingPage() {
               <p className="inline-flex rounded-full border border-[#166534]/20 bg-white/55 px-3 py-1 font-mono text-xs font-semibold uppercase text-[#166534] dark:border-white/20 dark:bg-black/20 dark:text-[#bbf7d0]">
                 Usage and billing
               </p>
-              <h1 className="mt-2 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl">
+              <h1 className="mt-2 max-w-4xl text-2xl font-semibold leading-[1.1] tracking-[-0.03em] text-current sm:text-3xl lg:text-5xl">
                 Keep credits, usage, and customer traffic in one clear ledger.
               </h1>
             </div>
 
-            {isBillingLoading ? (
+            {isSnapshotLoading ? (
               <BalanceCardSkeleton />
             ) : (
             <div className="grid content-between gap-3 rounded-3xl bg-[linear-gradient(135deg,#dcfce7_0%,#86efac_48%,#22c55e_100%)] p-3 text-[#052e16]">
@@ -110,10 +110,10 @@ export default function BillingPage() {
           </div>
         ) : null}
 
-        {isBillingLoading ? (
+        {isSnapshotLoading ? (
           <MetricGridSkeleton />
         ) : (
-        <section className="grid gap-4 md:grid-cols-4">
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <LedgerMetric icon={<WalletCards aria-hidden="true" className="h-5 w-5" />} label="Balance" value={formatAmount(balance)} detail="available credits" tone="dark" />
           <LedgerMetric icon={<Activity aria-hidden="true" className="h-5 w-5" />} label="Active sessions" value={String(activeSessions)} detail={`open in last ${snapshot?.stats.activeSessionWindowMinutes ?? 30}m`} tone="blue" />
           <LedgerMetric icon={<MessageSquare aria-hidden="true" className="h-5 w-5" />} label="Messages" value={String(totalMessages)} detail="conversation volume" tone="coral" />
@@ -122,7 +122,7 @@ export default function BillingPage() {
         )}
 
         <section className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
-          {isBillingLoading ? (
+          {isSnapshotLoading ? (
             <PlanHealthSkeleton />
           ) : (
           <article className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
@@ -139,7 +139,7 @@ export default function BillingPage() {
           </article>
           )}
 
-          {isBillingLoading ? (
+          {isSnapshotLoading ? (
             <TransactionTableSkeleton />
           ) : (
           <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
@@ -160,7 +160,13 @@ export default function BillingPage() {
                 <EmptyState title="No ledger entries yet" description="Credits and usage debits will appear here after billing events are recorded." />
               </div>
             ) : (
-              <div className="max-h-[520px] w-full overflow-auto [scrollbar-color:#22c55e_var(--ui-panel-2)] [scrollbar-width:thin]">
+              <>
+              <div className="grid gap-3 p-3 md:hidden">
+                {transactions.map((transaction) => (
+                  <TransactionCard transaction={transaction} key={transaction.id} />
+                ))}
+              </div>
+              <div className="scroll-hint is-scrollable hidden max-h-[520px] w-full overflow-auto [scrollbar-color:#22c55e_var(--ui-panel-2)] [scrollbar-width:thin] md:block">
                 <table className="w-full min-w-[760px] border-collapse text-left text-sm">
                   <thead className="sticky top-0 z-10 bg-[var(--ui-panel)] text-xs uppercase text-[var(--ui-muted)] shadow-[0_1px_0_var(--ui-border)]">
                     <tr>
@@ -178,7 +184,7 @@ export default function BillingPage() {
                           <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 text-xs font-semibold text-[var(--ui-text)]">{transaction.transactionType}</span>
                         </td>
                         <td className="px-5 py-4 font-medium text-[var(--ui-muted)]">{transaction.description}</td>
-                        <td className={`px-5 py-4 text-right font-mono font-semibold ${transaction.amount < 0 ? "text-[#dc2626]" : "text-[#15803d]"}`}>
+                        <td className={`whitespace-nowrap px-5 py-4 text-right font-mono font-semibold ${transaction.amount < 0 ? "text-[#dc2626]" : "text-[#15803d]"}`}>
                           {formatAmount(transaction.amount)}
                         </td>
                       </tr>
@@ -186,6 +192,7 @@ export default function BillingPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </section>
           )}
@@ -245,7 +252,7 @@ function BalanceCardSkeleton() {
 
 function MetricGridSkeleton() {
   return (
-    <section className="grid gap-4 md:grid-cols-4">
+    <section className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <MetricSkeleton key={index} />
       ))}
@@ -345,20 +352,39 @@ function LedgerMetric({
   }[tone];
 
   return (
-    <article className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+    <article className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4 sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <p className="font-mono text-xs font-semibold uppercase text-[var(--ui-muted)]">{label}</p>
         <span className={`grid h-9 w-9 place-items-center rounded-full ${toneClass}`}>{icon}</span>
       </div>
-      <p className="mt-5 font-mono text-4xl font-semibold tracking-[-0.04em] text-[var(--ui-text)]">{value}</p>
+      <p className="mt-5 break-words font-mono text-2xl font-semibold tracking-[-0.04em] text-[var(--ui-text)] sm:text-3xl xl:text-4xl">{value}</p>
       <p className="mt-3 text-sm font-medium text-[var(--ui-muted)]">{detail}</p>
+    </article>
+  );
+}
+
+function TransactionCard({ transaction }: { transaction: BillingTransaction }) {
+  const amountClass = transaction.amount < 0 ? "text-[#dc2626]" : "text-[#15803d]";
+
+  return (
+    <article className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-xs font-semibold uppercase text-[var(--ui-muted)]">{formatDate(transaction.created)}</p>
+          <p className="mt-2 rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 text-xs font-semibold text-[var(--ui-text)]">
+            {transaction.transactionType}
+          </p>
+        </div>
+        <p className={`shrink-0 whitespace-nowrap font-mono text-sm font-semibold ${amountClass}`}>{formatAmount(transaction.amount)}</p>
+      </div>
+      <p className="mt-3 break-words text-sm font-medium leading-6 text-[var(--ui-muted)]">{transaction.description}</p>
     </article>
   );
 }
 
 function PlanRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-3">
+    <div className="flex flex-col gap-1 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:rounded-full">
       <span className="text-sm font-semibold text-[var(--ui-muted)]">{label}</span>
       <span className="font-mono text-xs font-semibold text-[var(--ui-text)]">{value}</span>
     </div>

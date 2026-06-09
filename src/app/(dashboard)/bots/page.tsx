@@ -47,13 +47,10 @@ export default function BotsPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
-      setIsAgentsLoading(false);
       return;
     }
 
     let isActive = true;
-    setIsAgentsLoading(true);
-    setStatus("");
     listBots(tenant.$id).then((response) => {
       if (!isActive) {
         return;
@@ -74,6 +71,8 @@ export default function BotsPage() {
       isActive = false;
     };
   }, [tenant?.$id]);
+
+  const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
   function selectBot(bot: Bot) {
     setSelectedId(bot.$id);
@@ -167,9 +166,9 @@ export default function BotsPage() {
     <div className="cockpit-lane min-h-screen">
       <BotsHeader botCount={bots.length} />
 
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
         <section className="grid content-start gap-3 md:grid-cols-2">
-          {isAgentsLoading ? (
+          {isAgentListLoading ? (
             <AgentGridSkeleton />
           ) : (
             <>
@@ -214,7 +213,7 @@ export default function BotsPage() {
           )}
         </section>
 
-        {isAgentsLoading ? (
+        {isAgentListLoading ? (
           <AgentFormSkeleton />
         ) : (
         <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
@@ -357,7 +356,7 @@ function BotsPageSkeleton() {
   return (
     <div className="cockpit-lane min-h-screen">
       <BotsHeaderSkeleton />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
         <section className="grid content-start gap-3 md:grid-cols-2">
           <AgentGridSkeleton />
         </section>
@@ -490,7 +489,7 @@ function BotsHeader({ botCount }: { botCount: number }) {
                 <StatusPill tone="warn">{botCount}</StatusPill>
               </div>
               <div className="grid gap-2">
-                {steps.map((step, index) => (
+                {steps.map((step) => (
                   <div className="flex min-h-10 items-center gap-3 rounded-full border border-white/35 bg-white/30 px-3 text-sm font-semibold text-current dark:bg-black/15" key={step}>
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#312e81]/10 text-[#312e81] dark:bg-white/15 dark:text-[#ccfbf1]">
                       <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
