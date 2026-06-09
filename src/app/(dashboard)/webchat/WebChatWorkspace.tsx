@@ -7,6 +7,7 @@ import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu, type SelectMenuOption } from "@/components/ui/SelectMenu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useWebChatConfig } from "@/context/WebChatConfigContext";
 import { useTenant } from "@/context/TenantContext";
 import { cn } from "@/lib/utils";
@@ -201,7 +202,7 @@ const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
 };
 
 export function WebChatWorkspace() {
-  const { tenant } = useTenant();
+  const { tenant, loading: tenantLoading } = useTenant();
   const { config, error, replaceConfig, resetConfig } = useWebChatConfig();
   const [openSection, setOpenSection] = useState<SectionId | null>("identity");
   const [bots, setBots] = useState<WebChatBotSummary[]>([]);
@@ -223,13 +224,34 @@ export function WebChatWorkspace() {
   const deploymentGuide = deploymentGuides[deployTab];
   const selectedDeploymentLabel = deploymentTabs.find((tab) => tab.id === deployTab)?.label ?? "Deploy";
   const [previewCopied, setPreviewCopied] = useState(false);
+  const initialLoading = tenantLoading || (botLoading && bots.length === 0 && !saveError && !error);
 
   useEffect(() => {
-    if (!tenant?.$id) {
+    if (tenantLoading) {
       return;
     }
 
+    if (!tenant?.$id) {
+      const timeout = window.setTimeout(() => {
+        setBotLoading(false);
+        setBots([]);
+        setSelectedBotId("");
+      }, 0);
+
+      return () => window.clearTimeout(timeout);
+    }
+
     let active = true;
+    window.setTimeout(() => {
+      if (!active) {
+        return;
+      }
+
+      setBotLoading(true);
+      setSaveState((current) => (current === "error" ? "idle" : current));
+      setSaveError("");
+    }, 0);
+
     listWebChatBots(tenant.$id).then((response) => {
       if (!active) {
         return;
@@ -243,6 +265,7 @@ export function WebChatWorkspace() {
       }
 
       setBots(response.bots);
+      setSelectedBotId("");
       const firstBot = response.bots[0];
       if (firstBot) {
         setSelectedBotId(firstBot.id);
@@ -253,7 +276,7 @@ export function WebChatWorkspace() {
     return () => {
       active = false;
     };
-  }, [replaceConfig, tenant?.$id]);
+  }, [replaceConfig, tenant?.$id, tenantLoading]);
 
   useEffect(() => {
     if (!deployModalOpen && !resetConfirmOpen && !saveSuccess) {
@@ -344,8 +367,12 @@ export function WebChatWorkspace() {
     setTimeout(() => setPreviewCopied(false), 1600);
   }
 
+  if (initialLoading) {
+    return <WebChatPageSkeleton />;
+  }
+
   return (
-    <div className="cockpit-lane min-h-screen bg-[var(--ui-bg)] text-[var(--ui-text)]">
+    <div className="cockpit-lane bg-[var(--ui-bg)] text-[var(--ui-text)]">
       <section className="px-4 py-3 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#12b981]/35 bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.32)_0%,transparent_28%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.28)_0%,transparent_30%),linear-gradient(135deg,#f8fffb_0%,#d7fff1_42%,#e8f1ff_100%)] text-[#083344] shadow-[0_24px_70px_rgba(20,184,166,0.15)] dark:bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.26)_0%,transparent_30%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.22)_0%,transparent_32%),linear-gradient(135deg,#08110f_0%,#0b332e_48%,#10243d_100%)] dark:text-[#ecfeff]">
           <div className="grid items-center gap-4 p-3 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-4">
@@ -760,9 +787,6 @@ function BotSelector({
         value={selectedBotId}
         onChange={onSelect}
       />
-      <p className="mt-3 text-sm font-medium leading-6 text-[var(--ui-muted)]">
-        WebChat preferences are saved to the selected bot&apos;s Appwrite `theme_config`; the embed script reads them with `data-bot-id`.
-      </p>
     </section>
   );
 }
@@ -783,6 +807,308 @@ function StatusStrip({ saveState, error }: { saveState: string; error: string })
         {label}
       </span>
       <span className="text-right text-xs font-semibold text-[var(--ui-muted)]">{error || "Local draft persists in this browser."}</span>
+    </div>
+  );
+}
+
+function WebChatPageSkeleton() {
+  return (
+    <div aria-label="Loading WebChat workspace" className="cockpit-lane bg-[var(--ui-bg)] text-[var(--ui-text)]" role="status">
+      <WebChatHeroSkeleton />
+      <div className="mx-auto grid max-w-7xl items-start gap-4 px-4 pb-5 sm:px-6 sm:pb-6 xl:grid-cols-[minmax(360px,0.94fr)_minmax(0,1.06fr)] lg:px-8">
+        <aside className="grid min-w-0 content-start gap-4">
+          <BotSelectorSkeleton />
+          <StatusStripSkeleton />
+          <WebChatDropdownSkeleton descriptionWidth="w-48" open titleWidth="w-32">
+            <IdentityFormSkeleton />
+          </WebChatDropdownSkeleton>
+          <WebChatDropdownSkeleton descriptionWidth="w-56" titleWidth="w-40">
+            <AppearanceFormSkeleton />
+          </WebChatDropdownSkeleton>
+          <WebChatDropdownSkeleton descriptionWidth="w-52" titleWidth="w-36">
+            <DeploySettingsSkeleton />
+          </WebChatDropdownSkeleton>
+          <WebChatDropdownSkeleton descriptionWidth="w-44" titleWidth="w-36">
+            <FeatureToggleSkeleton />
+          </WebChatDropdownSkeleton>
+        </aside>
+
+        <main className="grid min-w-0 content-start gap-3">
+          <ActionBarSkeleton />
+          <WidgetPreviewSkeleton />
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function WebChatHeroSkeleton() {
+  return (
+    <section aria-hidden="true" className="px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-[#12b981]/35 bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.32)_0%,transparent_28%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.28)_0%,transparent_30%),linear-gradient(135deg,#f8fffb_0%,#d7fff1_42%,#e8f1ff_100%)] text-[#083344] shadow-[0_24px_70px_rgba(20,184,166,0.15)] dark:bg-[radial-gradient(circle_at_14%_18%,rgba(20,184,166,0.26)_0%,transparent_30%),radial-gradient(circle_at_86%_8%,rgba(255,122,89,0.22)_0%,transparent_32%),linear-gradient(135deg,#08110f_0%,#0b332e_48%,#10243d_100%)]">
+        <div className="grid items-center gap-4 p-3 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-4">
+          <div className="min-w-0">
+            <Skeleton className="h-7 w-44 rounded-full bg-white/55 dark:bg-white/20" />
+            <div className="mt-2 grid max-w-4xl gap-2">
+              <Skeleton className="h-9 w-full max-w-3xl bg-white/55 dark:bg-white/20 sm:h-11" />
+              <Skeleton className="h-9 w-4/5 max-w-2xl bg-white/45 dark:bg-white/15 sm:h-11" />
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-2xl border border-white/35 bg-white/40 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton className="h-3 w-32 bg-white/55 dark:bg-white/20" />
+              <Skeleton className="h-6 w-16 rounded-full bg-white/45 dark:bg-white/15" />
+            </div>
+            <Skeleton className="h-6 w-3/4 bg-white/50 dark:bg-white/20" />
+            <Skeleton className="h-3 w-full bg-white/40 dark:bg-white/15" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BotSelectorSkeleton() {
+  return (
+    <section aria-hidden="true" className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <Skeleton className="h-3 w-24 bg-[var(--ui-bg)]" />
+          <Skeleton className="mt-2 h-6 w-40 bg-[var(--ui-bg)]" />
+        </div>
+        <Skeleton className="h-10 w-10 shrink-0 rounded-full bg-[var(--ui-bg)]" />
+      </div>
+      <Skeleton className="h-12 w-full rounded-2xl bg-[var(--ui-bg)]" />
+    </section>
+  );
+}
+
+function StatusStripSkeleton() {
+  return (
+    <div aria-hidden="true" className="flex items-center justify-between gap-3 rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] px-4 py-3">
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-4 w-4 rounded-full bg-[var(--ui-bg)]" />
+        <Skeleton className="h-3 w-20 bg-[var(--ui-bg)]" />
+      </div>
+      <Skeleton className="h-3 w-44 max-w-[45%] bg-[var(--ui-bg)]" />
+    </div>
+  );
+}
+
+function WebChatDropdownSkeleton({
+  children,
+  descriptionWidth,
+  open = false,
+  titleWidth,
+}: {
+  children: React.ReactNode;
+  descriptionWidth: string;
+  open?: boolean;
+  titleWidth: string;
+}) {
+  return (
+    <section aria-hidden="true" className="overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+      <div
+        className={cn(
+          "flex w-full items-center gap-4 border-b px-4 py-4",
+          open ? "border-[var(--ui-blue)] bg-[var(--ui-blue)]" : "border-[var(--ui-border)] bg-[var(--ui-panel)]",
+        )}
+      >
+        <Skeleton className={cn("h-11 w-11 shrink-0 rounded-full", open ? "bg-white/25" : "bg-[var(--ui-bg)]")} />
+        <div className="min-w-0 flex-1">
+          <Skeleton className={cn("h-5", titleWidth, open ? "bg-white/35" : "bg-[var(--ui-bg)]")} />
+          <Skeleton className={cn("mt-2 h-4 max-w-full", descriptionWidth, open ? "bg-white/25" : "bg-[var(--ui-bg)]")} />
+        </div>
+        <Skeleton className={cn("h-5 w-5 shrink-0 rounded-full", open ? "bg-white/30" : "bg-[var(--ui-bg)]")} />
+      </div>
+      {open ? (
+        <div className="p-4 sm:p-5">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function ActionBarSkeleton() {
+  return (
+    <section aria-hidden="true" className="grid gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-2 sm:grid-cols-3">
+      <Skeleton className="h-9 rounded-full bg-[#f97316]/25" />
+      <Skeleton className="h-9 rounded-full bg-[#22c55e]/20" />
+      <Skeleton className="h-9 rounded-full bg-[#6366f1]/25" />
+    </section>
+  );
+}
+
+function IdentityFormSkeleton() {
+  return (
+    <div className="grid gap-4">
+      <TextFieldSkeleton labelWidth="w-24" />
+      <TextFieldSkeleton labelWidth="w-20" />
+      <TextFieldSkeleton className="h-32" labelWidth="w-28" />
+    </div>
+  );
+}
+
+function AppearanceFormSkeleton() {
+  return (
+    <div className="grid gap-4">
+      <AppearanceGroupSkeleton titleWidth="w-20">
+        <div className="grid gap-4 md:grid-cols-2">
+          <ColorFieldSkeleton labelWidth="w-32" />
+          <ColorFieldSkeleton labelWidth="w-20" />
+          <ColorFieldSkeleton labelWidth="w-16" />
+          <ColorFieldSkeleton labelWidth="w-24" />
+        </div>
+        <SelectFieldSkeleton labelWidth="w-36" />
+      </AppearanceGroupSkeleton>
+      <AppearanceGroupSkeleton titleWidth="w-16">
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextFieldSkeleton labelWidth="w-28" />
+          <TextFieldSkeleton labelWidth="w-32" />
+          <ColorFieldSkeleton labelWidth="w-32" />
+          <ColorFieldSkeleton labelWidth="w-24" />
+        </div>
+      </AppearanceGroupSkeleton>
+      <AppearanceGroupSkeleton titleWidth="w-24">
+        <TextFieldSkeleton labelWidth="w-36" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <ColorFieldSkeleton labelWidth="w-32" />
+          <ColorFieldSkeleton labelWidth="w-20" />
+        </div>
+      </AppearanceGroupSkeleton>
+    </div>
+  );
+}
+
+function DeploySettingsSkeleton() {
+  return (
+    <div className="grid gap-4">
+      <TextFieldSkeleton labelWidth="w-16" />
+      <div className="grid gap-4 md:grid-cols-2">
+        <SelectFieldSkeleton labelWidth="w-24" />
+        <SelectFieldSkeleton labelWidth="w-32" />
+      </div>
+      <TextFieldSkeleton labelWidth="w-24" />
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextFieldSkeleton labelWidth="w-20" />
+        <TextFieldSkeleton labelWidth="w-20" />
+      </div>
+    </div>
+  );
+}
+
+function FeatureToggleSkeleton() {
+  return (
+    <div className="grid gap-3">
+      {["w-24", "w-36", "w-32", "w-28", "w-32"].map((labelWidth, index) => (
+        <SwitchSkeleton key={`${labelWidth}-${index}`} labelWidth={labelWidth} />
+      ))}
+    </div>
+  );
+}
+
+function AppearanceGroupSkeleton({ children, titleWidth }: { children: React.ReactNode; titleWidth: string }) {
+  return (
+    <section className="grid gap-4 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3 sm:p-4">
+      <Skeleton className={cn("h-3 bg-[var(--ui-panel-2)]", titleWidth)} />
+      {children}
+    </section>
+  );
+}
+
+function TextFieldSkeleton({ className = "h-12", labelWidth }: { className?: string; labelWidth: string }) {
+  return (
+    <div>
+      <Skeleton className={cn("mb-2 h-3 bg-[var(--ui-bg)]", labelWidth)} />
+      <Skeleton className={cn("w-full rounded-xl bg-[var(--ui-bg)]", className)} />
+    </div>
+  );
+}
+
+function SelectFieldSkeleton({ labelWidth }: { labelWidth: string }) {
+  return <TextFieldSkeleton className="h-12 rounded-2xl" labelWidth={labelWidth} />;
+}
+
+function ColorFieldSkeleton({ labelWidth }: { labelWidth: string }) {
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] items-end gap-3">
+      <div className="min-w-0">
+        <Skeleton className={cn("mb-2 h-3 bg-[var(--ui-bg)]", labelWidth)} />
+        <Skeleton className="h-12 w-full rounded-xl bg-[var(--ui-bg)]" />
+      </div>
+      <Skeleton className="h-12 w-14 rounded-xl bg-[var(--ui-bg)]" />
+    </div>
+  );
+}
+
+function SwitchSkeleton({ labelWidth }: { labelWidth: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
+      <div className="min-w-0 flex-1">
+        <Skeleton className={cn("h-4 bg-[var(--ui-bg)]", labelWidth)} />
+        <Skeleton className="mt-2 h-4 w-full max-w-[260px] bg-[var(--ui-bg)]" />
+      </div>
+      <Skeleton className="h-7 w-12 shrink-0 rounded-full bg-[var(--ui-bg)]" />
+    </div>
+  );
+}
+
+function WidgetPreviewSkeleton() {
+  return (
+    <section aria-hidden="true" className="overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] px-5 py-4">
+        <div>
+          <Skeleton className="h-3 w-24 bg-[var(--ui-bg)]" />
+          <Skeleton className="mt-2 h-7 w-48 bg-[var(--ui-bg)]" />
+        </div>
+        <Skeleton className="h-10 w-10 rounded-full bg-[var(--ui-bg)]" />
+      </div>
+
+      <div className="flex min-h-[560px] items-center justify-center overflow-hidden bg-[var(--ui-bg)] p-4 sm:p-5 lg:min-h-[620px]">
+        <div className="relative w-full max-w-[410px] pb-14 sm:pb-16">
+          <div className="flex h-[min(570px,calc(100svh-190px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4] bg-[#f8fafc]">
+            <div className="flex items-center justify-between gap-3 border-b border-black/15 bg-[#e2e8f0] px-4 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Skeleton className="h-12 w-12 shrink-0 rounded-full bg-white/70" />
+                <div className="min-w-0">
+                  <Skeleton className="h-5 w-40 max-w-full bg-white/75" />
+                  <Skeleton className="mt-2 h-3 w-28 bg-white/65" />
+                </div>
+              </div>
+              <Skeleton className="h-9 w-9 shrink-0 rounded-full bg-white/55" />
+            </div>
+
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+              <PreviewBubbleSkeleton />
+              <PreviewBubbleSkeleton align="right" />
+              <PreviewBubbleSkeleton />
+              <Skeleton className="h-9 w-40 rounded-xl bg-slate-200" />
+            </div>
+
+            <div className="border-t border-black p-4">
+              <div className="flex gap-2">
+                <Skeleton className="h-12 min-w-0 flex-1 rounded-xl bg-slate-200" />
+                <Skeleton className="h-12 w-20 rounded-xl bg-[#0099ff]/35" />
+              </div>
+            </div>
+          </div>
+
+          <Skeleton className="absolute bottom-0 right-[-8px] z-10 h-14 w-14 rounded-full bg-[#0099ff]/35 sm:right-[-18px] sm:h-16 sm:w-16" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PreviewBubbleSkeleton({ align = "left" }: { align?: "left" | "right" }) {
+  return (
+    <div className={cn("flex", align === "right" ? "justify-end" : "justify-start")}>
+      <div className="w-[82%] max-w-[300px] rounded-[18px] border border-black/10 bg-slate-200 px-4 py-3">
+        <Skeleton className="h-4 w-full bg-white/70" />
+        <Skeleton className="mt-2 h-4 w-3/4 bg-white/60" />
+      </div>
     </div>
   );
 }

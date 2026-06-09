@@ -59,7 +59,7 @@ function LoginContent() {
             <ArrowLeft aria-hidden="true" className="h-5 w-5" />
           </Link>
           <div className="login-robot-toggle rounded-full p-1 backdrop-blur-md">
-            <ThemeToggle compact variant="cockpit" />
+            <ThemeToggle variant="cockpit" />
           </div>
         </div>
 
