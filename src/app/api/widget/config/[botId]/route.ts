@@ -39,6 +39,12 @@ type WidgetConfig = {
   messageEndpoint: string;
   websocketEndpoint: string | null;
   theme: WidgetTheme;
+  proactiveMessage: boolean;
+  proactiveMessageText: string;
+  proactiveMessageDelay: number;
+  proactiveMessageShowOnce: boolean;
+  proactiveMessageSound: boolean;
+  proactiveMessageAutoclose: number;
 };
 
 type WidgetConfigResponse = {
@@ -67,6 +73,12 @@ type WebChatConfigDocument = Models.Document & {
   accent_color?: unknown;
   font_family?: unknown;
   source_citations?: unknown;
+  proactive_message?: unknown;
+  proactive_message_text?: unknown;
+  proactive_message_delay?: unknown;
+  proactive_message_show_once?: unknown;
+  proactive_message_sound?: unknown;
+  proactive_message_autoclose?: unknown;
 };
 
 type ErrorResponse = {
@@ -118,6 +130,12 @@ const DEMO_CONFIGS: Record<string, WidgetConfig> = {
     messageEndpoint: "/api/chat/message",
     websocketEndpoint: null,
     theme: DEFAULT_THEME,
+    proactiveMessage: false,
+    proactiveMessageText: "Hi! 👋 Need help?",
+    proactiveMessageDelay: 5,
+    proactiveMessageShowOnce: true,
+    proactiveMessageSound: false,
+    proactiveMessageAutoclose: 0,
   },
 };
 
@@ -184,6 +202,7 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
       ...DEFAULT_THEME,
       ...themeConfig.theme,
     };
+    const features = themeConfig.features || {};
 
     return {
       botId,
@@ -201,6 +220,12 @@ async function getAppwriteBotConfig(botId: string): Promise<WidgetConfig | null>
       messageEndpoint: "/api/chat/message",
       websocketEndpoint: null,
       theme,
+      proactiveMessage: typeof features.proactiveMessage === "boolean" ? features.proactiveMessage : false,
+      proactiveMessageText: cleanText(stringValue(features.proactiveMessageText, "Hi! 👋 Need help?"), 300),
+      proactiveMessageDelay: typeof features.proactiveMessageDelay === "number" ? features.proactiveMessageDelay : 5,
+      proactiveMessageShowOnce: typeof features.proactiveMessageShowOnce === "boolean" ? features.proactiveMessageShowOnce : true,
+      proactiveMessageSound: typeof features.proactiveMessageSound === "boolean" ? features.proactiveMessageSound : false,
+      proactiveMessageAutoclose: typeof features.proactiveMessageAutoclose === "number" ? features.proactiveMessageAutoclose : 0,
     };
   } catch {
     return null;
@@ -259,6 +284,12 @@ function widgetConfigFromWebChatDocument(botId: string, bot: BotDocument, config
     messageEndpoint: "/api/chat/message",
     websocketEndpoint: null,
     theme,
+    proactiveMessage: typeof config.proactive_message === "boolean" ? config.proactive_message : false,
+    proactiveMessageText: cleanText(stringValue(config.proactive_message_text, "Hi! 👋 Need help?"), 300),
+    proactiveMessageDelay: typeof config.proactive_message_delay === "number" ? config.proactive_message_delay : 5,
+    proactiveMessageShowOnce: typeof config.proactive_message_show_once === "boolean" ? config.proactive_message_show_once : true,
+    proactiveMessageSound: typeof config.proactive_message_sound === "boolean" ? config.proactive_message_sound : false,
+    proactiveMessageAutoclose: typeof config.proactive_message_autoclose === "number" ? config.proactive_message_autoclose : 0,
   };
 }
 
@@ -276,13 +307,13 @@ function parseEnvConfigs(): Record<string, WidgetConfig> {
   }
 }
 
-function parseThemeConfig(value: unknown): Partial<WidgetConfig> & { theme?: Partial<WidgetTheme> } {
+function parseThemeConfig(value: unknown): Partial<WidgetConfig> & { theme?: Partial<WidgetTheme>; features?: Record<string, unknown> } {
   if (typeof value !== "string" || !value.trim()) {
     return {};
   }
 
   try {
-    const parsed = JSON.parse(value) as Partial<WidgetConfig> & { theme?: Partial<WidgetTheme> };
+    const parsed = JSON.parse(value) as Partial<WidgetConfig> & { theme?: Partial<WidgetTheme>; features?: Record<string, unknown> };
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -306,6 +337,12 @@ function sanitizeConfig(config: WidgetConfig): WidgetConfig {
     messageEndpoint: sanitizeEndpoint(config.messageEndpoint),
     websocketEndpoint: sanitizeWebSocketEndpoint(config.websocketEndpoint) ?? getPublicServerWebSocketUrl(),
     theme: sanitizeTheme(config.theme),
+    proactiveMessage: config.proactiveMessage === true,
+    proactiveMessageText: cleanText(config.proactiveMessageText, 300),
+    proactiveMessageDelay: typeof config.proactiveMessageDelay === "number" ? config.proactiveMessageDelay : 5,
+    proactiveMessageShowOnce: config.proactiveMessageShowOnce === true,
+    proactiveMessageSound: config.proactiveMessageSound === true,
+    proactiveMessageAutoclose: typeof config.proactiveMessageAutoclose === "number" ? config.proactiveMessageAutoclose : 0,
   };
 }
 

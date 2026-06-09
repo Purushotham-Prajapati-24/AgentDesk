@@ -40,6 +40,12 @@ type WebChatConfigDocument = Models.Document & {
   file_uploads?: unknown;
   human_handoff?: unknown;
   source_citations?: unknown;
+  proactive_message?: unknown;
+  proactive_message_text?: unknown;
+  proactive_message_delay?: unknown;
+  proactive_message_show_once?: unknown;
+  proactive_message_sound?: unknown;
+  proactive_message_autoclose?: unknown;
 };
 
 export type WebChatBotSummary = {
@@ -232,6 +238,12 @@ function webChatConfigFromDocument(document: WebChatConfigDocument, botThemeConf
       fileUploads: booleanValue(document.file_uploads, DEFAULT_WEBCHAT_CONFIG.features.fileUploads),
       humanHandoff: booleanValue(document.human_handoff, DEFAULT_WEBCHAT_CONFIG.features.humanHandoff),
       sourceCitations: booleanValue(document.source_citations, DEFAULT_WEBCHAT_CONFIG.features.sourceCitations),
+      proactiveMessage: booleanValue(document.proactive_message, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessage),
+      proactiveMessageText: stringValue(document.proactive_message_text, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageText),
+      proactiveMessageDelay: typeof document.proactive_message_delay === "number" ? document.proactive_message_delay : DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageDelay,
+      proactiveMessageShowOnce: booleanValue(document.proactive_message_show_once, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageShowOnce),
+      proactiveMessageSound: booleanValue(document.proactive_message_sound, DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageSound),
+      proactiveMessageAutoclose: typeof document.proactive_message_autoclose === "number" ? document.proactive_message_autoclose : DEFAULT_WEBCHAT_CONFIG.features.proactiveMessageAutoclose,
     },
   });
 }
@@ -299,6 +311,12 @@ function webChatConfigToDocumentPayload(tenantId: string, botId: string, config:
     file_uploads: config.features.fileUploads,
     human_handoff: config.features.humanHandoff,
     source_citations: config.features.sourceCitations,
+    proactive_message: config.features.proactiveMessage,
+    proactive_message_text: config.features.proactiveMessageText,
+    proactive_message_delay: config.features.proactiveMessageDelay,
+    proactive_message_show_once: config.features.proactiveMessageShowOnce,
+    proactive_message_sound: config.features.proactiveMessageSound,
+    proactive_message_autoclose: config.features.proactiveMessageAutoclose,
     updated: new Date().toISOString(),
   };
 }

@@ -1215,6 +1215,30 @@ function WidgetPreview({ config }: { config: WebChatConfig }) {
             </div>
           </div>
 
+          {config.features.proactiveMessage && (
+            <div
+              className="absolute bottom-16 right-[-8px] z-20 flex w-72 flex-col gap-1 rounded-2xl border border-[#eceae4] bg-white p-3.5 text-slate-800 shadow-xl sm:right-[-18px] transition-all animate-fade-in"
+              style={{
+                fontFamily,
+              }}
+            >
+              <div className="absolute bottom-[-6px] right-6 h-3 w-3 rotate-45 border-b border-r border-[#eceae4] bg-white" />
+              <button
+                aria-label="Dismiss preview"
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 font-bold text-sm"
+                type="button"
+              >
+                ×
+              </button>
+              <p className="pr-4 text-xs font-semibold leading-snug text-slate-900">
+                {config.features.proactiveMessageText}
+              </p>
+              <p className="text-[10px] font-medium text-slate-400">
+                {config.identity.botName} · a few moments ago
+              </p>
+            </div>
+          )}
+
           <button
             aria-label="Launcher preview"
             className="absolute bottom-0 right-[-8px] z-10 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-black/10 text-2xl font-semibold text-black sm:right-[-18px] sm:h-16 sm:w-16 sm:text-3xl"

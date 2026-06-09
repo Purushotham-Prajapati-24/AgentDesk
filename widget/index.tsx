@@ -37,6 +37,12 @@
     messageEndpoint: string;
     websocketEndpoint: string | null;
     theme: WidgetTheme;
+    proactiveMessage: boolean;
+    proactiveMessageText: string;
+    proactiveMessageDelay: number;
+    proactiveMessageShowOnce: boolean;
+    proactiveMessageSound: boolean;
+    proactiveMessageAutoclose: number;
   };
 
   type ChatMessage = {
@@ -98,6 +104,9 @@
     private composerInputRef: HTMLTextAreaElement | null = null;
     private sendButtonRef: HTMLButtonElement | null = null;
     private quickActionButtons: HTMLButtonElement[] = [];
+    private proactiveTimer: number | null = null;
+    private proactiveAutocloseTimer: number | null = null;
+    private proactiveBubbleRef: HTMLDivElement | null = null;
 
     constructor() {
       super();
@@ -111,6 +120,9 @@
 
     toggle() {
       this.isOpen = !this.isOpen;
+      if (this.isOpen) {
+        this.hideProactiveBubble(true);
+      }
       this.renderShell();
     }
 
@@ -148,6 +160,7 @@
       }
       this.renderShell();
       this.initSocket(this.config);
+      this.startProactiveMessage();
     }
 
     private initSocket(this: AgentDeskWidget, config: WidgetConfig) {
@@ -259,10 +272,14 @@
       }
       launcher.addEventListener("click", () => {
         this.isOpen = !this.isOpen;
+        if (this.isOpen) {
+          this.hideProactiveBubble(true);
+        }
         this.renderShell();
       });
 
-      wrapper.append(pane, launcher);
+      const proactiveBubble = this.createProactiveBubble(config);
+      wrapper.append(pane, launcher, proactiveBubble);
       return wrapper;
     }
 
@@ -529,6 +546,116 @@
           this.updateMessageRow(message, row);
           await delay(12);
         }
+      }
+    }
+
+    private startProactiveMessage() {
+      if (this.proactiveTimer) window.clearTimeout(this.proactiveTimer);
+      if (this.proactiveAutocloseTimer) window.clearTimeout(this.proactiveAutocloseTimer);
+
+      const config = this.config;
+      if (!config || !config.proactiveMessage || embedMode === "inline" || this.isOpen) {
+        return;
+      }
+
+      const storageKey = `agentdesk:proactive-dismissed:${config.botId}`;
+      const isDismissed = window.sessionStorage.getItem(storageKey) === "true";
+      if (config.proactiveMessageShowOnce && isDismissed) {
+        return;
+      }
+
+      const delayMs = (config.proactiveMessageDelay || 5) * 1000;
+      this.proactiveTimer = window.setTimeout(() => {
+        if (this.isOpen) return;
+        this.showProactiveBubble();
+      }, delayMs);
+    }
+
+    private showProactiveBubble() {
+      if (!this.proactiveBubbleRef) return;
+      this.proactiveBubbleRef.classList.add("active");
+
+      if (this.config?.proactiveMessageSound) {
+        this.playProactiveSound();
+      }
+
+      const autocloseSec = this.config?.proactiveMessageAutoclose || 0;
+      if (autocloseSec > 0) {
+        this.proactiveAutocloseTimer = window.setTimeout(() => {
+          this.hideProactiveBubble();
+        }, autocloseSec * 1000);
+      }
+    }
+
+    private hideProactiveBubble(dismiss = false) {
+      if (this.proactiveBubbleRef) {
+        this.proactiveBubbleRef.classList.remove("active");
+      }
+      if (this.proactiveAutocloseTimer) {
+        window.clearTimeout(this.proactiveAutocloseTimer);
+        this.proactiveAutocloseTimer = null;
+      }
+      if (dismiss && this.config) {
+        const storageKey = `agentdesk:proactive-dismissed:${this.config.botId}`;
+        window.sessionStorage.setItem(storageKey, "true");
+      }
+    }
+
+    private createProactiveBubble(config: WidgetConfig) {
+      const bubble = createElement("div", "ad-proactive-bubble");
+      this.proactiveBubbleRef = bubble;
+
+      const closeBtn = createElement("button", "ad-proactive-close");
+      closeBtn.type = "button";
+      closeBtn.setAttribute("aria-label", "Dismiss greeting");
+      closeBtn.textContent = "×";
+      closeBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.hideProactiveBubble(true);
+      });
+
+      const body = createElement("div", "ad-proactive-body");
+      const text = createElement("p", "ad-proactive-text");
+      text.textContent = config.proactiveMessageText;
+      const meta = createElement("p", "ad-proactive-meta");
+      meta.textContent = `${config.botName} · a few moments ago`;
+
+      body.append(text, meta);
+      bubble.append(closeBtn, body);
+
+      bubble.addEventListener("click", () => {
+        this.isOpen = true;
+        this.hideProactiveBubble(true);
+        this.renderShell();
+      });
+
+      return bubble;
+    }
+
+    private playProactiveSound() {
+      try {
+        const windowRef = window as unknown as {
+          AudioContext?: typeof AudioContext;
+          webkitAudioContext?: typeof AudioContext;
+        };
+        const AudioCtx = windowRef.AudioContext || windowRef.webkitAudioContext;
+        if (!AudioCtx) return;
+        const audioContext = new AudioCtx();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(587.33, audioContext.currentTime); // D5
+        gain.gain.setValueAtTime(0.08, audioContext.currentTime);
+        osc.start();
+
+        osc.frequency.setValueAtTime(880, audioContext.currentTime + 0.1); // A5
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
+        osc.stop(audioContext.currentTime + 0.35);
+      } catch (e) {
+        console.warn("Audio Context playback failed", e);
       }
     }
   }
@@ -898,6 +1025,12 @@
       logoUrl: config.logoUrl || null,
       useCustomIcon: config.useCustomIcon === true,
       widgetIconUrl: normalizeImageUrl(config.widgetIconUrl),
+      proactiveMessage: config.proactiveMessage === true,
+      proactiveMessageText: stringValue(config.proactiveMessageText, fallback.proactiveMessageText),
+      proactiveMessageDelay: typeof config.proactiveMessageDelay === "number" ? config.proactiveMessageDelay : fallback.proactiveMessageDelay,
+      proactiveMessageShowOnce: config.proactiveMessageShowOnce === true,
+      proactiveMessageSound: config.proactiveMessageSound === true,
+      proactiveMessageAutoclose: typeof config.proactiveMessageAutoclose === "number" ? config.proactiveMessageAutoclose : fallback.proactiveMessageAutoclose,
     };
   }
 
@@ -921,6 +1054,12 @@
       inputPlaceholder: "Write your message here...",
       messageEndpoint: `${scriptOrigin}/api/chat/message`,
       websocketEndpoint: null,
+      proactiveMessage: false,
+      proactiveMessageText: "Hi! 👋 Need help?",
+      proactiveMessageDelay: 5,
+      proactiveMessageShowOnce: true,
+      proactiveMessageSound: false,
+      proactiveMessageAutoclose: 0,
       theme: {
         headerHsl: "0 0% 11%",
         headerTextHsl: "0 0% 100%",
@@ -1356,9 +1495,74 @@
         70% { box-shadow: 0 12px 36px var(--ad-accent-glow), 0 0 0 12px hsla(${theme.accentHsl} / 0); }
       }
 
-      @keyframes stream-in {
-        0% { opacity: 0; transform: translateY(4px); }
-        100% { opacity: 1; transform: translateY(0); }
+      .ad-proactive-bubble {
+        background: white;
+        border: 1px solid var(--ad-border-color);
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+        color: #1c1c1c;
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        opacity: 0;
+        padding: 14px 16px;
+        position: absolute;
+        bottom: 80px;
+        right: 0;
+        transform: translateY(12px);
+        transition: opacity 200ms ease, transform 200ms ease;
+        width: 280px;
+        z-index: 2147483646;
+        cursor: pointer;
+      }
+
+      .ad-proactive-bubble.active {
+        display: flex;
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .ad-proactive-bubble::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        right: 24px;
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid white;
+      }
+
+      .ad-proactive-close {
+        background: transparent;
+        border: 0;
+        color: #999999;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        position: absolute;
+        right: 12px;
+        top: 12px;
+      }
+
+      .ad-proactive-close:hover {
+        color: #555555;
+      }
+
+      .ad-proactive-text {
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.4;
+        margin: 0;
+        padding-right: 14px;
+        color: #1c1c1c;
+      }
+
+      .ad-proactive-meta {
+        color: #999999;
+        font-size: 10px;
+        margin: 0;
       }
 
       @media (max-width: 480px) {

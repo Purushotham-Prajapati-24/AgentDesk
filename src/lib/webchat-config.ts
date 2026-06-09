@@ -59,6 +59,12 @@ export const WebChatConfigSchema = z.object({
     fileUploads: z.boolean(),
     humanHandoff: z.boolean(),
     sourceCitations: z.boolean(),
+    proactiveMessage: z.boolean(),
+    proactiveMessageText: z.string().trim().max(300),
+    proactiveMessageDelay: z.number().int().min(0).max(120),
+    proactiveMessageShowOnce: z.boolean(),
+    proactiveMessageSound: z.boolean(),
+    proactiveMessageAutoclose: z.number().int().min(0).max(300),
   }),
 });
 
@@ -119,6 +125,12 @@ export const DEFAULT_WEBCHAT_CONFIG: WebChatConfig = {
     fileUploads: false,
     humanHandoff: true,
     sourceCitations: true,
+    proactiveMessage: false,
+    proactiveMessageText: "Hi! 👋 Need help?",
+    proactiveMessageDelay: 5,
+    proactiveMessageShowOnce: true,
+    proactiveMessageSound: false,
+    proactiveMessageAutoclose: 0,
   },
 };
 

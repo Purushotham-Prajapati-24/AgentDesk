@@ -34,6 +34,7 @@ const stringAttributes = [
   ["theme_id", 160, false],
   ["created", 50, true],
   ["updated", 50, true],
+  ["proactive_message_text", 500, false],
 ];
 
 const booleanAttributes = [
@@ -42,6 +43,14 @@ const booleanAttributes = [
   ["file_uploads", false],
   ["human_handoff", true],
   ["source_citations", true],
+  ["proactive_message", false],
+  ["proactive_message_show_once", true],
+  ["proactive_message_sound", false],
+];
+
+const integerAttributes = [
+  ["proactive_message_delay", 5],
+  ["proactive_message_autoclose", 0],
 ];
 
 async function ensureCollection() {
@@ -80,6 +89,17 @@ async function createBooleanAttribute([key, defaultValue]) {
   }
 }
 
+async function createIntegerAttribute([key, defaultValue]) {
+  try {
+    console.log(`Creating integer attribute ${key}...`);
+    await databases.createIntegerAttribute(databaseId, collectionId, key, false, 0, 1000, defaultValue);
+  } catch (error) {
+    if (error.code !== 409) {
+      throw error;
+    }
+  }
+}
+
 async function createIndex(key, type, attributes) {
   try {
     console.log(`Creating index ${key}...`);
@@ -100,6 +120,10 @@ async function run() {
 
   for (const attribute of booleanAttributes) {
     await createBooleanAttribute(attribute);
+  }
+
+  for (const attribute of integerAttributes) {
+    await createIntegerAttribute(attribute);
   }
 
   console.log("Waiting for Appwrite attributes to become available...");
