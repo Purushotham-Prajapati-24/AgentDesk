@@ -11,7 +11,7 @@ const options: Array<{ value: ThemeMode; label: string; icon: React.ReactNode }>
   { value: "system", label: "System theme", icon: <Monitor aria-hidden="true" className="h-4 w-4" /> },
 ];
 
-export function ThemeToggle({ variant = "cream" }: { variant?: "cream" | "cockpit"; compact?: boolean }) {
+export function ThemeToggle({ variant = "cream" }: { variant?: "cream" | "cockpit" }) {
   const { theme, setTheme } = useTheme();
   const isCockpit = variant === "cockpit";
 

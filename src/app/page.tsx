@@ -89,7 +89,7 @@ export default function Home() {
             <Link href="/docs">Docs</Link>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeToggle compact variant="cockpit" />
+            <ThemeToggle variant="cockpit" />
             <Link
               className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#22c55e] to-[#4ade80] px-4 text-xs font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.22)] transition hover:-translate-y-0.5 hover:from-[#16a34a] hover:to-[#22c55e] active:scale-[0.98]"
               href="/login"
@@ -131,7 +131,7 @@ export default function Home() {
                     style={{ animationDelay: `${index * 90}ms` }}
                   >
                     <div className="flex items-center justify-between">
-                      <p className="font-mono text-[9px] sm:text-[10px] font-semibold uppercase text-white/80 tracking-wider">{card.eyebrow}</p>
+                      <p className="font-mono text-xs font-semibold uppercase text-white/80 tracking-wide sm:text-sm">{card.eyebrow}</p>
                       <Icon aria-hidden="true" className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
                     </div>
                     <h2 className="mt-3 sm:mt-6 text-lg sm:text-2xl font-semibold tracking-[-0.03em]">{card.title}</h2>

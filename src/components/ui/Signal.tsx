@@ -78,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
 
             <div className="flex min-w-0 items-center gap-2 lg:mt-auto lg:flex-col lg:items-stretch lg:gap-4">
-              <ThemeToggle compact variant="cockpit" />
+              <ThemeToggle variant="cockpit" />
 
               <button
                 className="flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-[var(--ui-muted)] transition duration-200 ease-out hover:border-[#dc2626]/30 hover:bg-[#dc2626]/10 hover:text-[#ef4444] lg:min-h-11 lg:gap-3"

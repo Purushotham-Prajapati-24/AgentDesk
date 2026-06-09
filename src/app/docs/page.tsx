@@ -569,7 +569,7 @@ function askShipping() {
           </div>
 
           <div className="flex items-center gap-2">
-            <ThemeToggle compact variant="cockpit" />
+            <ThemeToggle variant="cockpit" />
             <Link className="hidden min-h-10 items-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-4 text-sm font-semibold text-[var(--ui-muted)] transition hover:border-[#0099ff]/60 hover:text-[var(--ui-text)] sm:inline-flex" href="/webchat">
               WebChat
             </Link>

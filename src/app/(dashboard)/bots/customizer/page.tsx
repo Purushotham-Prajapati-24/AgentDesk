@@ -55,7 +55,7 @@ const DEFAULT_STATE: CustomizerState = {
 };
 
 const fontStacks: Record<FontChoice, string> = {
-  Fira: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+  Fira: "Fira Sans, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
   Outfit: "Outfit, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
   System: "system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
 };
