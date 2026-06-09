@@ -20,12 +20,10 @@ export default function MonitorUsersPage() {
 
   useEffect(() => {
     if (!tenant?.$id) {
-      setLoading(false);
       return;
     }
 
     let isActive = true;
-    setLoading(true);
     getMonitorUsers({ tenantId: tenant.$id, search, cursor }).then((response) => {
       if (!isActive) {
         return;
@@ -78,7 +76,9 @@ export default function MonitorUsersPage() {
 
   const activeUsers = users.filter((user) => user.active > 0 || user.paused > 0).length;
   const totalMessages = users.reduce((total, user) => total + user.messages, 0);
-  const initialLoading = tenantLoading || (loading && users.length === 0 && !error);
+  const hasTenant = Boolean(tenant?.$id);
+  const isUserLoading = hasTenant && loading;
+  const initialLoading = tenantLoading || (isUserLoading && users.length === 0 && !error);
 
   if (initialLoading) {
     return <MonitorUsersPageSkeleton />;
@@ -107,7 +107,7 @@ export default function MonitorUsersPage() {
         </section>
 
         <section className="grid gap-4 md:grid-cols-3">
-          <MonitorMetric label="Visible users" value={String(users.length)} detail={loading ? "loading window" : "session-derived customers"} tone="blue" />
+          <MonitorMetric label="Visible users" value={String(users.length)} detail={isUserLoading ? "loading window" : "session-derived customers"} tone="blue" />
           <MonitorMetric label="Active or paused" value={String(activeUsers)} detail="customers still in motion" tone="green" />
           <MonitorMetric label="Messages" value={String(totalMessages)} detail="in visible user rows" tone="coral" />
         </section>
@@ -133,12 +133,12 @@ export default function MonitorUsersPage() {
             </form>
           </div>
 
-          {loading ? (
+          {isUserLoading ? (
             <UsersTableBodySkeleton />
           ) : users.length === 0 ? (
             <div className="p-5">
               <MonitorEmpty
-                title={loading ? "Loading customers" : "No customers found"}
+                title={isUserLoading ? "Loading customers" : "No customers found"}
                 description="End-customer identities are inferred from persisted widget sessions in this tenant."
               />
             </div>
@@ -201,13 +201,13 @@ export default function MonitorUsersPage() {
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
-            <Button className="rounded-full" disabled={cursorStack.length === 0 || loading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
+            <Button className="rounded-full" disabled={cursorStack.length === 0 || isUserLoading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
               Prev
             </Button>
             <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">
-              {loading ? "Loading" : `${users.length} rows`}
+              {isUserLoading ? "Loading" : `${users.length} rows`}
             </span>
-            <Button className="rounded-full" disabled={!nextCursor || loading} rightIcon={<ChevronRight className="h-4 w-4" />} onClick={nextPage} size="sm" type="button" variant="outline">
+            <Button className="rounded-full" disabled={!nextCursor || isUserLoading} rightIcon={<ChevronRight className="h-4 w-4" />} onClick={nextPage} size="sm" type="button" variant="outline">
               Next
             </Button>
           </div>

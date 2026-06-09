@@ -16,6 +16,7 @@ import { useTenant } from "@/context/TenantContext";
 import { cn } from "@/lib/utils";
 
 const statusOptions: Array<MonitorSessionStatus | "all"> = ["all", "active", "paused_by_human", "closed"];
+type MobileMonitorPanel = "queue" | "transcript";
 
 export default function MonitorConversationsPage() {
   const { tenant, loading: tenantLoading } = useTenant();
@@ -31,15 +32,14 @@ export default function MonitorConversationsPage() {
   const [loading, setLoading] = useState(true);
   const [messageLoading, setMessageLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mobilePanel, setMobilePanel] = useState<MobileMonitorPanel>("queue");
 
   useEffect(() => {
     if (!tenant?.$id) {
-      setLoading(false);
       return;
     }
 
     let isActive = true;
-    setLoading(true);
     getMonitorConversationList({ tenantId: tenant.$id, search, status, cursor }).then((response) => {
       if (!isActive) {
         return;
@@ -71,6 +71,7 @@ export default function MonitorConversationsPage() {
 
     setSelectedConversation(conversation);
     setMessageLoading(true);
+    setMobilePanel("transcript");
     const response = await getMonitorConversationMessages({ tenantId: tenant.$id, sessionId: conversation.id });
     setMessageLoading(false);
 
@@ -131,7 +132,9 @@ export default function MonitorConversationsPage() {
   const activeCount = conversations.filter((conversation) => conversation.status === "active").length;
   const handoffCount = conversations.filter((conversation) => conversation.status === "paused_by_human").length;
   const totalMessages = conversations.reduce((total, conversation) => total + conversation.messageCount, 0);
-  const initialLoading = tenantLoading || (loading && conversations.length === 0 && !error);
+  const hasTenant = Boolean(tenant?.$id);
+  const isConversationLoading = hasTenant && loading;
+  const initialLoading = tenantLoading || (isConversationLoading && conversations.length === 0 && !error);
 
   if (initialLoading) {
     return <MonitorConversationsPageSkeleton />;
@@ -161,28 +164,33 @@ export default function MonitorConversationsPage() {
         </section>
 
         <section className="grid gap-4 md:grid-cols-3">
-          <MonitorMetric label="Visible conversations" value={String(conversations.length)} detail={loading ? "loading window" : "current result window"} tone="blue" />
+          <MonitorMetric label="Visible conversations" value={String(conversations.length)} detail={isConversationLoading ? "loading window" : "current result window"} tone="blue" />
           <MonitorMetric label="Active now" value={String(activeCount)} detail="automation still engaged" tone="green" />
           <MonitorMetric label="Human handoffs" value={String(handoffCount)} detail={`${totalMessages} messages visible`} tone="coral" />
         </section>
 
         {error ? <ErrorNotice message={error} /> : null}
 
-        <div className="grid min-w-0 gap-5 xl:h-[calc(100vh-8rem)] xl:min-h-[680px] xl:grid-cols-[410px_minmax(0,1fr)]">
-          <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
+        <MobileMonitorTabs activePanel={mobilePanel} onChange={setMobilePanel} />
+
+        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[680px] lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[410px_minmax(0,1fr)]">
+          <section className={cn("min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]", mobilePanel === "queue" ? "flex" : "hidden lg:flex")}>
             <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
               <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
                 <p className="studio-kicker text-[var(--ui-blue)]">Conversation queue</p>
                 <h3 className="text-base font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Find the chat that needs attention</h3>
               </div>
               <form className="flex gap-2" onSubmit={submitSearch}>
-                <input
-                  className="min-h-10 min-w-0 flex-1 rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
-                  placeholder="Search session, agent, status"
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                />
-                <Button aria-label="Search conversations" className="rounded-full" disabled={!searchInput.trim()} size="icon" type="submit" variant="secondary">
+                <div className="relative min-w-0 flex-1">
+                  <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ui-muted)]" />
+                  <input
+                    className="min-h-10 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] pl-10 pr-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
+                    placeholder="Search session, agent, status"
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                  />
+                </div>
+                <Button aria-label="Search conversations" className="hidden rounded-full sm:inline-flex" disabled={!searchInput.trim()} size="icon" type="submit" variant="secondary">
                   <Search aria-hidden="true" className="h-4 w-4" />
                 </Button>
               </form>
@@ -191,7 +199,7 @@ export default function MonitorConversationsPage() {
                 {statusOptions.map((item) => (
                   <button
                     className={cn(
-                      "min-h-8 shrink-0 rounded-full border px-3 font-mono text-xs font-semibold capitalize transition",
+                      "min-h-[36px] shrink-0 rounded-full border px-3 font-mono text-xs font-semibold capitalize transition",
                       status === item
                         ? "border-[var(--ui-blue)] bg-[var(--ui-blue)] text-white"
                         : "border-[var(--ui-border)] bg-[var(--ui-panel)] text-[var(--ui-muted)] hover:border-[var(--ui-blue)]/60 hover:text-[var(--ui-text)]",
@@ -207,11 +215,11 @@ export default function MonitorConversationsPage() {
             </div>
 
             <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto p-3">
-              {loading ? (
+              {isConversationLoading ? (
                 <ConversationListRowsSkeleton />
               ) : conversations.length === 0 ? (
                 <MonitorEmpty
-                  title={loading ? "Loading conversations" : "No conversations found"}
+                  title={isConversationLoading ? "Loading conversations" : "No conversations found"}
                   description="Customer widget sessions matching the current filters will appear here."
                 />
               ) : (
@@ -245,33 +253,59 @@ export default function MonitorConversationsPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2.5">
-              <Button className="rounded-full" disabled={cursorStack.length === 0 || loading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
+              <Button className="rounded-full" disabled={cursorStack.length === 0 || isConversationLoading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={previousPage} size="sm" type="button" variant="outline">
                 Prev
               </Button>
               <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">
-                {loading ? "Loading" : `${conversations.length} rows`}
+                {isConversationLoading ? "Loading" : `${conversations.length} rows`}
               </span>
-              <Button className="rounded-full" disabled={!nextCursor || loading} rightIcon={<ChevronRight className="h-4 w-4" />} onClick={nextPage} size="sm" type="button" variant="outline">
+              <Button className="rounded-full" disabled={!nextCursor || isConversationLoading} rightIcon={<ChevronRight className="h-4 w-4" />} onClick={nextPage} size="sm" type="button" variant="outline">
                 Next
               </Button>
             </div>
           </section>
 
-          <section className="flex h-[620px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[720px] xl:h-full">
+          <section className={cn("min-h-[58svh] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] lg:h-[720px] lg:min-h-0 xl:h-full", mobilePanel === "transcript" ? "flex" : "hidden lg:flex")}>
             <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
               {selectedConversation ? (
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <p className="studio-kicker text-[var(--ui-blue)]">Transcript</p>
-                    <h2 className="mt-1 break-all text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">{selectedConversation.sessionToken}</h2>
-                    <p className="mt-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">{selectedConversation.botId || "unassigned agent"}</p>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <Button
+                      aria-label="Back to conversation queue"
+                      className="mt-0.5 min-h-11 rounded-full lg:hidden"
+                      leftIcon={<ChevronLeft aria-hidden="true" className="h-4 w-4" />}
+                      onClick={() => setMobilePanel("queue")}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Queue
+                    </Button>
+                    <div className="min-w-0">
+                      <p className="studio-kicker text-[var(--ui-blue)]">Transcript</p>
+                      <h2 className="mt-1 break-all text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">{selectedConversation.sessionToken}</h2>
+                      <p className="mt-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">{selectedConversation.botId || "unassigned agent"}</p>
+                    </div>
                   </div>
                   <MonitorStatus status={selectedConversation.status} />
                 </div>
               ) : (
-                <div>
-                  <p className="studio-kicker text-[var(--ui-blue)]">Transcript</p>
-                  <h2 className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Review the full customer journey</h2>
+                <div className="flex items-start gap-2">
+                  <Button
+                    aria-label="Back to conversation queue"
+                    className="mt-0.5 min-h-11 rounded-full lg:hidden"
+                    leftIcon={<ChevronLeft aria-hidden="true" className="h-4 w-4" />}
+                    onClick={() => setMobilePanel("queue")}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Queue
+                  </Button>
+                  <div>
+                    <p className="studio-kicker text-[var(--ui-blue)]">Transcript</p>
+                    <h2 className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Review the full customer journey</h2>
+                  </div>
                 </div>
               )}
             </div>
@@ -300,12 +334,39 @@ function MonitorConversationsPageSkeleton() {
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
         <MonitorHeroSkeleton />
         <MonitorMetricGridSkeleton />
-        <div className="grid min-w-0 gap-5 xl:h-[calc(100vh-8rem)] xl:min-h-[680px] xl:grid-cols-[410px_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[680px] lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[410px_minmax(0,1fr)]">
           <ConversationPanelSkeleton />
           <TranscriptPanelSkeleton />
         </div>
       </div>
     </div>
+  );
+}
+
+function MobileMonitorTabs({ activePanel, onChange }: { activePanel: MobileMonitorPanel; onChange: (panel: MobileMonitorPanel) => void }) {
+  const items: Array<{ id: MobileMonitorPanel; label: string }> = [
+    { id: "queue", label: "Queue" },
+    { id: "transcript", label: "Transcript" },
+  ];
+
+  return (
+    <nav aria-label="Monitor mobile workspace" className="grid grid-cols-2 gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-1.5 lg:hidden">
+      {items.map((item) => (
+        <button
+          className={cn(
+            "min-h-11 rounded-full px-3 font-mono text-[11px] font-semibold uppercase transition",
+            activePanel === item.id
+              ? "bg-[var(--ui-blue)] text-white"
+              : "text-[var(--ui-muted)] hover:bg-[var(--ui-panel-2)] hover:text-[var(--ui-text)]",
+          )}
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -453,11 +514,6 @@ function TranscriptMessagesSkeleton() {
 }
 
 function MonitorMetric({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: "blue" | "green" | "coral" }) {
-  const toneClass = {
-    blue: "bg-[var(--ui-blue)] text-white",
-    green: "bg-[#22c55e]/15 text-[#22c55e]",
-    coral: "bg-[#ff5530] text-white",
-  }[tone];
   const dotClass = {
     blue: "bg-[var(--ui-blue)]",
     green: "bg-[#86efac] shadow-[0_0_16px_rgba(134,239,172,0.75)]",

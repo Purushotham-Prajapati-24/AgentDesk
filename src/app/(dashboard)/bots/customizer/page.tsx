@@ -108,16 +108,18 @@ export default function WidgetCustomizerPage() {
         action={<StatusPill tone="hot">Live preview</StatusPill>}
       />
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 xl:grid-cols-[300px_minmax(0,1fr)_420px] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)_360px] lg:px-8">
         <Panel className="h-fit p-5">
           <p className="studio-kicker text-[#0099ff]">Build checklist</p>
-          <div className="mt-5 grid gap-2">
-            {["Identity", "Greeting", "Color system", "Launcher icon", "Embed snippets"].map((item) => (
-              <div className="flex items-center justify-between border border-[#262626] bg-[#090909] px-3 py-3 text-sm font-semibold text-white" key={item}>
-                {item}
-                <span className="h-2 w-2 rounded-full bg-[#22c55e]" />
-              </div>
-            ))}
+          <div className="mt-5">
+            <div className="flex gap-2 overflow-x-auto pb-1 sm:grid sm:overflow-visible sm:pb-0">
+              {["Identity", "Greeting", "Color system", "Launcher icon", "Embed snippets"].map((item) => (
+                <div className="flex min-h-11 shrink-0 items-center justify-between gap-3 border border-[#262626] bg-[#090909] px-3 py-3 text-sm font-semibold text-white sm:w-full" key={item}>
+                  {item}
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[#22c55e]" />
+                </div>
+              ))}
+            </div>
           </div>
         </Panel>
 
@@ -229,7 +231,7 @@ function TextField({ label, value, disabled = false, onChange }: { label: string
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_56px] items-end gap-3">
+    <label className="flex min-w-0 flex-col gap-1.5 sm:grid sm:grid-cols-[minmax(0,1fr)_56px] sm:items-end sm:gap-3">
       <span className="min-w-0">
         <span className="studio-kicker mb-2 block text-[#999999]">{label}</span>
         <input
@@ -240,7 +242,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
       </span>
       <input
         aria-label={`${label} color picker`}
-        className="h-11 w-14 border border-[#262626] bg-[#090909] p-1"
+        className="h-11 w-14 border border-[#262626] bg-[#090909] p-1 sm:w-14"
         type="color"
         value={normalizeHex(value)}
         onChange={(event) => onChange(event.target.value)}
@@ -262,7 +264,7 @@ function WidgetPreview({ config }: { config: CustomizerState }) {
   const showCustomIcon = config.useCustomIcon && isHttpUrl(config.widgetIconUrl);
 
   return (
-    <div className="relative w-full max-w-[390px]">
+    <div className="relative w-full max-w-[calc(100vw-32px)] sm:max-w-[390px]">
       <div
         className="flex h-[min(620px,calc(100svh-220px))] min-h-[440px] w-full flex-col overflow-hidden rounded-2xl border border-[#eceae4]"
         style={{

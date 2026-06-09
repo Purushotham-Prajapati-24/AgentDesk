@@ -38,7 +38,7 @@ export default function MonitorLayout({ children }: { children: React.ReactNode 
                 return (
                   <Link
                     className={cn(
-                      "inline-flex min-h-12 min-w-0 items-center justify-center gap-3 rounded-full border px-4 py-2 text-left transition duration-200 ease-out lg:justify-start",
+                      "inline-flex min-h-[44px] min-w-0 items-center justify-center gap-3 rounded-full border px-4 py-2 text-left transition duration-200 ease-out lg:justify-start",
                       active
                         ? "border-[var(--ui-blue)] bg-[var(--ui-blue)] text-white"
                         : "border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:border-[var(--ui-blue)]/60 hover:text-[var(--ui-text)]",
