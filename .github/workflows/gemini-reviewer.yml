@@ -62,11 +62,11 @@ jobs:
           echo "truncated=$TRUNCATED" >> "$GITHUB_OUTPUT"
           echo "total_chars=$TOTAL_CHARS" >> "$GITHUB_OUTPUT"
 
-      - name: Call Gemini API
-        id: gemini
+      - name: Call Ollama Cloud API
+        id: ollama
         if: steps.diff.outputs.should_run == 'true'
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           DIFF_FILE: ${{ steps.diff.outputs.diff_file }}
@@ -86,37 +86,50 @@ jobs:
           EOF
           )
 
+          USER_PROMPT=$(cat <<EOF
+          PR Title: $PR_TITLE
+
+          PR Description:
+          $PR_BODY
+
+          Diff (truncated=$TRUNCATED):
+          \`\`\`diff
+          $(cat $DIFF_FILE)
+          \`\`\`
+          EOF
+          )
+
           # Format request body using jq to securely handle diff contents and avoid shell injection
           BODY_FILE="$(mktemp)"
           trap 'rm -f "$BODY_FILE"' EXIT
           
           jq -n \
-            --arg sys "$SYSTEM_PROMPT" \
-            --arg title "$PR_TITLE" \
-            --arg body "$PR_BODY" \
-            --arg truncated "$TRUNCATED" \
-            --rawfile diff "$DIFF_FILE" \
+            --arg model "minimax-m3" \
+            --arg prompt "$USER_PROMPT" \
+            --arg system "$SYSTEM_PROMPT" \
             '{
-              system_instruction: { parts: [{ text: $sys }] },
-              contents: [{ role: "user", parts: [{ text: "PR Title: \($title)\n\nPR Description:\n\($body)\n\nDiff (truncated=\($truncated)):\n```diff\n\($diff)\n```" }] }],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+              model: $model,
+              prompt: $prompt,
+              system: $system,
+              stream: false
             }' > "$BODY_FILE"
 
-          # Call Gemini API with retries to handle transient capacity errors
+          # Call Ollama Cloud API with retries to handle transient capacity errors
           for i in {1..3}; do
             RESPONSE=$(curl -sS \
               -X POST \
               -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $OLLAMA_API_KEY" \
               --data-binary "@$BODY_FILE" \
-              "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$GEMINI_API_KEY")
+              "https://ollama.com/api/generate")
             
             # Check if API response contains an error
-            ERROR_MSG=$(printf '%s' "$RESPONSE" | jq -r '.error.message // empty')
+            ERROR_MSG=$(printf '%s' "$RESPONSE" | jq -r '.error // empty')
             if [ -z "$ERROR_MSG" ]; then
               break
             fi
             
-            echo "API call failed (attempt $i): $ERROR_MSG"
+            echo "Ollama Cloud API failed (attempt $i): $ERROR_MSG"
             if [ "$i" -lt 3 ]; then
               echo "Retrying in 10 seconds..."
               sleep 10
@@ -125,14 +138,12 @@ jobs:
 
           # Extract text response or print error details
           REVIEW_BODY=$(printf '%s' "$RESPONSE" | jq -r '
-            if (.candidates[0].content.parts[0].text // "") != "" then
-              .candidates[0].content.parts[0].text
-            elif (.error.message // "") != "" then
-              "Gemini API error: " + .error.message
-            elif (.candidates[0].finishReason // "") != "" then
-              "Gemini finishReason=" + (.candidates[0].finishReason | tostring)
+            if (.response // "") != "" then
+              .response
+            elif (.error // "") != "" then
+              "Ollama API error: " + .error
             else
-              "Failed to parse Gemini response: " + (. | tostring | .[0:500])
+              "Failed to parse Ollama response: " + (. | tostring | .[0:500])
             end
           ')
 
@@ -146,7 +157,7 @@ jobs:
         if: steps.diff.outputs.should_run == 'true'
         uses: actions/github-script@v7
         env:
-          REVIEW: ${{ steps.gemini.outputs.review }}
+          REVIEW: ${{ steps.ollama.outputs.review }}
           TRUNCATED: ${{ steps.diff.outputs.truncated }}
           TOTAL_CHARS: ${{ steps.diff.outputs.total_chars }}
         with:
@@ -159,7 +170,7 @@ jobs:
               ? `\n\n> ⚠️ Diff was truncated (${Number(totalChars).toLocaleString()} characters total). Only the first 400,000 characters were sent to the model.`
               : '';
               
-            const body = `🤖 **Gemini AI Code Reviewer**\n\n${review}${truncNote}\n\n---\n*This review was generated automatically using the gemini-1.5-flash model.*`;
+            const body = `🤖 **MiniMax M3 AI Code Reviewer**\n\n${review}${truncNote}\n\n---\n*This review was generated automatically using the minimax-m3 model via Ollama Cloud.*`;
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
