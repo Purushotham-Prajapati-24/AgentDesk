@@ -1,29 +1,154 @@
 name: Gemini PR Reviewer
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   review:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    if: ${{ github.actor != 'dependabot[bot]' }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2 # Fetches the commit diff accurately
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Gemini AI Reviewer
-        uses: google-gemini/gemini-pr-review-action@v1
+      - name: Fetch Base Branch
+        run: |
+          git fetch --no-tags --depth=50 origin "${{ github.event.pull_request.base.ref }}"
+
+      - name: Compute Diff & Truncate
+        id: diff
+        env:
+          # Limit diff to ~400k characters to avoid exceeding model context limits and speed up response
+          CUTOFF_CHARS: "400000"
+        run: |
+          set -euo pipefail
+          BASE_REF="origin/${{ github.event.pull_request.base.ref }}"
+          
+          # Get name-only diff first to see if anything changed
+          CHANGED=$(git diff --name-only "$BASE_REF...HEAD" || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No changes detected."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+
+          # Get raw diff excluding binary files or lockfiles
+          RAW_DIFF=$(git diff "$BASE_REF...HEAD" -- ':(exclude)*.md' ':(exclude)*-lock.json' ':(exclude)*.lock' || true)
+          TOTAL_CHARS=${#RAW_DIFF}
+          
+          if [ "$TOTAL_CHARS" -gt "$CUTOFF_CHARS" ]; then
+            DIFF="${RAW_DIFF:0:$CUTOFF_CHARS}"
+            TRUNCATED=true
+          else
+            DIFF="$RAW_DIFF"
+            TRUNCATED=false
+          fi
+
+          # Save diff to a temporary file to avoid ARG_MAX issues in the environment
+          DIFF_FILE="$RUNNER_TEMP/pr_diff.txt"
+          printf '%s' "$DIFF" > "$DIFF_FILE"
+          
+          echo "diff_file=$DIFF_FILE" >> "$GITHUB_OUTPUT"
+          echo "truncated=$TRUNCATED" >> "$GITHUB_OUTPUT"
+          echo "total_chars=$TOTAL_CHARS" >> "$GITHUB_OUTPUT"
+
+      - name: Call Gemini API
+        id: gemini
+        if: steps.diff.outputs.should_run == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          DIFF_FILE: ${{ steps.diff.outputs.diff_file }}
+          TRUNCATED: ${{ steps.diff.outputs.truncated }}
+        run: |
+          set -euo pipefail
+
+          SYSTEM_PROMPT=$(cat <<'EOF'
+          You are an expert code reviewer. Analyze the pull request diff.
+          Point out critical logical bugs, security gaps, performance bottlenecks, or syntax formatting issues.
+          Keep your responses highly constructive and conversational. Give clear code examples if suggesting fixes.
+          
+          Output format:
+          - ## Summary: 2-3 sentence overview
+          - ## Findings: Priority (P0/P1/P2) bullet points. Cite file path and line numbers.
+          - ## Recommendation: Things to address before merging vs. things to do later.
+          EOF
+          )
+
+          # Format request body using jq to securely handle diff contents and avoid shell injection
+          BODY_FILE="$(mktemp)"
+          trap 'rm -f "$BODY_FILE"' EXIT
+          
+          jq -n \
+            --arg sys "$SYSTEM_PROMPT" \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg truncated "$TRUNCATED" \
+            --rawfile diff "$DIFF_FILE" \
+            '{
+              system_instruction: { parts: [{ text: $sys }] },
+              contents: [{ role: "user", parts: [{ text: "PR Title: \($title)\n\nPR Description:\n\($body)\n\nDiff (truncated=\($truncated)):\n```diff\n\($diff)\n```" }] }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+            }' > "$BODY_FILE"
+
+          RESPONSE=$(curl -sS \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data-binary "@$BODY_FILE" \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY")
+
+          # Extract text response or print error details
+          REVIEW_BODY=$(printf '%s' "$RESPONSE" | jq -r '
+            if (.candidates[0].content.parts[0].text // "") != "" then
+              .candidates[0].content.parts[0].text
+            elif (.error.message // "") != "" then
+              "Gemini API error: " + .error.message
+            elif (.candidates[0].finishReason // "") != "" then
+              "Gemini finishReason=" + (.candidates[0].finishReason | tostring)
+            else
+              "Failed to parse Gemini response: " + (. | tostring | .[0:500])
+            end
+          ')
+
+          {
+            echo 'review<<__REVIEW_EOF__'
+            printf '%s\n' "$REVIEW_BODY"
+            echo '__REVIEW_EOF__'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post Review as PR Comment
+        if: steps.diff.outputs.should_run == 'true'
+        uses: actions/github-script@v7
+        env:
+          REVIEW: ${{ steps.gemini.outputs.review }}
+          TRUNCATED: ${{ steps.diff.outputs.truncated }}
+          TOTAL_CHARS: ${{ steps.diff.outputs.total_chars }}
         with:
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          github_token: ${{ github.token }}
-          model: 'gemini-2.5-flash' # Free tier optimized model
-          system_instruction: |
-            You are an expert code reviewer. Analyze the pull request diff.
-            Point out critical logical bugs, security gaps, performance bottlenecks, or syntax formatting issues.
-            Keep your responses highly constructive and conversational. Give clear code examples if suggesting fixes.
+          script: |
+            const review = process.env.REVIEW || '_No review body generated._';
+            const truncated = process.env.TRUNCATED === 'true';
+            const totalChars = process.env.TOTAL_CHARS;
+            
+            const truncNote = truncated
+              ? `\n\n> ⚠️ Diff was truncated (${Number(totalChars).toLocaleString()} characters total). Only the first 400,000 characters were sent to the model.`
+              : '';
+              
+            const body = `🤖 **Gemini AI Code Reviewer**\n\n${review}${truncNote}\n\n---\n*This review was generated automatically using the gemini-2.5-flash model.*`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
