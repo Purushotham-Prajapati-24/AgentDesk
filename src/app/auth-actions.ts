@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser, type TenantDocument } from "@/lib/server/auth-tenants";
+import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
@@ -193,9 +193,7 @@ async function ensureTenantForUser(userId: string): Promise<{ success: true; ten
       });
     }
 
-    const tenant = tenantId
-      ? await getAuthorizedTenantDocument(userId, tenantId)
-      : ((await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument);
+    const tenant = await getAuthorizedTenantDocument(userId, tenantId);
     const inferredRole = tenantRoleForUser(tenant, userId);
     role = normalizeTenantRole(prefs.role) ?? inferredRole;
     if (!normalizeTenantRole(prefs.role)) {

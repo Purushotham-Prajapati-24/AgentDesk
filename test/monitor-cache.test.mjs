@@ -31,3 +31,25 @@ test("monitor cache memory fallback deletes prefixes", async () => {
   assert.equal(await getCachedJson("monitor:tenant:analytics:a"), null);
   assert.equal(await getCachedJson("monitor:tenant:users:a"), 2);
 });
+
+test("monitor cache treats Redis failures as cache misses and skipped writes", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
+  process.env.UPSTASH_REDIS_REST_TOKEN = "token";
+  globalThis.fetch = async () => {
+    throw new Error("network unavailable");
+  };
+  console.warn = () => {};
+
+  try {
+    assert.equal(await getCachedJson("monitor:test:redis"), null);
+    await setCachedJson("monitor:test:redis", { ok: true }, 30);
+    await deleteCachedPrefix("monitor:test:");
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  }
+});

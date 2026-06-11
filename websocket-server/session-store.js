@@ -1,4 +1,4 @@
-import { Client, Databases, Operator, Query } from "node-appwrite";
+import { Client, Databases, ID, Operator, Query } from "node-appwrite";
 import { Redis as UpstashRedis } from "@upstash/redis";
 import { createHash } from "node:crypto";
 
@@ -89,6 +89,30 @@ export async function persistAppwriteSessionStatus(room, status) {
   return session.$id;
 }
 
+export async function persistAppwriteAgentMessage(room, content, createdAt) {
+  const databases = createAppwriteDatabases();
+  if (!databases) {
+    throw new Error("Appwrite persistence is not configured.");
+  }
+
+  const session = await findAppwriteSession(databases, room);
+  if (!session) {
+    throw new Error("Session was not found in Appwrite.");
+  }
+
+  const message = await databases.createDocument(databaseId(), messagesCollectionId(), ID.unique(), {
+    tenant_id: room.tenant_id,
+    session_id: session.$id,
+    sender: "agent",
+    content: content.slice(0, 4000),
+    tokens_used: 0,
+    created: createdAt,
+  });
+
+  await updateAgentMessageRollupBestEffort(databases, session, content, createdAt);
+  return message.$id;
+}
+
 export function defaultSessionState(room) {
   return {
     tenant_id: room.tenant_id,
@@ -147,7 +171,9 @@ async function updateStatusRollupBestEffort(databases, session, previousStatus, 
 
   try {
     const documentId = stableId(`tenant_${session.tenant_id}`);
-    await ensureTenantRollup(databases, session.tenant_id, documentId);
+    await ensureTenantRollup(databases, session.tenant_id, documentId, {
+      [statusCounterKey(previousStatus)]: 1,
+    });
     const now = new Date().toISOString();
     const update = {
       [statusCounterKey(previousStatus)]: Operator.increment(-1),
@@ -164,9 +190,58 @@ async function updateStatusRollupBestEffort(databases, session, previousStatus, 
   }
 }
 
-async function ensureTenantRollup(databases, tenantId, documentId) {
+async function updateAgentMessageRollupBestEffort(databases, session, content, createdAt) {
+  if (typeof session.tenant_id !== "string") {
+    return;
+  }
+
+  try {
+    await databases.updateDocument(databaseId(), sessionsCollectionId(), session.$id, {
+      message_count: Operator.increment(1),
+      agent_message_count: Operator.increment(1),
+      last_message_content: content.slice(0, 1000),
+      last_sender: "agent",
+      last_message_at: createdAt,
+      updated: createdAt,
+    });
+
+    const tenantDocumentId = stableId(`tenant_${session.tenant_id}`);
+    await ensureTenantRollup(databases, session.tenant_id, tenantDocumentId);
+    await databases.updateDocument(databaseId(), tenantRollupsCollectionId(), tenantDocumentId, {
+      messages: Operator.increment(1),
+      agent_messages: Operator.increment(1),
+      updated: new Date().toISOString(),
+    });
+
+    const date = dateKey(new Date(createdAt));
+    const dailyDocumentId = stableId(`daily_${session.tenant_id}_${date}`);
+    await ensureDailyRollup(databases, session.tenant_id, date, dailyDocumentId);
+    await databases.updateDocument(databaseId(), dailyRollupsCollectionId(), dailyDocumentId, {
+      messages: Operator.increment(1),
+      agent_messages: Operator.increment(1),
+      updated: new Date().toISOString(),
+    });
+
+    const botId = typeof session.bot_id === "string" ? session.bot_id : "";
+    if (botId) {
+      const botDocumentId = stableId(`bot_${session.tenant_id}_${botId}`);
+      await ensureBotRollup(databases, session.tenant_id, botId, botDocumentId);
+      await databases.updateDocument(databaseId(), botRollupsCollectionId(), botDocumentId, {
+        messages: Operator.increment(1),
+        updated: new Date().toISOString(),
+      });
+    }
+
+    await invalidateMonitorCache(session.tenant_id);
+  } catch (error) {
+    console.warn("[session-store] agent message rollup update failed", error);
+  }
+}
+
+async function ensureTenantRollup(databases, tenantId, documentId, counters = {}) {
   try {
     await databases.getDocument(databaseId(), tenantRollupsCollectionId(), documentId);
+    return false;
   } catch (error) {
     if (error.code !== 404) {
       throw error;
@@ -176,9 +251,9 @@ async function ensureTenantRollup(databases, tenantId, documentId) {
       await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
         tenant_id: tenantId,
         conversations: 0,
-        active_sessions: 0,
-        paused_sessions: 0,
-        closed_sessions: 0,
+        active_sessions: counters.active_sessions ?? 0,
+        paused_sessions: counters.paused_sessions ?? 0,
+        closed_sessions: counters.closed_sessions ?? 0,
         messages: 0,
         customer_messages: 0,
         bot_messages: 0,
@@ -192,7 +267,65 @@ async function ensureTenantRollup(databases, tenantId, documentId) {
       if (createError.code !== 409) {
         throw createError;
       }
+      return false;
     }
+    return true;
+  }
+}
+
+async function ensureDailyRollup(databases, tenantId, date, documentId) {
+  try {
+    await databases.getDocument(databaseId(), dailyRollupsCollectionId(), documentId);
+    return false;
+  } catch (error) {
+    if (error.code !== 404) {
+      throw error;
+    }
+
+    try {
+      await databases.createDocument(databaseId(), dailyRollupsCollectionId(), documentId, {
+        tenant_id: tenantId,
+        date,
+        messages: 0,
+        customer_messages: 0,
+        bot_messages: 0,
+        agent_messages: 0,
+        updated: new Date().toISOString(),
+      });
+    } catch (createError) {
+      if (createError.code !== 409) {
+        throw createError;
+      }
+      return false;
+    }
+    return true;
+  }
+}
+
+async function ensureBotRollup(databases, tenantId, botId, documentId) {
+  try {
+    await databases.getDocument(databaseId(), botRollupsCollectionId(), documentId);
+    return false;
+  } catch (error) {
+    if (error.code !== 404) {
+      throw error;
+    }
+
+    try {
+      await databases.createDocument(databaseId(), botRollupsCollectionId(), documentId, {
+        tenant_id: tenantId,
+        bot_id: botId,
+        conversations: 0,
+        messages: 0,
+        updated: new Date().toISOString(),
+      });
+    } catch (createError) {
+      if (createError.code !== 409) {
+        throw createError;
+      }
+      return false;
+    }
+    return true;
   }
 }
 
@@ -203,7 +336,7 @@ async function invalidateMonitorCache(tenantId) {
 
   const redis = getMonitorCacheRedis();
   for (const scope of ["conversations", "users", "analytics"]) {
-    for await (const keys of scanKeys(redis, `monitor:${tenantId}:${scope}:*`)) {
+    for await (const keys of scanKeys(redis, `monitor:${cacheTenantPart(tenantId)}:${scope}:*`)) {
       if (keys.length > 0) {
         await redis.del(...keys);
       }
@@ -241,6 +374,14 @@ function stableId(value) {
   return `${clean.slice(0, 25)}_${hash}`.slice(0, 36);
 }
 
+function cacheTenantPart(tenantId) {
+  return createHash("sha1").update(tenantId).digest("hex").slice(0, 16);
+}
+
+function dateKey(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 function databaseId() {
   return process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "agentdesk";
 }
@@ -249,6 +390,18 @@ function sessionsCollectionId() {
   return process.env.APPWRITE_SESSIONS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_SESSIONS_COLLECTION_ID ?? "sessions";
 }
 
+function messagesCollectionId() {
+  return process.env.APPWRITE_MESSAGES_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_MESSAGES_COLLECTION_ID ?? "messages";
+}
+
 function tenantRollupsCollectionId() {
   return process.env.APPWRITE_MONITOR_TENANT_ROLLUPS_COLLECTION_ID ?? "monitor_tenant_rollups";
+}
+
+function dailyRollupsCollectionId() {
+  return process.env.APPWRITE_MONITOR_DAILY_ROLLUPS_COLLECTION_ID ?? "monitor_daily_rollups";
+}
+
+function botRollupsCollectionId() {
+  return process.env.APPWRITE_MONITOR_BOT_ROLLUPS_COLLECTION_ID ?? "monitor_bot_rollups";
 }

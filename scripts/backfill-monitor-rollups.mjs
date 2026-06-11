@@ -53,7 +53,13 @@ async function upsert(collectionId, documentId, data) {
     if (error.code !== 404) {
       throw error;
     }
-    await databases.createDocument(databaseId, collectionId, documentId, data);
+    try {
+      await databases.createDocument(databaseId, collectionId, documentId, data);
+    } catch (createError) {
+      if (createError.code !== 409) {
+        throw createError;
+      }
+    }
   }
 }
 

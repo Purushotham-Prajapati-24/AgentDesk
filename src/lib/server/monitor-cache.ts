@@ -8,15 +8,20 @@ const memoryCache = new Map<string, CacheEntry>();
 
 export async function getCachedJson<T>(key: string): Promise<T | null> {
   if (hasRedisConfig()) {
-    const value = await redisCommand<string | null>(["GET", key]);
-    if (!value) {
-      return null;
-    }
-
     try {
-      return JSON.parse(value) as T;
-    } catch {
-      await redisCommand(["DEL", key]);
+      const value = await redisCommand<string | null>(["GET", key]);
+      if (!value) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(value) as T;
+      } catch {
+        await redisCommand(["DEL", key]);
+        return null;
+      }
+    } catch (error) {
+      console.warn("[monitor-cache] Redis read failed; falling back to source data.", error);
       return null;
     }
   }
@@ -37,7 +42,11 @@ export async function getCachedJson<T>(key: string): Promise<T | null> {
 export async function setCachedJson(key: string, value: unknown, ttlSeconds: number) {
   const ttl = Math.max(1, Math.floor(ttlSeconds));
   if (hasRedisConfig()) {
-    await redisCommand(["SET", key, JSON.stringify(value), "EX", ttl]);
+    try {
+      await redisCommand(["SET", key, JSON.stringify(value), "EX", ttl]);
+    } catch (error) {
+      console.warn("[monitor-cache] Redis write failed; skipping cache write.", error);
+    }
     return;
   }
 
@@ -50,10 +59,14 @@ export async function setCachedJson(key: string, value: unknown, ttlSeconds: num
 
 export async function deleteCachedPrefix(prefix: string) {
   if (hasRedisConfig()) {
-    for await (const keys of scanKeys(`${prefix}*`)) {
-      if (keys.length > 0) {
-        await redisCommand(["DEL", ...keys]);
+    try {
+      for await (const keys of scanKeys(`${prefix}*`)) {
+        if (keys.length > 0) {
+          await redisCommand(["DEL", ...keys]);
+        }
       }
+    } catch (error) {
+      console.warn("[monitor-cache] Redis invalidation failed; cached data will expire by TTL.", error);
     }
     return;
   }

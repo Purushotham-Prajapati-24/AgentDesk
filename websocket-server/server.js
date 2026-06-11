@@ -8,6 +8,7 @@ import { createClient as createRedisClient } from "redis";
 import {
   createSessionStore,
   defaultSessionState,
+  persistAppwriteAgentMessage,
   persistAppwriteSessionStatus,
   readAppwriteSessionStatus,
 } from "./session-store.js";
@@ -21,6 +22,7 @@ export function createHandoffServer(options = {}) {
   const app = express();
   const server = http.createServer(app);
   const sessionStore = options.sessionStore ?? createSessionStore(options);
+  const persistAgentMessage = options.persistAgentMessage ?? persistAppwriteAgentMessage;
   const io = new Server(server, {
     cors: {
       origin: parseCorsOrigins(process.env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN),
@@ -76,7 +78,7 @@ export function createHandoffServer(options = {}) {
     });
 
     socket.on("agent-message", (payload, acknowledge) => {
-      handleAgentMessage(socket, room, payload, acknowledge);
+      void handleAgentMessage(socket, room, payload, acknowledge, persistAgentMessage);
     });
 
     socket.on("bot-status-toggle", (payload, acknowledge) => {
@@ -109,18 +111,33 @@ async function handleCustomerMessage(socket, sessionStore, room, payload, acknow
   acknowledge?.({ success: true, data: event });
 }
 
-function handleAgentMessage(socket, room, payload, acknowledge) {
+async function handleAgentMessage(socket, room, payload, acknowledge, persistAgentMessage) {
   const message = parseMessagePayload(payload, "agent");
   if (!message.ok) {
     acknowledge?.(errorBody("INVALID_MESSAGE", message.error));
     return;
   }
 
+  const createdAt = new Date().toISOString();
+  let messageId;
+  try {
+    messageId = await persistAgentMessage(room, message.value.content, createdAt);
+  } catch (error) {
+    console.error("[handoff] failed to persist agent message", {
+      tenant_id: room.tenant_id,
+      session_id: room.session_id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    acknowledge?.(errorBody("MESSAGE_PERSIST_FAILED", "Agent reply could not be persisted."));
+    return;
+  }
+
   const event = {
     ...message.value,
+    message_id: messageId,
     tenant_id: room.tenant_id,
     session_id: room.session_id,
-    created_at: new Date().toISOString(),
+    created_at: createdAt,
   };
 
   socket.to(roomName(room)).emit("agent-message", event);

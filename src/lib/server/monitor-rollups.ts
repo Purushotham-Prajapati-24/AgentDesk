@@ -131,7 +131,12 @@ export async function recordSessionStatusChanged(
     return;
   }
 
-  await incrementTenantRollup(databases, tenantId, {
+  const documentId = tenantRollupId(tenantId);
+  await ensureTenantRollupDocument(databases, tenantId, {
+    [statusCounterKey(previous)]: 1,
+  });
+
+  await incrementDocument(databases, tenantRollupsCollectionId(), documentId, {
     [statusCounterKey(previous)]: -1,
     [statusCounterKey(next)]: 1,
     handoffs: next === "paused_by_human" ? 1 : 0,
@@ -166,7 +171,10 @@ export async function recordMessageCreated(
       messages: 1,
       [tenantSenderCounterKey(sender)]: 1,
     }),
-    incrementDailyRollup(databases, tenantId, dateKey(new Date(createdAt)), { messages: 1 }),
+    incrementDailyRollup(databases, tenantId, dateKey(new Date(createdAt)), {
+      messages: 1,
+      [tenantSenderCounterKey(sender)]: 1,
+    }),
     botId ? incrementBotRollup(databases, tenantId, botId, { messages: 1 }) : Promise.resolve(),
   ]);
   await invalidateMonitorCache(tenantId, ["conversations", "users", "analytics"]);
@@ -288,7 +296,7 @@ export async function invalidateMonitorCache(tenantId: string, scopes: Array<"co
 }
 
 export function monitorCachePrefix(tenantId: string, scope: "conversations" | "users" | "analytics") {
-  return `monitor:${tenantId}:${scope}:`;
+  return `monitor:${cacheTenantPart(tenantId)}:${scope}:`;
 }
 
 function buildRecentActivityFromRollups(rollups: DailyRollupDocument[]) {
@@ -310,12 +318,21 @@ function buildRecentActivityFromRollups(rollups: DailyRollupDocument[]) {
 
 async function incrementTenantRollup(databases: RollupDatabases, tenantId: string, increments: Record<string, number>) {
   const documentId = tenantRollupId(tenantId);
-  await ensureRollupDocument(databases, tenantRollupsCollectionId(), documentId, {
+  await ensureTenantRollupDocument(databases, tenantId);
+  await incrementDocument(databases, tenantRollupsCollectionId(), documentId, increments);
+}
+
+async function ensureTenantRollupDocument(
+  databases: RollupDatabases,
+  tenantId: string,
+  counters: Partial<Record<"active_sessions" | "paused_sessions" | "closed_sessions", number>> = {},
+) {
+  return ensureRollupDocument(databases, tenantRollupsCollectionId(), tenantRollupId(tenantId), {
     tenant_id: tenantId,
     conversations: 0,
-    active_sessions: 0,
-    paused_sessions: 0,
-    closed_sessions: 0,
+    active_sessions: counters.active_sessions ?? 0,
+    paused_sessions: counters.paused_sessions ?? 0,
+    closed_sessions: counters.closed_sessions ?? 0,
     messages: 0,
     customer_messages: 0,
     bot_messages: 0,
@@ -325,7 +342,6 @@ async function incrementTenantRollup(databases: RollupDatabases, tenantId: strin
     credit_balance: 0,
     updated: new Date().toISOString(),
   });
-  await incrementDocument(databases, tenantRollupsCollectionId(), documentId, increments);
 }
 
 async function incrementDailyRollup(databases: RollupDatabases, tenantId: string, date: string, increments: Record<string, number>) {
@@ -362,6 +378,7 @@ async function ensureRollupDocument(
 ) {
   try {
     await databases.getDocument(databaseId(), collectionId, documentId);
+    return false;
   } catch (error) {
     if (errorCode(error) !== 404) {
       throw error;
@@ -373,7 +390,9 @@ async function ensureRollupDocument(
       if (errorCode(createError) !== 409) {
         throw createError;
       }
+      return false;
     }
+    return true;
   }
 }
 
@@ -430,6 +449,10 @@ function stableId(value: string) {
   const clean = value.replace(/[^a-zA-Z0-9_.-]/g, "_");
   const hash = createHash("sha1").update(value).digest("hex").slice(0, 10);
   return `${clean.slice(0, 25)}_${hash}`.slice(0, 36) || ID.unique();
+}
+
+function cacheTenantPart(tenantId: string) {
+  return createHash("sha1").update(tenantId).digest("hex").slice(0, 16);
 }
 
 function statusCounterKey(status: MonitorSessionStatus) {

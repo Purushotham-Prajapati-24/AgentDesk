@@ -49,6 +49,10 @@ test("recordMessageCreated emits atomic counters for customer messages", async (
   const tenantUpdate = db.updates.find((update) => update.collectionId === "monitor_tenant_rollups");
   assert.match(tenantUpdate.data.messages, /"values":\[1\]/);
   assert.match(tenantUpdate.data.customer_messages, /"values":\[1\]/);
+
+  const dailyUpdate = db.updates.find((update) => update.collectionId === "monitor_daily_rollups");
+  assert.match(dailyUpdate.data.messages, /"values":\[1\]/);
+  assert.match(dailyUpdate.data.customer_messages, /"values":\[1\]/);
 });
 
 test("recordSessionStatusChanged decrements old status and increments new status", async () => {
@@ -73,11 +77,36 @@ test("recordSessionStatusChanged decrements old status and increments new status
   assert.match(tenantUpdate.data.handoffs, /"values":\[1\]/);
 });
 
+test("recordSessionStatusChanged pre-seeds missing rollup before decrementing old status", async () => {
+  const db = createFakeDatabase();
+
+  await recordSessionStatusChanged(
+    db,
+    "active",
+    "paused_by_human",
+    {
+      $id: "session_1",
+      tenant_id: "tenant_1",
+      $createdAt: "",
+      $updatedAt: "",
+    },
+  );
+
+  const createdRollup = db.creates.find((create) => create.collectionId === "monitor_tenant_rollups");
+  assert.equal(createdRollup.data.active_sessions, 1);
+
+  const tenantUpdate = db.updates.find((update) => update.collectionId === "monitor_tenant_rollups");
+  assert.match(tenantUpdate.data.active_sessions, /"values":\[-1\]/);
+  assert.match(tenantUpdate.data.paused_sessions, /"values":\[1\]/);
+});
+
 function createFakeDatabase() {
   const documents = new Map();
   const updates = [];
+  const creates = [];
   return {
     updates,
+    creates,
     documents,
     async getDocument(_databaseId, collectionId, documentId) {
       const document = documents.get(`${collectionId}:${documentId}`);
@@ -89,6 +118,7 @@ function createFakeDatabase() {
       return document;
     },
     async createDocument(_databaseId, collectionId, documentId, data) {
+      creates.push({ collectionId, documentId, data });
       const document = { $id: documentId, $createdAt: "", $updatedAt: "", ...data };
       documents.set(`${collectionId}:${documentId}`, document);
       return document;

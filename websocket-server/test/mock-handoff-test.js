@@ -8,7 +8,15 @@ const sessionId = "session_demo";
 
 const backingState = new Map();
 const sessionStore = createMemorySessionStore(backingState);
-const { server, io } = createHandoffServer({ sessionStore });
+const persistedAgentMessages = [];
+const { server, io } = createHandoffServer({
+  sessionStore,
+  persistAgentMessage: async (room, content, createdAt) => {
+    const id = `agent_${persistedAgentMessages.length + 1}`;
+    persistedAgentMessages.push({ id, room, content, createdAt });
+    return id;
+  },
+});
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 
 const address = server.address();
@@ -67,6 +75,8 @@ try {
   const [agentPayload] = await agentMessage;
 
   assert(agentAck.success, "agent message should be accepted");
+  assert(agentAck.data.message_id === "agent_1", "agent ack should use the persisted message id");
+  assert(persistedAgentMessages.length === 1, "agent message should be persisted before acknowledgement");
   assert(agentPayload.sender === "agent", "customer should receive agent sender payload");
 
   console.info("Mock handoff verification passed.");

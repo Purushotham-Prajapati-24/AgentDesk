@@ -535,7 +535,7 @@ function stableCachePart(value: string) {
     return "none";
   }
 
-  return createHash("sha1").update(normalized).digest("hex").slice(0, 16);
+  return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
 }
 
 function databaseId() {
