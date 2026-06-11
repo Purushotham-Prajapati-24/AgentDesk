@@ -171,12 +171,10 @@ async function updateStatusRollupBestEffort(databases, session, previousStatus, 
 
   try {
     const documentId = stableId(`tenant_${session.tenant_id}`);
-    await ensureTenantRollup(databases, session.tenant_id, documentId, {
-      [statusCounterKey(previousStatus)]: 1,
-    });
+    const created = await ensureTenantRollup(databases, session.tenant_id, documentId);
     const now = new Date().toISOString();
     const update = {
-      [statusCounterKey(previousStatus)]: Operator.increment(-1),
+      [statusCounterKey(previousStatus)]: Operator.increment(created ? 0 : -1),
       [statusCounterKey(nextStatus)]: Operator.increment(1),
       updated: now,
     };
@@ -238,7 +236,7 @@ async function updateAgentMessageRollupBestEffort(databases, session, content, c
   }
 }
 
-async function ensureTenantRollup(databases, tenantId, documentId, counters = {}) {
+async function ensureTenantRollup(databases, tenantId, documentId) {
   try {
     await databases.getDocument(databaseId(), tenantRollupsCollectionId(), documentId);
     return false;
@@ -251,9 +249,9 @@ async function ensureTenantRollup(databases, tenantId, documentId, counters = {}
       await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
         tenant_id: tenantId,
         conversations: 0,
-        active_sessions: counters.active_sessions ?? 0,
-        paused_sessions: counters.paused_sessions ?? 0,
-        closed_sessions: counters.closed_sessions ?? 0,
+        active_sessions: 0,
+        paused_sessions: 0,
+        closed_sessions: 0,
         messages: 0,
         customer_messages: 0,
         bot_messages: 0,

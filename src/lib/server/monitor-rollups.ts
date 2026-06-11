@@ -132,12 +132,10 @@ export async function recordSessionStatusChanged(
   }
 
   const documentId = tenantRollupId(tenantId);
-  await ensureTenantRollupDocument(databases, tenantId, {
-    [statusCounterKey(previous)]: 1,
-  });
+  const created = await ensureTenantRollupDocument(databases, tenantId);
 
   await incrementDocument(databases, tenantRollupsCollectionId(), documentId, {
-    [statusCounterKey(previous)]: -1,
+    [statusCounterKey(previous)]: created ? 0 : -1,
     [statusCounterKey(next)]: 1,
     handoffs: next === "paused_by_human" ? 1 : 0,
   });
@@ -325,14 +323,13 @@ async function incrementTenantRollup(databases: RollupDatabases, tenantId: strin
 async function ensureTenantRollupDocument(
   databases: RollupDatabases,
   tenantId: string,
-  counters: Partial<Record<"active_sessions" | "paused_sessions" | "closed_sessions", number>> = {},
 ) {
   return ensureRollupDocument(databases, tenantRollupsCollectionId(), tenantRollupId(tenantId), {
     tenant_id: tenantId,
     conversations: 0,
-    active_sessions: counters.active_sessions ?? 0,
-    paused_sessions: counters.paused_sessions ?? 0,
-    closed_sessions: counters.closed_sessions ?? 0,
+    active_sessions: 0,
+    paused_sessions: 0,
+    closed_sessions: 0,
     messages: 0,
     customer_messages: 0,
     bot_messages: 0,

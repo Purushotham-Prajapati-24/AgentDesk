@@ -96,7 +96,8 @@ async function redisCommand<T>(command: Array<string | number>): Promise<T> {
     body: JSON.stringify(command),
   });
   if (!response.ok) {
-    throw new Error(`Upstash Redis command failed with ${response.status}.`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Upstash Redis command failed with ${response.status}${body ? `: ${body.slice(0, 500)}` : ""}.`);
   }
 
   const payload = (await response.json()) as { result?: T; error?: string };
@@ -125,6 +126,7 @@ function pruneMemoryCache() {
   }
 
   while (memoryCache.size > MAX_MEMORY_CACHE_ENTRIES) {
+    // Short TTLs make FIFO eviction sufficient for the in-process fallback.
     const oldestKey = memoryCache.keys().next().value as string | undefined;
     if (!oldestKey) {
       return;

@@ -170,6 +170,12 @@ async function run() {
     }
   }
 
+  // Backfill has only current session state, not transition history. Treat
+  // existing paused sessions as historical handoffs so analytics are not zeroed.
+  for (const [, rollup] of tenantRollups) {
+    rollup.handoffs = rollup.paused_sessions;
+  }
+
   for (const [tenantId, rollup] of tenantRollups) {
     await upsert(tenantRollupsCollectionId, stableId(`tenant_${tenantId}`), rollup);
   }

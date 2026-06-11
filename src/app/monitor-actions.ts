@@ -455,9 +455,22 @@ async function fetchAttentionConversations(
       status: "active",
     }),
   ]);
-  return [...(paused.documents as SessionDocument[]), ...(active.documents as SessionDocument[])]
-    .slice(0, 5)
-    .map((session) => mapSessionSummary(session) as MonitorConversation);
+  const prioritized = interleaveSessions(paused.documents as SessionDocument[], active.documents as SessionDocument[], 5);
+  return prioritized.map((session) => mapSessionSummary(session) as MonitorConversation);
+}
+
+function interleaveSessions(primary: SessionDocument[], secondary: SessionDocument[], limit: number) {
+  const sessions: SessionDocument[] = [];
+  for (let index = 0; sessions.length < limit && (index < primary.length || index < secondary.length); index++) {
+    if (primary[index]) {
+      sessions.push(primary[index]);
+    }
+    if (sessions.length < limit && secondary[index]) {
+      sessions.push(secondary[index]);
+    }
+  }
+
+  return sessions;
 }
 
 function buildRecentActivity(messages: MessageDocument[]) {

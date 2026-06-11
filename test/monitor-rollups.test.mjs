@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { test } from "node:test";
 import {
   mapSessionSummary,
@@ -77,7 +78,7 @@ test("recordSessionStatusChanged decrements old status and increments new status
   assert.match(tenantUpdate.data.handoffs, /"values":\[1\]/);
 });
 
-test("recordSessionStatusChanged pre-seeds missing rollup before decrementing old status", async () => {
+test("recordSessionStatusChanged does not decrement old status when rollup is missing", async () => {
   const db = createFakeDatabase();
 
   await recordSessionStatusChanged(
@@ -93,10 +94,10 @@ test("recordSessionStatusChanged pre-seeds missing rollup before decrementing ol
   );
 
   const createdRollup = db.creates.find((create) => create.collectionId === "monitor_tenant_rollups");
-  assert.equal(createdRollup.data.active_sessions, 1);
+  assert.equal(createdRollup.data.active_sessions, 0);
 
   const tenantUpdate = db.updates.find((update) => update.collectionId === "monitor_tenant_rollups");
-  assert.match(tenantUpdate.data.active_sessions, /"values":\[-1\]/);
+  assert.equal("active_sessions" in tenantUpdate.data, false);
   assert.match(tenantUpdate.data.paused_sessions, /"values":\[1\]/);
 });
 
@@ -137,7 +138,13 @@ function createFakeDatabase() {
 }
 
 function seedRollups(db, tenantId, botId) {
-  db.documents.set(`monitor_tenant_rollups:tenant_${tenantId}`, { $id: `tenant_${tenantId}` });
-  db.documents.set(`monitor_daily_rollups:daily_${tenantId}_2026-06-01`, { $id: `daily_${tenantId}_2026-06-01` });
-  db.documents.set(`monitor_bot_rollups:bot_${tenantId}_${botId}`, { $id: `bot_${tenantId}_${botId}` });
+  db.documents.set(`monitor_tenant_rollups:${stableId(`tenant_${tenantId}`)}`, { $id: stableId(`tenant_${tenantId}`) });
+  db.documents.set(`monitor_daily_rollups:${stableId(`daily_${tenantId}_2026-06-01`)}`, { $id: stableId(`daily_${tenantId}_2026-06-01`) });
+  db.documents.set(`monitor_bot_rollups:${stableId(`bot_${tenantId}_${botId}`)}`, { $id: stableId(`bot_${tenantId}_${botId}`) });
+}
+
+function stableId(value) {
+  const clean = value.replace(/[^a-zA-Z0-9_.-]/g, "_");
+  const hash = createHash("sha1").update(value).digest("hex").slice(0, 10);
+  return `${clean.slice(0, 25)}_${hash}`.slice(0, 36);
 }
