@@ -101,6 +101,27 @@ test("recordSessionStatusChanged does not decrement old status when rollup is mi
   assert.match(tenantUpdate.data.paused_sessions, /"values":\[1\]/);
 });
 
+test("recordSessionStatusChanged skips old status decrement when existing counter is zero", async () => {
+  const db = createFakeDatabase();
+  seedRollups(db, "tenant_1", "bot_1", { active_sessions: 0 });
+
+  await recordSessionStatusChanged(
+    db,
+    "active",
+    "closed",
+    {
+      $id: "session_1",
+      tenant_id: "tenant_1",
+      $createdAt: "",
+      $updatedAt: "",
+    },
+  );
+
+  const tenantUpdate = db.updates.find((update) => update.collectionId === "monitor_tenant_rollups");
+  assert.equal("active_sessions" in tenantUpdate.data, false);
+  assert.match(tenantUpdate.data.closed_sessions, /"values":\[1\]/);
+});
+
 function createFakeDatabase() {
   const documents = new Map();
   const updates = [];
@@ -137,8 +158,14 @@ function createFakeDatabase() {
   };
 }
 
-function seedRollups(db, tenantId, botId) {
-  db.documents.set(`monitor_tenant_rollups:${stableId(`tenant_${tenantId}`)}`, { $id: stableId(`tenant_${tenantId}`) });
+function seedRollups(db, tenantId, botId, tenantFields = {}) {
+  db.documents.set(`monitor_tenant_rollups:${stableId(`tenant_${tenantId}`)}`, {
+    $id: stableId(`tenant_${tenantId}`),
+    active_sessions: 1,
+    paused_sessions: 0,
+    closed_sessions: 0,
+    ...tenantFields,
+  });
   db.documents.set(`monitor_daily_rollups:${stableId(`daily_${tenantId}_2026-06-01`)}`, { $id: stableId(`daily_${tenantId}_2026-06-01`) });
   db.documents.set(`monitor_bot_rollups:${stableId(`bot_${tenantId}_${botId}`)}`, { $id: stableId(`bot_${tenantId}_${botId}`) });
 }

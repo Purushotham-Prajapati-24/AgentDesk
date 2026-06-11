@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 const SESSION_STATUSES = new Set(["active", "paused_by_human", "closed"]);
 const KEY_PREFIX = "agentdesk:session";
 let monitorCacheRedis = null;
+let monitorCacheConfigWarningLogged = false;
 
 export function createSessionStore(options = {}) {
   if (options.sessionState) {
@@ -171,13 +172,15 @@ async function updateStatusRollupBestEffort(databases, session, previousStatus, 
 
   try {
     const documentId = stableId(`tenant_${session.tenant_id}`);
-    const created = await ensureTenantRollup(databases, session.tenant_id, documentId);
+    const { created, document } = await ensureTenantRollup(databases, session.tenant_id, documentId);
+    const previousCounter = statusCounterKey(previousStatus);
+    const shouldDecrementPrevious = !created && numberValue(document?.[previousCounter]) > 0;
     const now = new Date().toISOString();
-    const update = {
-      [statusCounterKey(previousStatus)]: Operator.increment(created ? 0 : -1),
-      [statusCounterKey(nextStatus)]: Operator.increment(1),
-      updated: now,
-    };
+    const update = incrementPayload({
+      [previousCounter]: shouldDecrementPrevious ? -1 : 0,
+      [statusCounterKey(nextStatus)]: 1,
+    });
+    update.updated = now;
     if (nextStatus === "paused_by_human") {
       update.handoffs = Operator.increment(1);
     }
@@ -238,15 +241,15 @@ async function updateAgentMessageRollupBestEffort(databases, session, content, c
 
 async function ensureTenantRollup(databases, tenantId, documentId) {
   try {
-    await databases.getDocument(databaseId(), tenantRollupsCollectionId(), documentId);
-    return false;
+    const document = await databases.getDocument(databaseId(), tenantRollupsCollectionId(), documentId);
+    return { created: false, document };
   } catch (error) {
     if (error.code !== 404) {
       throw error;
     }
 
     try {
-      await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
+      const document = await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
         tenant_id: tenantId,
         conversations: 0,
         active_sessions: 0,
@@ -261,13 +264,14 @@ async function ensureTenantRollup(databases, tenantId, documentId) {
         credit_balance: 0,
         updated: new Date().toISOString(),
       });
+      return { created: true, document };
     } catch (createError) {
       if (createError.code !== 409) {
         throw createError;
       }
-      return false;
+      const document = await databases.getDocument(databaseId(), tenantRollupsCollectionId(), documentId);
+      return { created: false, document };
     }
-    return true;
   }
 }
 
@@ -329,6 +333,10 @@ async function ensureBotRollup(databases, tenantId, botId, documentId) {
 
 async function invalidateMonitorCache(tenantId) {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    if (!monitorCacheConfigWarningLogged) {
+      console.warn("[session-store] monitor cache invalidation skipped because Upstash Redis REST is not configured.");
+      monitorCacheConfigWarningLogged = true;
+    }
     return;
   }
 
@@ -364,6 +372,18 @@ async function* scanKeys(redis, pattern) {
 
 function statusCounterKey(status) {
   return status === "paused_by_human" ? "paused_sessions" : `${status}_sessions`;
+}
+
+function incrementPayload(increments) {
+  return Object.fromEntries(
+    Object.entries(increments)
+      .filter(([, value]) => Number.isFinite(value) && value !== 0)
+      .map(([key, value]) => [key, Operator.increment(value)]),
+  );
+}
+
+function numberValue(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function stableId(value) {

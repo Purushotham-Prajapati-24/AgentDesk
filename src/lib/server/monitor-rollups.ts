@@ -132,10 +132,11 @@ export async function recordSessionStatusChanged(
   }
 
   const documentId = tenantRollupId(tenantId);
-  const created = await ensureTenantRollupDocument(databases, tenantId);
+  const { created, document } = await ensureTenantRollupDocument(databases, tenantId);
+  const shouldDecrementPrevious = !created && numberValue((document as TenantRollupDocument)[statusCounterKey(previous)]) > 0;
 
   await incrementDocument(databases, tenantRollupsCollectionId(), documentId, {
-    [statusCounterKey(previous)]: created ? 0 : -1,
+    [statusCounterKey(previous)]: shouldDecrementPrevious ? -1 : 0,
     [statusCounterKey(next)]: 1,
     handoffs: next === "paused_by_human" ? 1 : 0,
   });
@@ -374,22 +375,23 @@ async function ensureRollupDocument(
   data: Record<string, unknown>,
 ) {
   try {
-    await databases.getDocument(databaseId(), collectionId, documentId);
-    return false;
+    const document = await databases.getDocument(databaseId(), collectionId, documentId);
+    return { created: false, document };
   } catch (error) {
     if (errorCode(error) !== 404) {
       throw error;
     }
 
     try {
-      await databases.createDocument(databaseId(), collectionId, documentId, data);
+      const document = await databases.createDocument(databaseId(), collectionId, documentId, data);
+      return { created: true, document };
     } catch (createError) {
       if (errorCode(createError) !== 409) {
         throw createError;
       }
-      return false;
+      const document = await databases.getDocument(databaseId(), collectionId, documentId);
+      return { created: false, document };
     }
-    return true;
   }
 }
 
@@ -452,7 +454,7 @@ function cacheTenantPart(tenantId: string) {
   return createHash("sha1").update(tenantId).digest("hex").slice(0, 16);
 }
 
-function statusCounterKey(status: MonitorSessionStatus) {
+function statusCounterKey(status: MonitorSessionStatus): "active_sessions" | "paused_sessions" | "closed_sessions" {
   return status === "paused_by_human" ? "paused_sessions" : `${status}_sessions`;
 }
 
@@ -485,7 +487,12 @@ function numberValue(value: unknown) {
 }
 
 function errorCode(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error ? Number((error as { code?: unknown }).code) : 0;
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return 0;
+  }
+
+  const code = Number((error as { code?: unknown }).code);
+  return Number.isFinite(code) ? code : 0;
 }
 
 function getUnknownAttribute(error: unknown) {

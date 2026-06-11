@@ -5,7 +5,7 @@ import { createChunks } from "@/lib/server/chunking";
 import { WebsiteCrawler } from "@/lib/server/crawler";
 import { createEmbeddings } from "@/lib/server/embeddings";
 import { claimIngestionLock, createWorkerId, releaseIngestionLock } from "@/lib/server/ingestion-locks";
-import { recordDocumentStorageAdded } from "@/lib/server/monitor-rollups";
+import { recordDocumentStorageAdded, recordDocumentStorageRemoved } from "@/lib/server/monitor-rollups";
 import { upsertKnowledgePoints } from "@/lib/server/qdrant";
 
 type IngestRequest = {
@@ -166,6 +166,8 @@ async function crawlQueuedDocument(
       throw new Error("No readable text could be extracted from this URL.");
     }
     const markdownBytes = Buffer.byteLength(markdown, "utf8");
+    const previousBytes = numberValue(document.file_size, 0);
+    const storageDelta = markdownBytes - previousBytes;
 
     await updateDocumentCompat(databases, document.$id, {
       parsed_text: markdown,
@@ -174,9 +176,12 @@ async function crawlQueuedDocument(
       last_error: "",
       updated: new Date().toISOString(),
     });
-    await recordBestEffort("document storage rollup", () =>
-      recordDocumentStorageAdded(databases, stringValue(document.tenant_id, ""), markdownBytes),
-    );
+    await recordBestEffort("document storage rollup", () => {
+      const tenantId = stringValue(document.tenant_id, "");
+      return storageDelta >= 0
+        ? recordDocumentStorageAdded(databases, tenantId, storageDelta)
+        : recordDocumentStorageRemoved(databases, tenantId, Math.abs(storageDelta));
+    });
 
     document.parsed_text = markdown;
     document.file_size = markdownBytes;

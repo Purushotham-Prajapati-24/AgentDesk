@@ -2,6 +2,10 @@ import { createAdminClient } from "./appwrite";
 import { tenantAllowsUser, type TenantDocument } from "./auth-tenants";
 import { cache } from "react";
 
+/**
+ * Authorizes a user for a tenant. Per-document permissions are preferred, while
+ * prefs.tenant_id remains as a legacy fallback until older tenants are migrated.
+ */
 export const getAuthorizedTenantDocument = cache(async function getAuthorizedTenantDocument(userId: string, tenantId: string) {
   const { databases, users } = await createAdminClient();
   const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
