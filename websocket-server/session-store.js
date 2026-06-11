@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 
 const SESSION_STATUSES = new Set(["active", "paused_by_human", "closed"]);
 const KEY_PREFIX = "agentdesk:session";
+let monitorCacheRedis = null;
 
 export function createSessionStore(options = {}) {
   if (options.sessionState) {
@@ -200,10 +201,7 @@ async function invalidateMonitorCache(tenantId) {
     return;
   }
 
-  const redis = new UpstashRedis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
+  const redis = getMonitorCacheRedis();
   for (const scope of ["conversations", "users", "analytics"]) {
     for await (const keys of scanKeys(redis, `monitor:${tenantId}:${scope}:*`)) {
       if (keys.length > 0) {
@@ -211,6 +209,17 @@ async function invalidateMonitorCache(tenantId) {
       }
     }
   }
+}
+
+function getMonitorCacheRedis() {
+  if (!monitorCacheRedis) {
+    monitorCacheRedis = new UpstashRedis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
+
+  return monitorCacheRedis;
 }
 
 async function* scanKeys(redis, pattern) {

@@ -181,6 +181,15 @@ export async function recordDocumentStorageAdded(databases: RollupDatabases, ten
   await invalidateMonitorCache(tenantId, ["analytics"]);
 }
 
+export async function recordDocumentStorageRemoved(databases: RollupDatabases, tenantId: string, bytes: number) {
+  if (!tenantId || !Number.isFinite(bytes) || bytes <= 0) {
+    return;
+  }
+
+  await incrementTenantRollup(databases, tenantId, { document_storage_bytes: -Math.round(bytes) });
+  await invalidateMonitorCache(tenantId, ["analytics"]);
+}
+
 export async function recordCreditLedgerEntry(databases: RollupDatabases, tenantId: string, amount: number) {
   if (!tenantId || !Number.isFinite(amount) || amount === 0) {
     return;
@@ -284,16 +293,16 @@ export function monitorCachePrefix(tenantId: string, scope: "conversations" | "u
 
 function buildRecentActivityFromRollups(rollups: DailyRollupDocument[]) {
   const byDate = new Map(rollups.map((rollup) => [stringValue(rollup.date, ""), numberValue(rollup.messages)]));
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - index));
-    return date;
+    return new Date(todayUtc - (6 - index) * 24 * 60 * 60 * 1000);
   });
 
   return days.map((date) => {
     const key = dateKey(date);
     return {
-      label: date.toLocaleDateString("en-US", { weekday: "short" }),
+      label: date.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }),
       value: byDate.get(key) ?? 0,
     };
   });

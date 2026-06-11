@@ -1,6 +1,7 @@
 "use server";
 
 import { Query, type Models } from "node-appwrite";
+import { createHash } from "node:crypto";
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { getCachedJson, setCachedJson } from "@/lib/server/monitor-cache";
@@ -529,7 +530,12 @@ function numberValue(value: unknown) {
 }
 
 function stableCachePart(value: string) {
-  return encodeURIComponent(value.trim().slice(0, 120) || "none");
+  const normalized = value.trim().slice(0, 1000);
+  if (!normalized) {
+    return "none";
+  }
+
+  return createHash("sha1").update(normalized).digest("hex").slice(0, 16);
 }
 
 function databaseId() {

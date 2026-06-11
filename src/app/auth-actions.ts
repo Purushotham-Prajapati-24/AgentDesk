@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { mapTenantDocument, tenantRoleForUser, type TenantDocument } from "@/lib/server/auth-tenants";
+import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser, type TenantDocument } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
@@ -97,7 +97,7 @@ export async function getCurrentTenant(): Promise<{ success: true; tenant: AuthT
 
     if (tenantId) {
       const tenant = await getAuthorizedTenantDocument(user.$id, tenantId);
-      const role = tenantRoleForUser(tenant, user.$id);
+      const role = normalizeTenantRole(prefs.role) ?? tenantRoleForUser(tenant, user.$id);
       return { success: true, tenant: mapTenantDocument(tenant, role) };
     }
 
@@ -164,7 +164,7 @@ async function ensureTenantForUser(userId: string): Promise<{ success: true; ten
     const user = await users.get(userId);
     const prefs = user.prefs as AuthUser["prefs"];
     let tenantId = typeof prefs.tenant_id === "string" ? prefs.tenant_id : "";
-    let role: AuthTenant["role"] = "agent";
+    let role: AuthTenant["role"] = normalizeTenantRole(prefs.role) ?? "agent";
 
     if (!tenantId) {
       tenantId = ID.unique();
@@ -196,7 +196,15 @@ async function ensureTenantForUser(userId: string): Promise<{ success: true; ten
     const tenant = tenantId
       ? await getAuthorizedTenantDocument(userId, tenantId)
       : ((await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument);
-    role = tenantRoleForUser(tenant, userId);
+    const inferredRole = tenantRoleForUser(tenant, userId);
+    role = normalizeTenantRole(prefs.role) ?? inferredRole;
+    if (!normalizeTenantRole(prefs.role)) {
+      await users.updatePrefs(userId, {
+        ...prefs,
+        tenant_id: tenantId,
+        role,
+      });
+    }
     return {
       success: true,
       tenant: mapTenantDocument(tenant, role),

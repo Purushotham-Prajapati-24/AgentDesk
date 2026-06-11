@@ -23,6 +23,10 @@ export function tenantRoleForUser(tenant: TenantDocument, userId: string): Tenan
   return tenantAllowsUser(tenant, userId, "update") || tenantAllowsUser(tenant, userId, "delete") ? "admin" : "agent";
 }
 
+export function normalizeTenantRole(value: unknown): TenantRole | null {
+  return value === "admin" || value === "agent" ? value : null;
+}
+
 export function tenantAllowsUser(tenant: TenantDocument, userId: string, action: "read" | "update" | "delete") {
   return Array.isArray(tenant.$permissions) && tenant.$permissions.includes(`${action}("user:${userId}")`);
 }

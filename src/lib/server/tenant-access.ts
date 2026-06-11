@@ -1,7 +1,8 @@
 import { createAdminClient } from "./appwrite";
 import { tenantAllowsUser, type TenantDocument } from "./auth-tenants";
+import { cache } from "react";
 
-export async function getAuthorizedTenantDocument(userId: string, tenantId: string) {
+export const getAuthorizedTenantDocument = cache(async function getAuthorizedTenantDocument(userId: string, tenantId: string) {
   const { databases } = await createAdminClient();
   const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
   if (!tenantAllowsUser(tenant, userId, "read")) {
@@ -9,7 +10,7 @@ export async function getAuthorizedTenantDocument(userId: string, tenantId: stri
   }
 
   return tenant;
-}
+});
 
 function databaseId() {
   return process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.APPWRITE_DATABASE_ID || "agentdesk";

@@ -75,6 +75,33 @@ async function createIndex(collectionId, key, type, attributes) {
   }
 }
 
+async function waitForAttributes(collectionId, keys) {
+  const pending = new Set(keys);
+  const deadline = Date.now() + 60000;
+
+  while (pending.size > 0) {
+    const collection = await databases.getCollection(databaseId, collectionId);
+    const available = new Set((collection.attributes ?? []).filter((attribute) => attribute.status === "available").map((attribute) => attribute.key));
+
+    for (const key of pending) {
+      if (available.has(key)) {
+        pending.delete(key);
+      }
+    }
+
+    if (pending.size === 0) {
+      return;
+    }
+
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for attributes on ${collectionId}: ${Array.from(pending).join(", ")}`);
+    }
+
+    console.log(`Waiting for ${collectionId} attributes: ${Array.from(pending).join(", ")}...`);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
 async function addSessionSummaryFields() {
   await createIntegerAttribute(sessionsCollectionId, "message_count", false, 0);
   await createIntegerAttribute(sessionsCollectionId, "customer_message_count", false, 0);
@@ -123,6 +150,11 @@ async function addBotRollupFields() {
 }
 
 async function addIndexes() {
+  await waitForAttributes(sessionsCollectionId, ["tenant_id", "updated", "status", "session_token", "bot_id"]);
+  await waitForAttributes(tenantRollupsCollectionId, ["tenant_id"]);
+  await waitForAttributes(dailyRollupsCollectionId, ["tenant_id", "date"]);
+  await waitForAttributes(botRollupsCollectionId, ["tenant_id", "bot_id"]);
+
   await createIndex(sessionsCollectionId, "tenant_id_idx", "key", ["tenant_id"]);
   await createIndex(sessionsCollectionId, "updated_idx", "key", ["updated"]);
   await createIndex(sessionsCollectionId, "status_idx", "key", ["status"]);
@@ -140,9 +172,6 @@ async function run() {
   await addTenantRollupFields();
   await addDailyRollupFields();
   await addBotRollupFields();
-
-  console.log("Waiting for Appwrite attributes to become available...");
-  await new Promise((resolve) => setTimeout(resolve, 5000));
 
   await addIndexes();
   console.log("Monitor performance schema is ready.");

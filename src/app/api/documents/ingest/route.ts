@@ -166,7 +166,6 @@ async function crawlQueuedDocument(
       throw new Error("No readable text could be extracted from this URL.");
     }
     const markdownBytes = Buffer.byteLength(markdown, "utf8");
-    const storageDelta = numberValue(document.file_size, 0) > 0 ? 0 : markdownBytes;
 
     await updateDocumentCompat(databases, document.$id, {
       parsed_text: markdown,
@@ -176,7 +175,7 @@ async function crawlQueuedDocument(
       updated: new Date().toISOString(),
     });
     await recordBestEffort("document storage rollup", () =>
-      recordDocumentStorageAdded(databases, stringValue(document.tenant_id, ""), storageDelta),
+      recordDocumentStorageAdded(databases, stringValue(document.tenant_id, ""), markdownBytes),
     );
 
     document.parsed_text = markdown;
