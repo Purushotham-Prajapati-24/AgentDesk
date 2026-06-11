@@ -1,7 +1,9 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { deleteKnowledgePointsForBot } from "@/lib/server/qdrant";
+import { recordDocumentStorageRemoved } from "@/lib/server/monitor-rollups";
 import { ID, Query, type Models } from "node-appwrite";
 
 type BotDocument = Models.Document & {
@@ -13,7 +15,9 @@ type BotDocument = Models.Document & {
 };
 
 type StoredDocument = Models.Document & {
+  tenant_id?: unknown;
   storage_path?: unknown;
+  file_size?: unknown;
 };
 
 type BotInput = {
@@ -140,6 +144,9 @@ async function deleteBotDocuments(
       }
 
       await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
+      await recordBestEffort("document storage rollup", () =>
+        recordDocumentStorageRemoved(databases, stringValue(document.tenant_id, tenantId), numberValue(document.file_size, 0)),
+      );
     }
   } catch (error: unknown) {
     if (!isMissingResourceError(error)) {
@@ -178,10 +185,7 @@ async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessi
   }
 
   const user = await account.get();
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await getAuthorizedTenantDocument(user.$id, tenantId);
 }
 
 async function assertBotTenant(
@@ -260,6 +264,10 @@ function stringValue(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
+function numberValue(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function isSafeId(value: string) {
   return /^[a-zA-Z0-9_-]{3,160}$/.test(value);
 }
@@ -275,4 +283,12 @@ function isMissingResourceError(error: unknown) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Bot request failed.";
+}
+
+async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
+  try {
+    await callback();
+  } catch (error) {
+    console.warn(`[bot-actions] ${label} update failed`, error);
+  }
 }

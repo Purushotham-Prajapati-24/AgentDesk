@@ -2,6 +2,8 @@
 
 import { Query, type Models } from "node-appwrite";
 import { createSessionClient } from "@/lib/server/appwrite";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
+import { mapSessionSummary } from "@/lib/server/monitor-rollups";
 
 export type ConversationSummary = {
   id: string;
@@ -28,6 +30,13 @@ type SessionDocument = Models.Document & {
   session_token?: unknown;
   status?: unknown;
   updated?: unknown;
+  message_count?: unknown;
+  customer_message_count?: unknown;
+  bot_message_count?: unknown;
+  agent_message_count?: unknown;
+  last_message_content?: unknown;
+  last_sender?: unknown;
+  last_message_at?: unknown;
 };
 
 type MessageDocument = Models.Document & {
@@ -61,7 +70,7 @@ export async function listConversationSessions({
     const visibleSessions = sessions.documents.slice(0, PAGE_LIMIT) as SessionDocument[];
     const nextCursor = sessions.documents.length > PAGE_LIMIT ? visibleSessions.at(-1)?.$id ?? null : null;
 
-    const summaries = await Promise.all(visibleSessions.map((session) => summarizeSession(databases, session, tenantId)));
+    const summaries = visibleSessions.map(mapConversationSummary);
     return { success: true, data: { sessions: summaries, nextCursor } };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load conversation history." };
@@ -130,39 +139,6 @@ async function fetchSessions(
   }
 }
 
-async function summarizeSession(
-  databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
-  session: SessionDocument,
-  tenantId: string,
-): Promise<ConversationSummary> {
-  const [lastMessages, messageCount] = await Promise.all([
-    databases.listDocuments(databaseId(), messagesCollectionId(), [
-      Query.equal("tenant_id", tenantId),
-      Query.equal("session_id", session.$id),
-      Query.orderDesc("created"),
-      Query.limit(1),
-    ]),
-    databases.listDocuments(databaseId(), messagesCollectionId(), [
-      Query.equal("tenant_id", tenantId),
-      Query.equal("session_id", session.$id),
-      Query.limit(1),
-    ]),
-  ]);
-
-  const lastMessage = lastMessages.documents[0] as MessageDocument | undefined;
-  return {
-    id: session.$id,
-    tenantId,
-    botId: stringValue(session.bot_id, ""),
-    sessionToken: stringValue(session.session_token, session.$id),
-    status: sessionStatus(session.status),
-    updatedAt: stringValue(session.updated, session.$updatedAt),
-    lastMessage: stringValue(lastMessage?.content, "No messages recorded yet."),
-    lastSender: messageSender(lastMessage?.sender),
-    messageCount: messageCount.total,
-  };
-}
-
 async function assertSessionTenant(
   databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
   tenantId: string,
@@ -184,10 +160,7 @@ async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessi
   }
 
   const user = await account.get();
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await getAuthorizedTenantDocument(user.$id, tenantId);
 }
 
 function mapMessage(document: MessageDocument): ConversationMessage {
@@ -200,8 +173,19 @@ function mapMessage(document: MessageDocument): ConversationMessage {
   };
 }
 
-function sessionStatus(value: unknown): ConversationSummary["status"] {
-  return value === "paused_by_human" || value === "closed" ? value : "active";
+function mapConversationSummary(session: SessionDocument): ConversationSummary {
+  const summary = mapSessionSummary(session);
+  return {
+    id: summary.id,
+    tenantId: summary.tenantId,
+    botId: summary.botId,
+    sessionToken: summary.sessionToken,
+    status: summary.status,
+    updatedAt: summary.updatedAt,
+    lastMessage: summary.lastMessage,
+    lastSender: summary.lastSender,
+    messageCount: summary.messageCount,
+  };
 }
 
 function messageSender(value: unknown): ConversationSummary["lastSender"] {

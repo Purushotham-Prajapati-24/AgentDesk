@@ -2,6 +2,8 @@ import { ID, type Users } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 import { createAdminClient } from "@/lib/server/appwrite";
 import { getDocumentType, parseDocument, SUPPORTED_DOCUMENT_TYPES, type SupportedDocumentType } from "@/lib/server/document-parser";
+import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
+import { recordDocumentStorageAdded } from "@/lib/server/monitor-rollups";
 
 type UploadMetadata = {
   tenant_id: string;
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
     };
 
     const document = await databases.createDocument(databaseId(), documentsCollectionId(), ID.unique(), metadata);
+    await recordBestEffort("document storage rollup", () => recordDocumentStorageAdded(databases, tenantId, file.size));
     return Response.json({ success: true, data: { document_id: document.$id, ...metadata } }, { status: 201 });
   } catch (error: unknown) {
     return jsonError("UPLOAD_FAILED", getErrorMessage(error), 500);
@@ -72,11 +75,8 @@ export async function POST(request: Request) {
 }
 
 async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
-  const user = await users.get(userId);
-  const prefs = user.prefs as { tenant_id?: string };
-  if (prefs.tenant_id !== tenantId) {
-    throw new Error("You do not have access to this tenant.");
-  }
+  await users.get(userId);
+  await getAuthorizedTenantDocument(userId, tenantId);
 }
 
 function stringField(formData: FormData, key: string) {
@@ -118,4 +118,12 @@ function getErrorMessage(error: unknown) {
   }
 
   return error instanceof Error ? error.message : "Document upload failed.";
+}
+
+async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
+  try {
+    await callback();
+  } catch (error) {
+    console.warn(`[documents/upload] ${label} update failed`, error);
+  }
 }
