@@ -69,6 +69,40 @@ export function createHandoffServer(options = {}) {
     });
   });
 
+  app.post("/bot-message", async (request, response) => {
+    const room = parseRoomPayload(request.body);
+    if (!room.ok) {
+      response.status(422).json(errorBody("INVALID_ROOM", room.error));
+      return;
+    }
+
+    const token = typeof request.body?.token === "string" ? request.body.token : "";
+    if (!verifyHandoffToken(token, { ...room.value, role: "server" })) {
+      response.status(401).json(errorBody("UNAUTHORIZED", "A valid server handoff token is required."));
+      return;
+    }
+
+    const message = parseMessagePayload(request.body, "bot");
+    if (!message.ok) {
+      response.status(422).json(errorBody("INVALID_MESSAGE", message.error));
+      return;
+    }
+
+    const event = {
+      ...message.value,
+      tenant_id: room.value.tenant_id,
+      session_id: room.value.session_id,
+      created_at: new Date().toISOString(),
+    };
+
+    io.of(`/tenant-${room.value.tenant_id}`).to(roomName(room.value)).emit("bot-message", event);
+
+    response.status(200).json({
+      success: true,
+      data: event,
+    });
+  });
+
   io.of(/^\/tenant-[a-zA-Z0-9_-]+$/).on("connection", async (socket) => {
     const joinResult = joinSessionRoom(socket);
     if (!joinResult.ok) {

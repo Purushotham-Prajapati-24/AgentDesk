@@ -116,6 +116,7 @@ export async function POST(request: Request) {
         botId: parsed.value.bot_id,
       });
       void persistBotMessage(databases, parsed.value, fallbackMessage, 0);
+      void broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage);
       return streamStaticMessage(fallbackMessage);
     }
 
@@ -129,6 +130,7 @@ export async function POST(request: Request) {
       },
       onMessageComplete: (content, tokenCount) => {
         void persistBotMessage(databases, parsed.value, content || fallbackMessage, tokenCount);
+        void broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage);
       },
     });
   } catch {
@@ -534,5 +536,43 @@ async function checkRagPermission(tenantId: string, sessionId: string): Promise<
     return body.success && body.data ? body.data.shouldCallRag : true;
   } catch {
     return true;
+  }
+}
+
+async function broadcastBotMessage(tenantId: string, sessionId: string, content: string): Promise<boolean> {
+  const wsUrl = getServerWebSocketUrl();
+  if (!wsUrl) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(`${wsUrl}/bot-message`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        session_id: sessionId,
+        content,
+        token: createHandoffToken({
+          tenant_id: tenantId,
+          session_id: sessionId,
+          role: "server",
+          sub: "chat-route-broadcast",
+        }),
+      }),
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!response.ok) {
+      console.warn("[chat] failed to broadcast bot message", { status: response.status });
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn("[chat] failed to broadcast bot message", error);
+    return false;
   }
 }

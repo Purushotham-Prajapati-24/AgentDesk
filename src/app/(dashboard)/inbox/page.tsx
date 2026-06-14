@@ -269,7 +269,7 @@ export default function InboxPage() {
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  function updateRoom(event: FormEvent<HTMLFormElement>) {
+  async function updateRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isSafeId(draftRoom.tenantId) || !isSafeId(draftRoom.sessionId)) {
       setError("Tenant and session IDs must be 3-120 characters using letters, numbers, underscores, or hyphens.");
@@ -281,6 +281,32 @@ export default function InboxPage() {
     setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
+
+    setMessageLoading(true);
+    try {
+      const response = await listConversationMessages({
+        tenantId: draftRoom.tenantId,
+        sessionId: draftRoom.sessionId,
+      });
+
+      if (!response.success) {
+        setMessages([]);
+        return;
+      }
+
+      setMessages(
+        response.data.messages.map((message) => ({
+          id: message.id,
+          sender: message.sender,
+          content: message.content,
+          createdAt: message.createdAt,
+        })),
+      );
+    } catch (messageError) {
+      setMessages([]);
+    } finally {
+      setMessageLoading(false);
+    }
   }
 
   function searchHistory(event: FormEvent<HTMLFormElement>) {
@@ -980,8 +1006,8 @@ function LiveTranscriptPanel({
           <TranscriptMessagesSkeleton />
         ) : messages.length === 0 ? (
           <InboxEmptyState
-            title={selectedConversation ? "No messages recorded" : "No live session selected"}
-            description={selectedConversation ? "This session exists, but no messages have been persisted yet." : "Choose a conversation from history or connect a tenant-scoped room to watch support traffic."}
+            title={selectedConversation || room.sessionId !== "session_demo" ? "No messages recorded" : "No live session selected"}
+            description={selectedConversation || room.sessionId !== "session_demo" ? "This session exists, but no messages have been persisted yet." : "Choose a conversation from history or connect a tenant-scoped room to watch support traffic."}
           />
         ) : (
           messages.map((message) => <MessageBubble key={message.id} message={message} />)
