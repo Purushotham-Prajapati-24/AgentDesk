@@ -103,9 +103,18 @@ export default function InboxPage() {
   const [mobilePanel, setMobilePanel] = useState<MobileInboxPanel>("queue");
   const socketRef = useRef<Socket | null>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
+  // Tracks whether the one-time initial auto-select has already fired.
+  // Prevents updateRoom() + history re-fetch from overwriting a manual selection.
+  const initialAutoSelectedRef = useRef(false);
 
   useEffect(() => {
     if (!WEB_SOCKET_URL) {
+      return;
+    }
+
+    // Skip connecting while the room still holds placeholder demo values — a real session
+    // will be auto-selected by the history effect and will update `room` appropriately.
+    if (room.tenantId === DEFAULT_ROOM.tenantId || room.sessionId === DEFAULT_ROOM.sessionId) {
       return;
     }
 
@@ -141,11 +150,31 @@ export default function InboxPage() {
         return;
       }
 
+      const tokenResponse = await fetch("/api/handoff/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: room.tenantId,
+          session_id: room.sessionId,
+        }),
+        signal: abortController.signal,
+      });
+      const tokenBody = (await tokenResponse.json()) as
+        | { success: true; data: { token: string } }
+        | { success: false; error: { message: string } };
+      if (!tokenResponse.ok || !tokenBody.success) {
+        setSocketStatus("disconnected");
+        setError(tokenBody.success ? "Unable to authorize live handoff." : tokenBody.error.message);
+        return;
+      }
+
       const namespace = `${wsUrl}/tenant-${room.tenantId}`;
       socket = io(namespace, {
         auth: {
           tenant_id: room.tenantId,
           session_id: room.sessionId,
+          role: "agent",
+          agent_token: tokenBody.data.token,
         },
         reconnectionAttempts: 5,
         timeout: 8000,
@@ -206,8 +235,21 @@ export default function InboxPage() {
 
       setHistoryLoading(false);
       if (response.success) {
-        setHistory(response.data.sessions);
+        const sessions = response.data.sessions;
+        setHistory(sessions);
         setHistoryNextCursor(response.data.nextCursor);
+
+        // Auto-select the most recent session only once on initial load.
+        // The ref ensures that if updateRoom() later clears selectedConversationId
+        // and triggers a history re-fetch, we do NOT overwrite the new manual selection.
+        if (!initialAutoSelectedRef.current && sessions.length > 0) {
+          initialAutoSelectedRef.current = true;
+          const first = sessions[0];
+          setSelectedConversationId(first.id);
+          setSessionStatus(first.status);
+          setDraftRoom({ tenantId: first.tenantId, sessionId: first.sessionToken });
+          setRoom({ tenantId: first.tenantId, sessionId: first.sessionToken });
+        }
       } else {
         setHistory([]);
         setHistoryNextCursor(null);
@@ -922,11 +964,13 @@ function LiveTranscriptPanel({
         </Button>
       </div>
 
-      {wakingUp && !error ? (
-        <Notice tone="warn" message="Waking up the live handoff server. Render cold starts can take about 30 seconds." />
-      ) : error ? (
-        <Notice tone="danger" message={error} />
-      ) : null}
+      {room.tenantId !== DEFAULT_ROOM.tenantId && room.sessionId !== DEFAULT_ROOM.sessionId && (
+        wakingUp && !error ? (
+          <Notice tone="warn" message="Waking up the live handoff server. Render cold starts can take about 30 seconds." />
+        ) : error ? (
+          <Notice tone="danger" message={error} />
+        ) : null
+      )}
 
       <div ref={feedRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--ui-bg)] p-4">
         {messageLoading ? (

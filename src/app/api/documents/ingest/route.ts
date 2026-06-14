@@ -1,17 +1,16 @@
-import { Query, type Models, type Users } from "node-appwrite";
+import { Query, type Models } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { createChunks } from "@/lib/server/chunking";
 import { WebsiteCrawler } from "@/lib/server/crawler";
 import { createEmbeddings } from "@/lib/server/embeddings";
 import { claimIngestionLock, createWorkerId, releaseIngestionLock } from "@/lib/server/ingestion-locks";
 import { recordDocumentStorageAdded, recordDocumentStorageRemoved } from "@/lib/server/monitor-rollups";
 import { upsertKnowledgePoints } from "@/lib/server/qdrant";
+import { requireAuthenticatedTenant } from "@/lib/server/route-auth";
 
 type IngestRequest = {
   tenant_id: string;
   bot_id: string;
-  user_id?: string;
   limit?: number;
   worker_id?: string;
 };
@@ -39,17 +38,22 @@ export async function POST(request: Request) {
 
   const tenantId = typeof body.tenant_id === "string" ? body.tenant_id.trim() : "";
   const botId = typeof body.bot_id === "string" ? body.bot_id.trim() : "";
-  const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
   const limit = typeof body.limit === "number" ? Math.min(Math.max(body.limit, 1), 3) : 1;
   const workerId = isSafeWorkerId(body.worker_id) ? body.worker_id : createWorkerId();
 
-  if (!isSafeId(tenantId) || !isSafeId(botId) || !userId) {
-    return jsonError("INVALID_SCOPE", "tenant_id, bot_id, and user_id are required.", 422);
+  if (!isSafeId(tenantId) || !isSafeId(botId)) {
+    return jsonError("INVALID_SCOPE", "tenant_id and bot_id are required.", 422);
   }
 
   try {
-    const { users, databases } = await createAdminClient();
-    await assertTenantAccess(users, userId, tenantId);
+    await requireAuthenticatedTenant(tenantId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to authorize tenant access.";
+    return jsonError("UNAUTHORIZED", message, 401);
+  }
+
+  try {
+    const { databases } = await createAdminClient();
 
     const documents = await listPendingDocuments(databases, tenantId, botId, limit);
 
@@ -261,11 +265,6 @@ async function updateDocumentCompat(
       delete remaining[unknownAttribute];
     }
   }
-}
-
-async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
-  await users.get(userId);
-  await getAuthorizedTenantDocument(userId, tenantId);
 }
 
 function databaseId() {

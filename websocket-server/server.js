@@ -12,6 +12,8 @@ import {
   persistAppwriteSessionStatus,
   readAppwriteSessionStatus,
 } from "./session-store.js";
+import { verifyHandoffToken, decodeHandoffTokenPayload } from "../src/lib/server/handoff-token-core.js";
+
 
 const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
 const DEFAULT_CORS_ORIGIN = "*";
@@ -49,6 +51,12 @@ export function createHandoffServer(options = {}) {
     const room = parseRoomPayload(request.body);
     if (!room.ok) {
       response.status(422).json(errorBody("INVALID_ROOM", room.error));
+      return;
+    }
+
+    const token = typeof request.body?.token === "string" ? request.body.token : "";
+    if (!verifyHandoffToken(token, { ...room.value, role: "server" })) {
+      response.status(401).json(errorBody("UNAUTHORIZED", "A valid server handoff token is required."));
       return;
     }
 
@@ -112,6 +120,11 @@ async function handleCustomerMessage(socket, sessionStore, room, payload, acknow
 }
 
 async function handleAgentMessage(socket, room, payload, acknowledge, persistAgentMessage) {
+  if (room.role !== "agent") {
+    acknowledge?.(errorBody("UNAUTHORIZED", "Agent authentication is required."));
+    return;
+  }
+
   const message = parseMessagePayload(payload, "agent");
   if (!message.ok) {
     acknowledge?.(errorBody("INVALID_MESSAGE", message.error));
@@ -146,6 +159,11 @@ async function handleAgentMessage(socket, room, payload, acknowledge, persistAge
 }
 
 async function handleStatusToggle(socket, sessionStore, room, payload, acknowledge) {
+  if (room.role !== "agent") {
+    acknowledge?.(errorBody("UNAUTHORIZED", "Agent authentication is required."));
+    return;
+  }
+
   const status = typeof payload?.status === "string" ? payload.status : "";
   if (!SESSION_STATUSES.has(status)) {
     acknowledge?.(errorBody("INVALID_STATUS", "Status must be active, paused_by_human, or closed."));
@@ -183,6 +201,8 @@ function joinSessionRoom(socket) {
   const tenantId = readHandshakeValue(socket, "tenant_id");
   const sessionId = readHandshakeValue(socket, "session_id");
   const namespaceTenantId = socket.nsp.name.replace(/^\/tenant-/, "");
+  const requestedRole = readHandshakeValue(socket, "role");
+  const role = requestedRole === "agent" ? "agent" : "customer";
 
   if (!isSafeId(tenantId) || !isSafeId(sessionId)) {
     return { ok: false, error: "tenant_id and session_id are required." };
@@ -192,7 +212,22 @@ function joinSessionRoom(socket) {
     return { ok: false, error: "Namespace tenant does not match handshake tenant." };
   }
 
-  return { ok: true, value: { tenant_id: tenantId, session_id: sessionId } };
+  if (role === "agent") {
+    const token = socket.handshake.auth?.agent_token;
+    if (!verifyHandoffToken(token, { tenant_id: tenantId, session_id: sessionId, role: "agent" })) {
+      return { ok: false, error: "A valid agent handoff token is required." };
+    }
+    // Audit log: record which user connected as an agent for this session.
+    const payload = decodeHandoffTokenPayload(token);
+    console.log("[handoff] agent connected", {
+      tenant_id: tenantId,
+      session_id: sessionId,
+      agent_user_id: payload?.sub ?? "unknown",
+      jti: payload?.jti ?? "unknown",
+    });
+  }
+
+  return { ok: true, value: { tenant_id: tenantId, session_id: sessionId, role } };
 }
 
 function parseRoomPayload(payload) {
@@ -287,6 +322,7 @@ function errorBody(code, message) {
   };
 }
 
+
 async function configureRedisAdapter(io) {
   const redisUrl = process.env.SOCKET_IO_REDIS_URL;
   if (!redisUrl) {
@@ -309,6 +345,9 @@ async function configureRedisAdapter(io) {
 
 const isEntrypoint = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
 if (isEntrypoint) {
+  if (!process.env.HANDOFF_TOKEN_SECRET) {
+    throw new Error("HANDOFF_TOKEN_SECRET must be configured for the websocket server.");
+  }
   const { server } = createHandoffServer();
   server.listen(PORT, () => {
     console.info(`AgentDesk websocket server listening on ${PORT}`);

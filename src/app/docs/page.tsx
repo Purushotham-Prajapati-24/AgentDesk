@@ -71,7 +71,10 @@ export default function DocsPage() {
   const [snippetHost, setSnippetHost] = useState<string>("https://agentdeskbot.vercel.app");
 
   useEffect(() => {
-    setSnippetHost(window.location.origin);
+    const updateSnippetHost = () => setSnippetHost(window.location.origin);
+    updateSnippetHost();
+    window.addEventListener("popstate", updateSnippetHost);
+    return () => window.removeEventListener("popstate", updateSnippetHost);
   }, []);
 
   const copyToClipboard = useCallback((text: string, id: string) => {

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { WebChatConfigPatchSchema } from "@/lib/webchat-config";
-import { updateWebChatConfig } from "@/lib/server/webchat-config-store";
+import { getWebChatConfig, updateWebChatConfig } from "@/lib/server/webchat-config-store";
+import { requireAuthenticatedTenant } from "@/lib/server/route-auth";
+import { createAdminClient } from "@/lib/server/appwrite";
+
+type WebChatConfigUpdatePayload = {
+  tenant_id?: unknown;
+  config?: unknown;
+};
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -20,7 +27,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const parsedPatch = WebChatConfigPatchSchema.safeParse(payload);
+  const updatePayload = payload as WebChatConfigUpdatePayload;
+  const tenantId = typeof updatePayload?.tenant_id === "string" ? updatePayload.tenant_id.trim() : "";
+  if (!isSafeId(tenantId)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "INVALID_SCOPE",
+          message: "tenant_id is required to update WebChat configuration.",
+        },
+      },
+      { status: 422 },
+    );
+  }
+
+  const parsedPatch = WebChatConfigPatchSchema.safeParse(updatePayload.config);
   if (!parsedPatch.success) {
     return NextResponse.json(
       {
@@ -35,7 +57,72 @@ export async function POST(request: Request) {
     );
   }
 
-  const config = await updateWebChatConfig(parsedPatch.data);
+  try {
+    await requireAuthenticatedTenant(tenantId);
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication is required to update WebChat configuration.",
+        },
+      },
+      { status: 401 },
+    );
+  }
+
+  const currentConfig = await getWebChatConfig(tenantId);
+  const botIdToCheck = parsedPatch.data.deploy?.botId || currentConfig.deploy.botId;
+
+  if (botIdToCheck) {
+    try {
+      const { databases } = await createAdminClient();
+      const bot = await databases.getDocument(
+        process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "agentdesk",
+        process.env.APPWRITE_BOTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID ?? "bots",
+        botIdToCheck
+      );
+      if (bot.tenant_id !== tenantId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "FORBIDDEN",
+              message: "You are not authorized to update configuration for this bot.",
+            },
+          },
+          { status: 403 },
+        );
+      }
+    } catch (error: any) {
+      if (error?.code === 404 || error?.status === 404 || error?.message?.includes("not found")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "The specified bot does not exist.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      // Return structured 500 error instead of throwing uncaught exception
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "DATABASE_ERROR",
+            message: error?.message ?? "An error occurred while fetching the bot document.",
+          },
+        },
+        { status: 500 },
+      );
+    }
+  }
+
+  const config = await updateWebChatConfig(tenantId, parsedPatch.data);
 
   return NextResponse.json({
     success: true,
@@ -43,4 +130,8 @@ export async function POST(request: Request) {
       config,
     },
   });
+}
+
+function isSafeId(value: string) {
+  return /^[a-zA-Z0-9_-]{3,160}$/.test(value);
 }

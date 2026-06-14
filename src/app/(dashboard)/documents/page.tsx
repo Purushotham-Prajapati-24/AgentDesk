@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, DragEvent, FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, Database, FileArchive, FileSpreadsheet, FileText, FileUp, Globe2, Layers3, Link2, UploadCloud } from "lucide-react";
+import { CheckCircle2, Database, FileArchive, FileText, FileUp, Globe2, Layers3, Link2, UploadCloud } from "lucide-react";
 import { listBots } from "@/app/bot-actions";
 import { useAuth } from "@/context/AuthContext";
 import { useTenant } from "@/context/TenantContext";
@@ -39,8 +39,6 @@ const acceptedPayloads = [
   { label: "PDF policies", icon: FileText, className: "border-[#ef4444]/30 bg-[linear-gradient(135deg,#fff1f2_0%,#fecdd3_50%,#ef4444_100%)] text-[#7f1d1d] dark:bg-[linear-gradient(135deg,#2a0b0f_0%,#7f1d1d_52%,#ef4444_100%)] dark:text-[#fff1f2]" },
   { label: "DOC manuals", icon: FileArchive, className: "border-[#2563eb]/30 bg-[linear-gradient(135deg,#eff6ff_0%,#bfdbfe_50%,#2563eb_100%)] text-[#172554] dark:bg-[linear-gradient(135deg,#07152f_0%,#1e3a8a_52%,#2563eb_100%)] dark:text-[#eff6ff]" },
   { label: "DOCX playbooks", icon: FileArchive, className: "border-[#4f46e5]/30 bg-[linear-gradient(135deg,#eef2ff_0%,#c7d2fe_50%,#4f46e5_100%)] text-[#1e1b4b] dark:bg-[linear-gradient(135deg,#11112d_0%,#312e81_52%,#4f46e5_100%)] dark:text-[#eef2ff]" },
-  { label: "XLSX sheets", icon: FileSpreadsheet, className: "border-[#16a34a]/30 bg-[linear-gradient(135deg,#f0fdf4_0%,#bbf7d0_50%,#16a34a_100%)] text-[#052e16] dark:bg-[linear-gradient(135deg,#051b0d_0%,#166534_52%,#16a34a_100%)] dark:text-[#f0fdf4]" },
-  { label: "XLS tables", icon: FileSpreadsheet, className: "border-[#65a30d]/30 bg-[linear-gradient(135deg,#f7fee7_0%,#d9f99d_50%,#65a30d_100%)] text-[#1a2e05] dark:bg-[linear-gradient(135deg,#101805_0%,#365314_52%,#65a30d_100%)] dark:text-[#f7fee7]" },
   { label: "CSV datasets", icon: Database, className: "border-[#0891b2]/30 bg-[linear-gradient(135deg,#ecfeff_0%,#a5f3fc_50%,#0891b2_100%)] text-[#083344] dark:bg-[linear-gradient(135deg,#061a20_0%,#155e75_52%,#0891b2_100%)] dark:text-[#ecfeff]" },
   { label: "TXT notes", icon: FileText, className: "border-[#f59e0b]/30 bg-[linear-gradient(135deg,#fffbeb_0%,#fde68a_50%,#f59e0b_100%)] text-[#451a03] dark:bg-[linear-gradient(135deg,#211403_0%,#92400e_52%,#f59e0b_100%)] dark:text-[#fffbeb]" },
   { label: "Markdown guides", icon: FileText, className: "border-[#0d9488]/30 bg-[linear-gradient(135deg,#f0fdfa_0%,#99f6e4_50%,#0d9488_100%)] text-[#042f2e] dark:bg-[linear-gradient(135deg,#041715_0%,#115e59_52%,#0d9488_100%)] dark:text-[#f0fdfa]" },
@@ -345,9 +343,9 @@ export default function DocumentsPage() {
                 </span>
                 <span className="mt-5 max-w-full break-words text-xl font-semibold text-[var(--ui-text)] sm:text-2xl">{file ? file.name : "Drop source file"}</span>
                 <span className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--ui-muted)]">
-                  Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. Text extraction starts before vector processing.
+                  Click or drop a PDF, DOC, DOCX, CSV, TXT, or MD file. Text extraction starts before vector processing.
                 </span>
-                <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md" onChange={handleFileChange} />
+                <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.csv,.txt,.md" onChange={handleFileChange} />
               </label>
 
               {uploadState.message ? (

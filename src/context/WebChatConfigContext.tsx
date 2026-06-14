@@ -11,6 +11,7 @@ import {
   type WebChatConfigPatch,
   type WebChatSection,
 } from "@/lib/webchat-config";
+import { useTenant } from "@/context/TenantContext";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -29,6 +30,7 @@ const WebChatConfigContext = createContext<WebChatConfigContextValue | undefined
 export const ConfigSchema = WebChatConfigSchema;
 
 export function WebChatConfigProvider({ children }: { children: React.ReactNode }) {
+  const { tenant } = useTenant();
   const didLoadStorageRef = useRef(false);
   const [config, setConfig] = useState<WebChatConfig>(DEFAULT_WEBCHAT_CONFIG);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -94,6 +96,12 @@ export function WebChatConfigProvider({ children }: { children: React.ReactNode 
     setSaveState("saving");
     setError("");
 
+    if (!tenant?.$id) {
+      setSaveState("error");
+      setError("Select a tenant before saving WebChat configuration.");
+      return false;
+    }
+
     const parsedPayload = WebChatConfigPatchSchema.safeParse(config satisfies WebChatConfigPatch);
     if (!parsedPayload.success) {
       setSaveState("error");
@@ -105,7 +113,10 @@ export function WebChatConfigProvider({ children }: { children: React.ReactNode 
       const response = await fetch("/api/webchat/config/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsedPayload.data),
+        body: JSON.stringify({
+          tenant_id: tenant.$id,
+          config: parsedPayload.data,
+        }),
       });
       const body = (await response.json()) as
         | { success: true; data: { config: WebChatConfig } }
@@ -125,7 +136,7 @@ export function WebChatConfigProvider({ children }: { children: React.ReactNode 
       setError(saveError instanceof Error ? saveError.message : "Unable to save WebChat configuration.");
       return false;
     }
-  }, [config]);
+  }, [config, tenant]);
 
   const value = useMemo(
     () => ({
