@@ -3,6 +3,9 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 const TOKEN_TTL_SECONDS = 5 * 60;
 
 export function createHandoffToken(input, now = Date.now()) {
+  if (!input || typeof input.sub !== "string" || !input.sub) {
+    throw new Error("sub (user identity) is required for handoff tokens.");
+  }
   const payload = {
     ...input,
     iat: Math.floor(now / 1000),
@@ -42,6 +45,22 @@ export function verifyHandoffToken(token, expected, now = Date.now()) {
     payload.iat <= Math.floor(now / 1000) &&
     payload.exp >= Math.floor(now / 1000)
   );
+}
+
+/**
+ * Decodes a token's payload without re-verifying the signature.
+ * Only call this AFTER a successful verifyHandoffToken() — the token is already trusted.
+ * Returns null if the payload cannot be parsed.
+ */
+export function decodeHandoffTokenPayload(token) {
+  if (typeof token !== "string") return null;
+  const [encodedPayload] = token.split(".");
+  if (!encodedPayload) return null;
+  try {
+    return JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function sign(encodedPayload) {

@@ -103,6 +103,9 @@ export default function InboxPage() {
   const [mobilePanel, setMobilePanel] = useState<MobileInboxPanel>("queue");
   const socketRef = useRef<Socket | null>(null);
   const feedRef = useRef<HTMLDivElement | null>(null);
+  // Tracks whether the one-time initial auto-select has already fired.
+  // Prevents updateRoom() + history re-fetch from overwriting a manual selection.
+  const initialAutoSelectedRef = useRef(false);
 
   useEffect(() => {
     if (!WEB_SOCKET_URL) {
@@ -236,17 +239,17 @@ export default function InboxPage() {
         setHistory(sessions);
         setHistoryNextCursor(response.data.nextCursor);
 
-        // Auto-select the most recent session on the first load when no conversation
-        // is selected yet (i.e. room is still the placeholder demo values).
-        setSelectedConversationId((currentId) => {
-          if (currentId !== null) return currentId; // already have a selection
-          if (sessions.length === 0) return null;
+        // Auto-select the most recent session only once on initial load.
+        // The ref ensures that if updateRoom() later clears selectedConversationId
+        // and triggers a history re-fetch, we do NOT overwrite the new manual selection.
+        if (!initialAutoSelectedRef.current && sessions.length > 0) {
+          initialAutoSelectedRef.current = true;
           const first = sessions[0];
+          setSelectedConversationId(first.id);
           setSessionStatus(first.status);
           setDraftRoom({ tenantId: first.tenantId, sessionId: first.sessionToken });
           setRoom({ tenantId: first.tenantId, sessionId: first.sessionToken });
-          return first.id;
-        });
+        }
       } else {
         setHistory([]);
         setHistoryNextCursor(null);

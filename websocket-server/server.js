@@ -12,7 +12,7 @@ import {
   persistAppwriteSessionStatus,
   readAppwriteSessionStatus,
 } from "./session-store.js";
-import { verifyHandoffToken } from "../src/lib/server/handoff-token-core.js";
+import { verifyHandoffToken, decodeHandoffTokenPayload } from "../src/lib/server/handoff-token-core.js";
 
 
 const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
@@ -217,6 +217,14 @@ function joinSessionRoom(socket) {
     if (!verifyHandoffToken(token, { tenant_id: tenantId, session_id: sessionId, role: "agent" })) {
       return { ok: false, error: "A valid agent handoff token is required." };
     }
+    // Audit log: record which user connected as an agent for this session.
+    const payload = decodeHandoffTokenPayload(token);
+    console.log("[handoff] agent connected", {
+      tenant_id: tenantId,
+      session_id: sessionId,
+      agent_user_id: payload?.sub ?? "unknown",
+      jti: payload?.jti ?? "unknown",
+    });
   }
 
   return { ok: true, value: { tenant_id: tenantId, session_id: sessionId, role } };

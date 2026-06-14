@@ -72,15 +72,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const currentConfig = await getWebChatConfig();
+  const currentConfig = await getWebChatConfig(tenantId);
   const botIdToCheck = parsedPatch.data.deploy?.botId || currentConfig.deploy.botId;
 
   if (botIdToCheck) {
     try {
       const { databases } = await createAdminClient();
       const bot = await databases.getDocument(
-        process.env.APPWRITE_DATABASE_ID ?? "agentdesk",
-        process.env.APPWRITE_BOTS_COLLECTION_ID ?? "bots",
+        process.env.APPWRITE_DATABASE_ID ?? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID ?? "agentdesk",
+        process.env.APPWRITE_BOTS_COLLECTION_ID ?? process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID ?? "bots",
         botIdToCheck
       );
       if (bot.tenant_id !== tenantId) {
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const config = await updateWebChatConfig(parsedPatch.data);
+  const config = await updateWebChatConfig(tenantId, parsedPatch.data);
 
   return NextResponse.json({
     success: true,

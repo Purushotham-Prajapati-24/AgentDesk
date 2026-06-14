@@ -22,6 +22,8 @@ type ResolvedHttpUrl = {
   family: 4 | 6;
   hostHeader: string;
   servername?: string;
+  /** All vetted IPs for the host (already validated as non-private). Used for connect-level retry. */
+  candidates?: Array<{ address: string; family: number }>;
 };
 
 type FetchTextTransport = (resolved: ResolvedHttpUrl, options: FetchOptions) => Promise<{
@@ -131,18 +133,15 @@ export async function discoverSitemapUrls(url: string, limit = 30) {
     .map((node) => normalizeHttpUrl(node.textContent ?? ""))
     .filter((value): value is string => Boolean(value));
 
-  const allowedLinks: string[] = [];
-  for (const link of Array.from(new Set(links))) {
-    try {
-      await resolveAllowedHttpUrl(link);
-      allowedLinks.push(link);
-      if (allowedLinks.length >= limit) {
-        break;
-      }
-    } catch {
-      // Ignore sitemap entries that would be rejected by the crawler itself.
-    }
-  }
+  const uniqueLinks = Array.from(new Set(links));
+  const settled = await Promise.allSettled(
+    uniqueLinks.map((link) => resolveAllowedHttpUrl(link).then(() => link)),
+  );
+
+  const allowedLinks = settled
+    .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+    .map((r) => r.value)
+    .slice(0, limit);
 
   return allowedLinks;
 }
@@ -175,14 +174,40 @@ async function fetchTextWithEgressGuard(
   redirects = 0,
 ): Promise<string> {
   const resolved = await resolveAllowedHttpUrl(url);
-  const response = await fetchTextTransport(resolved, options);
 
-  if (isRedirect(response.status)) {
+  // Try the primary record; on a network-level failure (not an HTTP error), rotate
+  // through the remaining vetted candidates without re-validating (they are already
+  // confirmed non-private from the same lookup batch — TOCTOU mitigation).
+  let response: Awaited<ReturnType<FetchTextTransport>>;
+  const candidates = resolved.candidates ?? [];
+  let lastError: Error | undefined;
+  let didRespond = false;
+
+  for (let i = 0; i <= candidates.length; i++) {
+    const attempt =
+      i === 0
+        ? resolved
+        : { ...resolved, connectHost: candidates[i - 1].address, family: candidates[i - 1].family as 4 | 6 };
+    try {
+      response = await fetchTextTransport(attempt, options);
+      didRespond = true;
+      break;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      // Network-level error — try next candidate, if any.
+    }
+  }
+
+  if (!didRespond) {
+    throw lastError ?? new Error("URL could not be reached.");
+  }
+
+  if (isRedirect(response!.status)) {
     if (redirects >= MAX_REDIRECTS) {
       throw new Error("URL redirects too many times.");
     }
 
-    const location = response.headers.get("location");
+    const location = response!.headers.get("location");
     if (!location) {
       throw new Error("URL redirected without a Location header.");
     }
@@ -191,17 +216,17 @@ async function fetchTextWithEgressGuard(
     return fetchTextWithEgressGuard(redirectUrl, options, redirects + 1);
   }
 
-  const ok = response.status >= 200 && response.status < 300;
+  const ok = response!.status >= 200 && response!.status < 300;
   if (!ok) {
-    throw new Error(`URL could not be fetched: ${response.status} ${response.statusText}`);
+    throw new Error(`URL could not be fetched: ${response!.status} ${response!.statusText}`);
   }
 
-  const contentLength = Number(response.headers.get("content-length") ?? "0");
+  const contentLength = Number(response!.headers.get("content-length") ?? "0");
   if (contentLength > MAX_FETCH_BYTES) {
     throw new Error("URL content is too large to ingest.");
   }
 
-  return response.text.slice(0, MAX_FETCH_BYTES);
+  return response!.text.slice(0, MAX_FETCH_BYTES);
 }
 
 export async function assertAllowedHttpUrl(value: string) {
@@ -249,6 +274,8 @@ async function resolveAllowedHttpUrl(value: string): Promise<ResolvedHttpUrl> {
     family: selected.family as 4 | 6,
     hostHeader: hostHeader(url),
     servername: hostname,
+    // All records are already vetted non-private; store them for connect-level retry.
+    candidates: records.slice(1),
   };
 }
 
