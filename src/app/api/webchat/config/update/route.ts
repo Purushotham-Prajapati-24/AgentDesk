@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { WebChatConfigPatchSchema } from "@/lib/webchat-config";
 import { updateWebChatConfig } from "@/lib/server/webchat-config-store";
+import { requireAuthenticatedUser } from "@/lib/server/route-auth";
 
 export async function POST(request: Request) {
   let payload: unknown;
@@ -32,6 +33,21 @@ export async function POST(request: Request) {
         },
       },
       { status: 422 },
+    );
+  }
+
+  try {
+    await requireAuthenticatedUser();
+  } catch {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication is required to update WebChat configuration.",
+        },
+      },
+      { status: 401 },
     );
   }
 

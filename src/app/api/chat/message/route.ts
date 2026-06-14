@@ -1,6 +1,7 @@
 import { ID, Query, type Models } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
 import { getServerWebSocketUrl } from "@/lib/server/websocket-url";
+import { createHandoffToken } from "@/lib/server/handoff-token";
 import { streamCompletionWithFallback } from "@/lib/server/llm-providers";
 import { retrieveContextChunks } from "@/lib/server/retrieval";
 import { recordCreditLedgerEntry, recordMessageCreated, recordSessionCreated } from "@/lib/server/monitor-rollups";
@@ -512,6 +513,12 @@ async function checkRagPermission(tenantId: string, sessionId: string): Promise<
       body: JSON.stringify({
         tenant_id: tenantId,
         session_id: sessionId,
+        token: createHandoffToken({
+          tenant_id: tenantId,
+          session_id: sessionId,
+          role: "server",
+          sub: "chat-route",
+        }),
       }),
       signal: AbortSignal.timeout(3000),
     });

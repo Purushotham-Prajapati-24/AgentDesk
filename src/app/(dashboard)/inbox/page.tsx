@@ -141,11 +141,31 @@ export default function InboxPage() {
         return;
       }
 
+      const tokenResponse = await fetch("/api/handoff/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenant_id: room.tenantId,
+          session_id: room.sessionId,
+        }),
+        signal: abortController.signal,
+      });
+      const tokenBody = (await tokenResponse.json()) as
+        | { success: true; data: { token: string } }
+        | { success: false; error: { message: string } };
+      if (!tokenResponse.ok || !tokenBody.success) {
+        setSocketStatus("disconnected");
+        setError(tokenBody.success ? "Unable to authorize live handoff." : tokenBody.error.message);
+        return;
+      }
+
       const namespace = `${wsUrl}/tenant-${room.tenantId}`;
       socket = io(namespace, {
         auth: {
           tenant_id: room.tenantId,
           session_id: room.sessionId,
+          role: "agent",
+          agent_token: tokenBody.data.token,
         },
         reconnectionAttempts: 5,
         timeout: 8000,

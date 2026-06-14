@@ -1,12 +1,11 @@
-import { ID, type Users } from "node-appwrite";
+import { ID } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { discoverSitemapUrls, looksLikeSitemapUrl, normalizeHttpUrl } from "@/lib/server/crawler";
+import { requireAuthenticatedTenant } from "@/lib/server/route-auth";
 
 type UrlIngestRequest = {
   tenant_id: string;
   bot_id: string;
-  user_id?: string;
   url: string;
 };
 
@@ -23,11 +22,10 @@ export async function POST(request: Request) {
 
   const tenantId = typeof body.tenant_id === "string" ? body.tenant_id.trim() : "";
   const botId = typeof body.bot_id === "string" ? body.bot_id.trim() : "";
-  const userId = typeof body.user_id === "string" ? body.user_id.trim() : "";
   const url = normalizeHttpUrl(body.url);
 
-  if (!isSafeId(tenantId) || !isSafeId(botId) || !userId) {
-    return jsonError("INVALID_SCOPE", "tenant_id, bot_id, and user_id are required.", 422);
+  if (!isSafeId(tenantId) || !isSafeId(botId)) {
+    return jsonError("INVALID_SCOPE", "tenant_id and bot_id are required.", 422);
   }
 
   if (!url) {
@@ -35,8 +33,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { users, databases } = await createAdminClient();
-    await assertTenantAccess(users, userId, tenantId);
+    await requireAuthenticatedTenant(tenantId);
+    const { databases } = await createAdminClient();
 
     if (looksLikeSitemapUrl(url)) {
       const pageUrls = await discoverSitemapUrls(url, SITEMAP_PAGE_LIMIT);
@@ -80,11 +78,6 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     return jsonError("URL_INGEST_FAILED", error instanceof Error ? error.message : "URL ingestion failed.", 500);
   }
-}
-
-async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
-  await users.get(userId);
-  await getAuthorizedTenantDocument(userId, tenantId);
 }
 
 function getUrlFileName(url: string) {

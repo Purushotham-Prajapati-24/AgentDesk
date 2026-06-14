@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -68,11 +68,9 @@ export default function DocsPage() {
   const [sandboxBotId, setSandboxBotId] = useState<string>("6a160c5a00212e6e9da0");
   const [sandboxTheme, setSandboxTheme] = useState<string>("webchat-v1");
   const [sandboxMode, setSandboxMode] = useState<DeploymentMode>("script");
-  const [snippetHost, setSnippetHost] = useState<string>("https://agentdeskbot.vercel.app");
-
-  useEffect(() => {
-    setSnippetHost(window.location.origin);
-  }, []);
+  const [snippetHost] = useState<string>(() =>
+    typeof window === "undefined" ? "https://agentdeskbot.vercel.app" : window.location.origin,
+  );
 
   const copyToClipboard = useCallback((text: string, id: string) => {
     if (typeof navigator === "undefined" || !navigator.clipboard) {

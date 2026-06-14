@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
+import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { cookies, headers } from "next/headers";
@@ -30,10 +31,7 @@ export async function loginWithMagicLink(email: string) {
   
   try {
     const headersList = await headers();
-    const host = headersList.get("host") || "localhost:3000";
-    const protocol = headersList.get("x-forwarded-proto") || "http";
-    const dynamicOrigin = `${protocol}://${host}`;
-    const origin = process.env.NEXT_PUBLIC_APP_URL || dynamicOrigin;
+    const origin = resolveAppOrigin(headersList);
     
     await account.createMagicURLToken({
       userId: ID.unique(),

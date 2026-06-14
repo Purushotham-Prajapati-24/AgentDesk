@@ -347,7 +347,7 @@ export default function DocumentsPage() {
                 <span className="mt-2 max-w-md text-sm font-medium leading-6 text-[var(--ui-muted)]">
                   Click or drop a PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, or MD file. Text extraction starts before vector processing.
                 </span>
-                <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md" onChange={handleFileChange} />
+                <input className="sr-only" type="file" accept=".pdf,.doc,.docx,.csv,.txt,.md" onChange={handleFileChange} />
               </label>
 
               {uploadState.message ? (

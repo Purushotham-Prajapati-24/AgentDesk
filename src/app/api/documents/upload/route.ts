@@ -1,9 +1,9 @@
-import { ID, type Users } from "node-appwrite";
+import { ID } from "node-appwrite";
 import { InputFile } from "node-appwrite/file";
 import { createAdminClient } from "@/lib/server/appwrite";
 import { getDocumentType, parseDocument, SUPPORTED_DOCUMENT_TYPES, type SupportedDocumentType } from "@/lib/server/document-parser";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { recordDocumentStorageAdded } from "@/lib/server/monitor-rollups";
+import { requireAuthenticatedTenant } from "@/lib/server/route-auth";
 
 type UploadMetadata = {
   tenant_id: string;
@@ -24,11 +24,10 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const tenantId = stringField(formData, "tenant_id");
     const botId = stringField(formData, "bot_id");
-    const userId = stringField(formData, "user_id");
     const file = formData.get("file");
 
-    if (!isSafeId(tenantId) || !isSafeId(botId) || !userId) {
-      return jsonError("INVALID_SCOPE", "tenant_id, bot_id, and user_id are required.", 422);
+    if (!isSafeId(tenantId) || !isSafeId(botId)) {
+      return jsonError("INVALID_SCOPE", "tenant_id and bot_id are required.", 422);
     }
 
     if (!(file instanceof File)) {
@@ -41,11 +40,11 @@ export async function POST(request: Request) {
 
     const fileType = getFileType(file.name);
     if (!fileType || !SUPPORTED_DOCUMENT_TYPES.has(fileType)) {
-      return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOC, DOCX, XLSX, XLS, CSV, TXT, and MD.", 422);
+      return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOC, DOCX, CSV, TXT, and MD.", 422);
     }
 
-    const { users, databases, storage } = await createAdminClient();
-    await assertTenantAccess(users, userId, tenantId);
+    await requireAuthenticatedTenant(tenantId);
+    const { databases, storage } = await createAdminClient();
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const parsedText = await parseDocument(buffer, fileType);
@@ -72,11 +71,6 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     return jsonError("UPLOAD_FAILED", getErrorMessage(error), 500);
   }
-}
-
-async function assertTenantAccess(users: Users, userId: string, tenantId: string) {
-  await users.get(userId);
-  await getAuthorizedTenantDocument(userId, tenantId);
 }
 
 function stringField(formData: FormData, key: string) {

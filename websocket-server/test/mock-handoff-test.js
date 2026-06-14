@@ -1,10 +1,12 @@
 import { once } from "node:events";
+import { createHmac } from "node:crypto";
 import { io as createClient } from "socket.io-client";
 import { createHandoffServer } from "../server.js";
 import { createMemorySessionStore } from "../session-store.js";
 
 const tenantId = "tenant_demo";
 const sessionId = "session_demo";
+process.env.HANDOFF_TOKEN_SECRET = "test_handoff_secret";
 
 const backingState = new Map();
 const sessionStore = createMemorySessionStore(backingState);
@@ -27,7 +29,14 @@ if (!address || typeof address === "string") {
 const baseUrl = `http://127.0.0.1:${address.port}/tenant-${tenantId}`;
 const auth = { tenant_id: tenantId, session_id: sessionId };
 const customer = createClient(baseUrl, { auth, transports: ["websocket"] });
-const agent = createClient(baseUrl, { auth, transports: ["websocket"] });
+const agent = createClient(baseUrl, {
+  auth: {
+    ...auth,
+    role: "agent",
+    agent_token: createToken({ ...auth, role: "agent", sub: "agent_test" }),
+  },
+  transports: ["websocket"],
+});
 
 try {
   await Promise.all([once(customer, "connect"), once(agent, "connect")]);
@@ -59,10 +68,21 @@ try {
   assert(forwardedPayload.content === "I need a human now.", "agent should receive forwarded customer message");
   assert(forwardedPayload.should_call_rag === false, "forwarded message should preserve RAG bypass flag");
 
-  const permission = await fetch(`http://127.0.0.1:${address.port}/rag-permission`, {
+  const deniedPermission = await fetch(`http://127.0.0.1:${address.port}/rag-permission`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tenant_id: tenantId, session_id: sessionId }),
+  });
+  assert(deniedPermission.status === 401, "rag-permission should require a server token");
+
+  const permission = await fetch(`http://127.0.0.1:${address.port}/rag-permission`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tenant_id: tenantId,
+      session_id: sessionId,
+      token: createToken({ ...auth, role: "server", sub: "chat_route" }),
+    }),
   }).then((response) => response.json());
 
   assert(permission.success, "rag-permission should return a success response");
@@ -103,4 +123,14 @@ function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function createToken(payload) {
+  const body = {
+    ...payload,
+    exp: Math.floor(Date.now() / 1000) + 300,
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(body), "utf8").toString("base64url");
+  const signature = createHmac("sha256", process.env.HANDOFF_TOKEN_SECRET).update(encodedPayload).digest("base64url");
+  return `${encodedPayload}.${signature}`;
 }

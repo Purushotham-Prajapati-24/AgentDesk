@@ -1,4 +1,5 @@
 import http from "node:http";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
@@ -49,6 +50,12 @@ export function createHandoffServer(options = {}) {
     const room = parseRoomPayload(request.body);
     if (!room.ok) {
       response.status(422).json(errorBody("INVALID_ROOM", room.error));
+      return;
+    }
+
+    const token = typeof request.body?.token === "string" ? request.body.token : "";
+    if (!verifyHandoffToken(token, { ...room.value, role: "server" })) {
+      response.status(401).json(errorBody("UNAUTHORIZED", "A valid server handoff token is required."));
       return;
     }
 
@@ -112,6 +119,11 @@ async function handleCustomerMessage(socket, sessionStore, room, payload, acknow
 }
 
 async function handleAgentMessage(socket, room, payload, acknowledge, persistAgentMessage) {
+  if (room.role !== "agent") {
+    acknowledge?.(errorBody("UNAUTHORIZED", "Agent authentication is required."));
+    return;
+  }
+
   const message = parseMessagePayload(payload, "agent");
   if (!message.ok) {
     acknowledge?.(errorBody("INVALID_MESSAGE", message.error));
@@ -146,6 +158,11 @@ async function handleAgentMessage(socket, room, payload, acknowledge, persistAge
 }
 
 async function handleStatusToggle(socket, sessionStore, room, payload, acknowledge) {
+  if (room.role !== "agent") {
+    acknowledge?.(errorBody("UNAUTHORIZED", "Agent authentication is required."));
+    return;
+  }
+
   const status = typeof payload?.status === "string" ? payload.status : "";
   if (!SESSION_STATUSES.has(status)) {
     acknowledge?.(errorBody("INVALID_STATUS", "Status must be active, paused_by_human, or closed."));
@@ -183,6 +200,8 @@ function joinSessionRoom(socket) {
   const tenantId = readHandshakeValue(socket, "tenant_id");
   const sessionId = readHandshakeValue(socket, "session_id");
   const namespaceTenantId = socket.nsp.name.replace(/^\/tenant-/, "");
+  const requestedRole = readHandshakeValue(socket, "role");
+  const role = requestedRole === "agent" ? "agent" : "customer";
 
   if (!isSafeId(tenantId) || !isSafeId(sessionId)) {
     return { ok: false, error: "tenant_id and session_id are required." };
@@ -192,7 +211,14 @@ function joinSessionRoom(socket) {
     return { ok: false, error: "Namespace tenant does not match handshake tenant." };
   }
 
-  return { ok: true, value: { tenant_id: tenantId, session_id: sessionId } };
+  if (role === "agent") {
+    const token = readHandshakeValue(socket, "agent_token");
+    if (!verifyHandoffToken(token, { tenant_id: tenantId, session_id: sessionId, role: "agent" })) {
+      return { ok: false, error: "A valid agent handoff token is required." };
+    }
+  }
+
+  return { ok: true, value: { tenant_id: tenantId, session_id: sessionId, role } };
 }
 
 function parseRoomPayload(payload) {
@@ -285,6 +311,52 @@ function errorBody(code, message) {
       requestId: crypto.randomUUID(),
     },
   };
+}
+
+function verifyHandoffToken(token, expected) {
+  if (typeof token !== "string") {
+    return false;
+  }
+
+  const [encodedPayload, signature] = token.split(".");
+  if (!encodedPayload || !signature || !safeEqual(signature, sign(encodedPayload))) {
+    return false;
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+  } catch {
+    return false;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  return (
+    payload.tenant_id === expected.tenant_id &&
+    payload.session_id === expected.session_id &&
+    payload.role === expected.role &&
+    Number.isFinite(payload.exp) &&
+    payload.exp >= now
+  );
+}
+
+function sign(encodedPayload) {
+  return createHmac("sha256", handoffTokenSecret()).update(encodedPayload).digest("base64url");
+}
+
+function handoffTokenSecret() {
+  const secret = process.env.HANDOFF_TOKEN_SECRET || process.env.APPWRITE_API_KEY;
+  if (!secret) {
+    throw new Error("HANDOFF_TOKEN_SECRET or APPWRITE_API_KEY must be configured for handoff tokens.");
+  }
+
+  return secret;
+}
+
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 async function configureRedisAdapter(io) {
