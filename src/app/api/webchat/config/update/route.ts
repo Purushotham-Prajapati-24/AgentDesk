@@ -72,11 +72,11 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const currentConfig = await getWebChatConfig();
-    const botIdToCheck = parsedPatch.data.deploy?.botId || currentConfig.deploy.botId;
+  const currentConfig = await getWebChatConfig();
+  const botIdToCheck = parsedPatch.data.deploy?.botId || currentConfig.deploy.botId;
 
-    if (botIdToCheck) {
+  if (botIdToCheck) {
+    try {
       const { databases } = await createAdminClient();
       const bot = await databases.getDocument(
         process.env.APPWRITE_DATABASE_ID ?? "agentdesk",
@@ -95,18 +95,31 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-    }
-  } catch {
-    return NextResponse.json(
-      {
-        success: false,
-        error: {
-          code: "NOT_FOUND",
-          message: "The specified bot does not exist.",
+    } catch (error: any) {
+      if (error?.code === 404 || error?.status === 404 || error?.message?.includes("not found")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "The specified bot does not exist.",
+            },
+          },
+          { status: 404 },
+        );
+      }
+      // Return structured 500 error instead of throwing uncaught exception
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: "DATABASE_ERROR",
+            message: error?.message ?? "An error occurred while fetching the bot document.",
+          },
         },
-      },
-      { status: 404 },
-    );
+        { status: 500 },
+      );
+    }
   }
 
   const config = await updateWebChatConfig(parsedPatch.data);

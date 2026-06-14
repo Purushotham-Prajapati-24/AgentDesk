@@ -109,7 +109,9 @@ export default function InboxPage() {
       return;
     }
 
-    if (room.tenantId === "tenant_demo" || room.sessionId === "session_demo") {
+    // Skip connecting while the room still holds placeholder demo values — a real session
+    // will be auto-selected by the history effect and will update `room` appropriately.
+    if (room.tenantId === DEFAULT_ROOM.tenantId || room.sessionId === DEFAULT_ROOM.sessionId) {
       return;
     }
 
@@ -230,8 +232,21 @@ export default function InboxPage() {
 
       setHistoryLoading(false);
       if (response.success) {
-        setHistory(response.data.sessions);
+        const sessions = response.data.sessions;
+        setHistory(sessions);
         setHistoryNextCursor(response.data.nextCursor);
+
+        // Auto-select the most recent session on the first load when no conversation
+        // is selected yet (i.e. room is still the placeholder demo values).
+        setSelectedConversationId((currentId) => {
+          if (currentId !== null) return currentId; // already have a selection
+          if (sessions.length === 0) return null;
+          const first = sessions[0];
+          setSessionStatus(first.status);
+          setDraftRoom({ tenantId: first.tenantId, sessionId: first.sessionToken });
+          setRoom({ tenantId: first.tenantId, sessionId: first.sessionToken });
+          return first.id;
+        });
       } else {
         setHistory([]);
         setHistoryNextCursor(null);
@@ -946,11 +961,13 @@ function LiveTranscriptPanel({
         </Button>
       </div>
 
-      {wakingUp && !error ? (
-        <Notice tone="warn" message="Waking up the live handoff server. Render cold starts can take about 30 seconds." />
-      ) : error ? (
-        <Notice tone="danger" message={error} />
-      ) : null}
+      {room.tenantId !== DEFAULT_ROOM.tenantId && room.sessionId !== DEFAULT_ROOM.sessionId && (
+        wakingUp && !error ? (
+          <Notice tone="warn" message="Waking up the live handoff server. Render cold starts can take about 30 seconds." />
+        ) : error ? (
+          <Notice tone="danger" message={error} />
+        ) : null
+      )}
 
       <div ref={feedRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--ui-bg)] p-4">
         {messageLoading ? (

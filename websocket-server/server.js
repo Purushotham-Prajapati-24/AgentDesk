@@ -1,5 +1,4 @@
 import http from "node:http";
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
 import express from "express";
@@ -13,6 +12,8 @@ import {
   persistAppwriteSessionStatus,
   readAppwriteSessionStatus,
 } from "./session-store.js";
+import { verifyHandoffToken } from "../src/lib/server/handoff-token-core.js";
+
 
 const PORT = Number.parseInt(process.env.PORT ?? "4000", 10);
 const DEFAULT_CORS_ORIGIN = "*";
@@ -313,51 +314,6 @@ function errorBody(code, message) {
   };
 }
 
-function verifyHandoffToken(token, expected) {
-  if (typeof token !== "string") {
-    return false;
-  }
-
-  const [encodedPayload, signature] = token.split(".");
-  if (!encodedPayload || !signature || !safeEqual(signature, sign(encodedPayload))) {
-    return false;
-  }
-
-  let payload;
-  try {
-    payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
-  } catch {
-    return false;
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  return (
-    payload.tenant_id === expected.tenant_id &&
-    payload.session_id === expected.session_id &&
-    payload.role === expected.role &&
-    Number.isFinite(payload.exp) &&
-    payload.exp >= now
-  );
-}
-
-function sign(encodedPayload) {
-  return createHmac("sha256", handoffTokenSecret()).update(encodedPayload).digest("base64url");
-}
-
-function handoffTokenSecret() {
-  const secret = process.env.HANDOFF_TOKEN_SECRET || process.env.APPWRITE_API_KEY;
-  if (!secret) {
-    throw new Error("HANDOFF_TOKEN_SECRET or APPWRITE_API_KEY must be configured for handoff tokens.");
-  }
-
-  return secret;
-}
-
-function safeEqual(left, right) {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
-}
 
 async function configureRedisAdapter(io) {
   const redisUrl = process.env.SOCKET_IO_REDIS_URL;
@@ -381,6 +337,9 @@ async function configureRedisAdapter(io) {
 
 const isEntrypoint = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
 if (isEntrypoint) {
+  if (!process.env.HANDOFF_TOKEN_SECRET) {
+    throw new Error("HANDOFF_TOKEN_SECRET must be configured for the websocket server.");
+  }
   const { server } = createHandoffServer();
   server.listen(PORT, () => {
     console.info(`AgentDesk websocket server listening on ${PORT}`);

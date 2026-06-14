@@ -323,14 +323,28 @@ function isRedirect(status: number) {
 export function isPrivateIp(address: string) {
   const normalizedAddress = unwrapMappedV6(normalizeHostname(address));
   if (net.isIPv4(normalizedAddress)) {
-    const [a, b] = normalizedAddress.split(".").map((part) => Number.parseInt(part, 10));
+    const parts = normalizedAddress.split(".");
+    if (parts.length !== 4) {
+      return true; // Fail-secure on invalid IPv4 dotted-quad lengths
+    }
+    const [a, b, c, d] = parts.map((part) => Number.parseInt(part, 10));
+    if (Number.isNaN(a) || Number.isNaN(b) || Number.isNaN(c) || Number.isNaN(d)) {
+      return true; // Fail-secure
+    }
+
     return (
-      a === 10 ||
-      a === 127 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 0)
+      a === 10 || // Private-Use (10.0.0.0/8)
+      a === 127 || // Loopback (127.0.0.0/8)
+      (a === 169 && b === 254) || // Link-Local (169.254.0.0/16)
+      (a === 172 && b >= 16 && b <= 31) || // Private-Use (172.16.0.0/12)
+      (a === 192 && b === 168) || // Private-Use (192.168.0.0/16)
+      a === 0 || // Current network (0.0.0.0/8)
+      (a === 100 && b >= 64 && b <= 127) || // Shared Address Space / CGNAT (100.64.0.0/10)
+      (a === 192 && b === 0 && c === 2) || // Documentation / TEST-NET-1 (192.0.2.0/24)
+      (a === 198 && b === 51 && c === 100) || // Documentation / TEST-NET-2 (198.51.100.0/24)
+      (a === 203 && b === 0 && c === 113) || // Documentation / TEST-NET-3 (203.0.113.0/24)
+      (a === 198 && b >= 18 && b <= 19) || // Benchmarking (198.18.0.0/15)
+      a >= 224 // Multicast/Reserved (224.0.0.0/4 and 240.0.0.0/4)
     );
   }
 
@@ -340,27 +354,35 @@ export function isPrivateIp(address: string) {
     normalized === "::1" ||
     normalized.startsWith("fc") ||
     normalized.startsWith("fd") ||
+    normalized.startsWith("ff") || // IPv6 Multicast
     /^fe[89ab][0-9a-f]:/.test(normalized) ||
     normalized.startsWith("100:") ||
     normalized.startsWith("64:ff9b:") ||
-    /^2001:0?[0-9a-f]?:/.test(normalized)
+    /^2001:0{1,4}:/i.test(normalized) || // Teredo prefix
+    normalized.startsWith("2001::")
   );
 }
 
-function unwrapMappedV6(address: string) {
-  const dotted = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
-  if (dotted) {
-    return dotted[1];
+function unwrapMappedV6(address: string): string {
+  const normalized = address.toLowerCase().trim();
+
+  // 1. Dotted-quad formats: ::ffff:a.b.c.d, ::a.b.c.d, and expanded equivalents like 0:0:0:0:0:0:a.b.c.d
+  const dottedMatch = normalized.match(/^(?:0{1,4}:){5}(?:ffff:)?(\d+\.\d+\.\d+\.\d+)$/i) ||
+                      normalized.match(/^(?:::(?:ffff:)?)(\d+\.\d+\.\d+\.\d+)$/i);
+  if (dottedMatch && dottedMatch[1]) {
+    return dottedMatch[1];
   }
 
-  const hex = address.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
-  if (!hex) {
-    return address;
+  // 2. Hex formats: ::ffff:high:low, ::high:low, and expanded equivalents like 0:0:0:0:0:0:high:low
+  const hexMatch = normalized.match(/^(?:0{1,4}:){5}(?:ffff:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i) ||
+                    normalized.match(/^(?:::(?:ffff:)?)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (hexMatch && hexMatch[1] && hexMatch[2]) {
+    const high = Number.parseInt(hexMatch[1], 16);
+    const low = Number.parseInt(hexMatch[2], 16);
+    return `${(high >> 8) & 255}.${high & 255}.${(low >> 8) & 255}.${low & 255}`;
   }
 
-  const high = Number.parseInt(hex[1], 16);
-  const low = Number.parseInt(hex[2], 16);
-  return `${(high >> 8) & 255}.${high & 255}.${(low >> 8) & 255}.${low & 255}`;
+  return address;
 }
 
 function normalizeHostname(hostname: string) {

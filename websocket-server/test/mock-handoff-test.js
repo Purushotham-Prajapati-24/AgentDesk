@@ -141,6 +141,9 @@ function assert(condition, message) {
 
 function createToken(payload) {
   const body = {
+    sub: "test_sub",
+    jti: "test_jti",
+    iat: Math.floor(Date.now() / 1000),
     ...payload,
     exp: Math.floor(Date.now() / 1000) + 300,
   };
