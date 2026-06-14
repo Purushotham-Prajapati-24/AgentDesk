@@ -1,5 +1,7 @@
 import { Readability } from "@mozilla/readability";
 import { lookup } from "node:dns/promises";
+import http from "node:http";
+import https from "node:https";
 import net from "node:net";
 import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
@@ -7,6 +9,29 @@ import TurndownService from "turndown";
 const MAX_FETCH_BYTES = 2 * 1024 * 1024;
 const MAX_MARKDOWN_CHARS = 500000;
 const MAX_REDIRECTS = 3;
+const DEFAULT_ALLOWED_PORTS = new Set(["80", "443"]);
+
+type FetchOptions = {
+  headers: Record<string, string>;
+  timeoutMs: number;
+};
+
+type ResolvedHttpUrl = {
+  originalUrl: URL;
+  connectHost: string;
+  family: 4 | 6;
+  hostHeader: string;
+  servername?: string;
+};
+
+type FetchTextTransport = (resolved: ResolvedHttpUrl, options: FetchOptions) => Promise<{
+  status: number;
+  statusText: string;
+  headers: Headers;
+  text: string;
+}>;
+
+let fetchTextTransport: FetchTextTransport = fetchPinnedText;
 
 export class WebsiteCrawler {
   private readonly turndown: TurndownService;
@@ -32,6 +57,25 @@ export class WebsiteCrawler {
   }
 
   private async fetchPageHtml(url: string) {
+    const browserlessKey = process.env.BROWSERLESS_API_KEY;
+    if (browserlessKey) {
+      await assertAllowedHttpUrl(url);
+      const response = await fetch(`https://chrome.browserless.io/content?token=${encodeURIComponent(browserlessKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          waitFor: 2000,
+          gotoOptions: { waitUntil: "networkidle2" },
+        }),
+        signal: AbortSignal.timeout(20000),
+      });
+
+      if (response.ok) {
+        return (await response.text()).slice(0, MAX_FETCH_BYTES);
+      }
+    }
+
     return fetchTextWithEgressGuard(url, {
       headers: {
         Accept: "text/html,text/plain,application/xhtml+xml",
@@ -87,7 +131,20 @@ export async function discoverSitemapUrls(url: string, limit = 30) {
     .map((node) => normalizeHttpUrl(node.textContent ?? ""))
     .filter((value): value is string => Boolean(value));
 
-  return Array.from(new Set(links)).slice(0, limit);
+  const allowedLinks: string[] = [];
+  for (const link of Array.from(new Set(links))) {
+    try {
+      await resolveAllowedHttpUrl(link);
+      allowedLinks.push(link);
+      if (allowedLinks.length >= limit) {
+        break;
+      }
+    } catch {
+      // Ignore sitemap entries that would be rejected by the crawler itself.
+    }
+  }
+
+  return allowedLinks;
 }
 
 export function looksLikeSitemapUrl(url: string) {
@@ -114,18 +171,11 @@ export function normalizeHttpUrl(value: unknown) {
 
 async function fetchTextWithEgressGuard(
   url: string,
-  options: {
-    headers: Record<string, string>;
-    timeoutMs: number;
-  },
+  options: FetchOptions,
   redirects = 0,
 ): Promise<string> {
-  await assertAllowedHttpUrl(url);
-  const response = await fetch(url, {
-    headers: options.headers,
-    redirect: "manual",
-    signal: AbortSignal.timeout(options.timeoutMs),
-  });
+  const resolved = await resolveAllowedHttpUrl(url);
+  const response = await fetchTextTransport(resolved, options);
 
   if (isRedirect(response.status)) {
     if (redirects >= MAX_REDIRECTS) {
@@ -141,7 +191,8 @@ async function fetchTextWithEgressGuard(
     return fetchTextWithEgressGuard(redirectUrl, options, redirects + 1);
   }
 
-  if (!response.ok) {
+  const ok = response.status >= 200 && response.status < 300;
+  if (!ok) {
     throw new Error(`URL could not be fetched: ${response.status} ${response.statusText}`);
   }
 
@@ -150,40 +201,129 @@ async function fetchTextWithEgressGuard(
     throw new Error("URL content is too large to ingest.");
   }
 
-  return (await response.text()).slice(0, MAX_FETCH_BYTES);
+  return response.text.slice(0, MAX_FETCH_BYTES);
 }
 
-async function assertAllowedHttpUrl(value: string) {
+export async function assertAllowedHttpUrl(value: string) {
+  await resolveAllowedHttpUrl(value);
+}
+
+async function resolveAllowedHttpUrl(value: string): Promise<ResolvedHttpUrl> {
   const url = new URL(value);
   if (!["http:", "https:"].includes(url.protocol)) {
     throw new Error("Only http and https URLs can be ingested.");
   }
 
-  const hostname = url.hostname.toLowerCase();
+  if (!DEFAULT_ALLOWED_PORTS.has(url.port || defaultPort(url))) {
+    throw new Error("Only default HTTP and HTTPS ports can be ingested.");
+  }
+
+  const hostname = normalizeHostname(url.hostname);
   if (hostname === "localhost" || hostname.endsWith(".localhost")) {
     throw new Error("Localhost URLs cannot be ingested.");
   }
 
   const literalIp = net.isIP(hostname);
-  if (literalIp && isPrivateIp(hostname)) {
+  if (literalIp) {
+    if (isPrivateIp(hostname)) {
+      throw new Error("Private-network URLs cannot be ingested.");
+    }
+
+    return {
+      originalUrl: url,
+      connectHost: hostname,
+      family: literalIp as 4 | 6,
+      hostHeader: hostHeader(url),
+    };
+  }
+
+  const records = await lookup(hostname, { all: true, verbatim: true });
+  if (records.length === 0 || records.some((record) => isPrivateIp(record.address))) {
     throw new Error("Private-network URLs cannot be ingested.");
   }
 
-  if (!literalIp) {
-    const records = await lookup(hostname, { all: true, verbatim: false });
-    if (records.length === 0 || records.some((record) => isPrivateIp(record.address))) {
-      throw new Error("Private-network URLs cannot be ingested.");
+  const selected = records[0];
+  return {
+    originalUrl: url,
+    connectHost: selected.address,
+    family: selected.family as 4 | 6,
+    hostHeader: hostHeader(url),
+    servername: hostname,
+  };
+}
+
+async function fetchPinnedText(resolved: ResolvedHttpUrl, options: FetchOptions) {
+  const client = resolved.originalUrl.protocol === "https:" ? https : http;
+  const headers = {
+    ...options.headers,
+    Host: resolved.hostHeader,
+  };
+
+  return new Promise<Awaited<ReturnType<FetchTextTransport>>>((resolve, reject) => {
+    const request = client.request(
+      {
+        protocol: resolved.originalUrl.protocol,
+        host: resolved.connectHost,
+        family: resolved.family,
+        port: Number.parseInt(resolved.originalUrl.port || defaultPort(resolved.originalUrl), 10),
+        path: `${resolved.originalUrl.pathname}${resolved.originalUrl.search}`,
+        method: "GET",
+        headers,
+        servername: resolved.servername,
+        timeout: options.timeoutMs,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        let totalBytes = 0;
+
+        response.on("data", (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          if (totalBytes > MAX_FETCH_BYTES) {
+            request.destroy(new Error("URL content is too large to ingest."));
+            return;
+          }
+          chunks.push(chunk);
+        });
+
+        response.on("end", () => {
+          resolve({
+            status: response.statusCode ?? 0,
+            statusText: response.statusMessage ?? "",
+            headers: headersFromIncoming(response.headers),
+            text: Buffer.concat(chunks).toString("utf8"),
+          });
+        });
+      },
+    );
+
+    request.on("timeout", () => request.destroy(new Error("URL fetch timed out.")));
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+function headersFromIncoming(headers: http.IncomingHttpHeaders) {
+  const result = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        result.append(key, item);
+      }
+    } else if (typeof value === "string") {
+      result.set(key, value);
     }
   }
+  return result;
 }
 
 function isRedirect(status: number) {
   return status >= 300 && status < 400;
 }
 
-function isPrivateIp(address: string) {
-  if (net.isIPv4(address)) {
-    const [a, b] = address.split(".").map((part) => Number.parseInt(part, 10));
+export function isPrivateIp(address: string) {
+  const normalizedAddress = unwrapMappedV6(normalizeHostname(address));
+  if (net.isIPv4(normalizedAddress)) {
+    const [a, b] = normalizedAddress.split(".").map((part) => Number.parseInt(part, 10));
     return (
       a === 10 ||
       a === 127 ||
@@ -194,8 +334,49 @@ function isPrivateIp(address: string) {
     );
   }
 
-  const normalized = address.toLowerCase();
-  return normalized === "::1" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
+  const normalized = normalizedAddress.toLowerCase();
+  return (
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    /^fe[89ab][0-9a-f]:/.test(normalized) ||
+    normalized.startsWith("100:") ||
+    normalized.startsWith("64:ff9b:") ||
+    /^2001:0?[0-9a-f]?:/.test(normalized)
+  );
+}
+
+function unwrapMappedV6(address: string) {
+  const dotted = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
+  if (dotted) {
+    return dotted[1];
+  }
+
+  const hex = address.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (!hex) {
+    return address;
+  }
+
+  const high = Number.parseInt(hex[1], 16);
+  const low = Number.parseInt(hex[2], 16);
+  return `${(high >> 8) & 255}.${high & 255}.${(low >> 8) & 255}.${low & 255}`;
+}
+
+function normalizeHostname(hostname: string) {
+  return hostname.toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+}
+
+function defaultPort(url: URL) {
+  return url.protocol === "https:" ? "443" : "80";
+}
+
+function hostHeader(url: URL) {
+  return url.port ? `${url.hostname}:${url.port}` : url.hostname;
+}
+
+export function setCrawlerFetchTransportForTests(transport: FetchTextTransport | null) {
+  fetchTextTransport = transport ?? fetchPinnedText;
 }
 
 function normalizeText(text: string) {

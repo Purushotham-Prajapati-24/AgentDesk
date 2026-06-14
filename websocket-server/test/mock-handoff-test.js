@@ -88,6 +88,20 @@ try {
   assert(permission.success, "rag-permission should return a success response");
   assert(permission.data.shouldCallRag === false, "rag-permission should use stored paused status");
 
+  // Negative authorization test: customer socket emitting agent-message should be rejected
+  const customerAgentMsgAck = await emitWithAck(customer, "agent-message", {
+    content: "Unauthorized customer attempting agent message",
+  });
+  assert(customerAgentMsgAck.success === false, "customer agent-message should fail");
+  assert(customerAgentMsgAck.error.code === "UNAUTHORIZED", "customer agent-message error should be UNAUTHORIZED");
+
+  // Negative authorization test: customer socket emitting bot-status-toggle should be rejected
+  const customerStatusToggleAck = await emitWithAck(customer, "bot-status-toggle", {
+    status: "active",
+  });
+  assert(customerStatusToggleAck.success === false, "customer bot-status-toggle should fail");
+  assert(customerStatusToggleAck.error.code === "UNAUTHORIZED", "customer bot-status-toggle error should be UNAUTHORIZED");
+
   const agentMessage = once(customer, "agent-message");
   const agentAck = await emitWithAck(agent, "agent-message", {
     content: "I am checking that for you.",

@@ -524,6 +524,9 @@ async function checkRagPermission(tenantId: string, sessionId: string): Promise<
     });
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        return false;
+      }
       return true;
     }
 

@@ -109,6 +109,10 @@ export default function InboxPage() {
       return;
     }
 
+    if (room.tenantId === "tenant_demo" || room.sessionId === "session_demo") {
+      return;
+    }
+
     const wsUrl = WEB_SOCKET_URL;
     const abortController = new AbortController();
     let socket: Socket | null = null;

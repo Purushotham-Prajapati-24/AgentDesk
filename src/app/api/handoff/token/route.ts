@@ -20,8 +20,15 @@ export async function POST(request: Request) {
     return jsonError("INVALID_ROOM", "tenant_id and session_id are required.", 422);
   }
 
+  let user;
   try {
-    const user = await requireAuthenticatedTenant(tenantId);
+    user = await requireAuthenticatedTenant(tenantId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to authorize handoff access.";
+    return jsonError("UNAUTHORIZED", message, 401);
+  }
+
+  try {
     const token = createHandoffToken({
       tenant_id: tenantId,
       session_id: sessionId,
@@ -30,8 +37,8 @@ export async function POST(request: Request) {
     });
     return Response.json({ success: true, data: { token } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to authorize handoff access.";
-    return jsonError("UNAUTHORIZED", message, 401);
+    const message = error instanceof Error ? error.message : "Token creation failed.";
+    return jsonError("TOKEN_CREATION_FAILED", message, 500);
   }
 }
 

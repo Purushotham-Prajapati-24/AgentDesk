@@ -47,6 +47,12 @@ export async function POST(request: Request) {
 
   try {
     await requireAuthenticatedTenant(tenantId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to authorize tenant access.";
+    return jsonError("UNAUTHORIZED", message, 401);
+  }
+
+  try {
     const { databases } = await createAdminClient();
 
     const documents = await listPendingDocuments(databases, tenantId, botId, limit);

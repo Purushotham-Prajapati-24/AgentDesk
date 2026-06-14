@@ -43,7 +43,13 @@ export async function POST(request: Request) {
       return jsonError("UNSUPPORTED_FILE", "Supported file types are PDF, DOC, DOCX, CSV, TXT, and MD.", 422);
     }
 
-    await requireAuthenticatedTenant(tenantId);
+    try {
+      await requireAuthenticatedTenant(tenantId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to authorize tenant access.";
+      return jsonError("UNAUTHORIZED", message, 401);
+    }
+
     const { databases, storage } = await createAdminClient();
 
     const buffer = Buffer.from(await file.arrayBuffer());

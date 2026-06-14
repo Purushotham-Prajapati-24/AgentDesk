@@ -212,7 +212,7 @@ function joinSessionRoom(socket) {
   }
 
   if (role === "agent") {
-    const token = readHandshakeValue(socket, "agent_token");
+    const token = socket.handshake.auth?.agent_token;
     if (!verifyHandoffToken(token, { tenant_id: tenantId, session_id: sessionId, role: "agent" })) {
       return { ok: false, error: "A valid agent handoff token is required." };
     }
