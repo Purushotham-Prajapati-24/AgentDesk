@@ -506,10 +506,30 @@
       try {
         const responseText = await requestBotReply(config, this.sessionToken, content);
         if (responseText) {
-          await this.typeBotMessage(responseText);
+          const messageId = await this.typeBotMessage(responseText);
+          if (this.socket && this.socket.connected) {
+            try {
+              this.socket.emit("bot-message", {
+                message_id: messageId,
+                content: responseText,
+              });
+            } catch (err) {
+              console.error("Failed to emit bot message over socket:", err);
+            }
+          }
         }
       } catch {
-        await this.typeBotMessage(config.fallbackMessage);
+        const messageId = await this.typeBotMessage(config.fallbackMessage);
+        if (this.socket && this.socket.connected) {
+          try {
+            this.socket.emit("bot-message", {
+              message_id: messageId,
+              content: config.fallbackMessage,
+            });
+          } catch (err) {
+            console.error("Failed to emit bot message over socket:", err);
+          }
+        }
       } finally {
         this.setSendingState(false);
       }
@@ -517,7 +537,8 @@
 
     private async typeBotMessage(content: string) {
       this.removeTypingIndicator();
-      const message: ChatMessage = { id: createId(), sender: "bot", content: "" };
+      const messageId = createId();
+      const message: ChatMessage = { id: messageId, sender: "bot", content: "" };
       this.messages.push(message);
       const row = this.appendMessageRow(message);
       const chars = Array.from(content);
@@ -530,6 +551,7 @@
           await delay(12);
         }
       }
+      return messageId;
     }
   }
 
