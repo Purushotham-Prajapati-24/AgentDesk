@@ -92,6 +92,10 @@ export function createHandoffServer(options = {}) {
     socket.on("bot-status-toggle", (payload, acknowledge) => {
       void handleStatusToggle(socket, sessionStore, room, payload, acknowledge);
     });
+
+    socket.on("bot-message", (payload, acknowledge) => {
+      void handleBotMessage(socket, room, payload, acknowledge);
+    });
   });
 
   return { app, server, io, sessionStore, sessionState: sessionStore.sessionState };
@@ -154,6 +158,25 @@ async function handleAgentMessage(socket, room, payload, acknowledge, persistAge
   };
 
   socket.to(roomName(room)).emit("agent-message", event);
+  socket.emit("message-accepted", event);
+  acknowledge?.({ success: true, data: event });
+}
+
+async function handleBotMessage(socket, room, payload, acknowledge) {
+  const message = parseMessagePayload(payload, "bot");
+  if (!message.ok) {
+    acknowledge?.(errorBody("INVALID_MESSAGE", message.error));
+    return;
+  }
+
+  const event = {
+    ...message.value,
+    tenant_id: room.tenant_id,
+    session_id: room.session_id,
+    created_at: new Date().toISOString(),
+  };
+
+  socket.to(roomName(room)).emit("bot-message", event);
   socket.emit("message-accepted", event);
   acknowledge?.({ success: true, data: event });
 }

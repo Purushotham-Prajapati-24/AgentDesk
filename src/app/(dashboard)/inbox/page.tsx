@@ -201,6 +201,9 @@ export default function InboxPage() {
       socket.on("agent-message", (message: SocketEventMessage) => {
         appendMessage(setMessages, mapSocketMessage(message));
       });
+      socket.on("bot-message", (message: SocketEventMessage) => {
+        appendMessage(setMessages, mapSocketMessage(message));
+      });
       socket.on("server-error", (response: AckResponse<never>) => {
         if (!response.success) {
           setError(response.error.message);
@@ -1094,11 +1097,11 @@ function InboxEmptyState({ title, description }: { title: string; description: s
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
-  const isCustomer = message.sender === "customer";
+  const isAgent = message.sender === "agent";
   const Icon = message.sender === "bot" ? Bot : message.sender === "agent" ? Headphones : UserRound;
 
   return (
-    <div className={cn("flex", isCustomer ? "justify-start" : "justify-end")}>
+    <div className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
       <article className={messageBubbleClass(message.sender)}>
         <div className="mb-2 flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 font-mono text-xs font-semibold uppercase">

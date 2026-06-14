@@ -540,11 +540,11 @@ function MonitorMetric({ label, value, detail, tone }: { label: string; value: s
 }
 
 function MessageBubble({ message }: { message: MonitorMessage }) {
-  const isCustomer = message.sender === "customer";
+  const isAgent = message.sender === "agent";
   const Icon = message.sender === "bot" ? Bot : message.sender === "agent" ? Headphones : UserRound;
 
   return (
-    <div className={cn("flex", isCustomer ? "justify-start" : "justify-end")}>
+    <div className={cn("flex", isAgent ? "justify-end" : "justify-start")}>
       <article className={messageClass(message.sender)}>
         <div className="mb-2 flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 font-mono text-xs font-semibold uppercase">
