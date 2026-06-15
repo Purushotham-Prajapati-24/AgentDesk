@@ -1,0 +1,80 @@
+name: Publish SDK Packages
+
+on:
+  push:
+    tags:
+      - 'sdk/v*'
+
+concurrency:
+  group: publish-sdk
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for npm provenance
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # `fetch-depth: 0` is required for npm provenance so the
+          # Sigstore-signed attestation can resolve the exact commit and
+          # ref from the build's working tree. With a shallow clone
+          # (the default) provenance generation fails with
+          # `gitsign: no commit found`.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        # `--legacy-peer-deps` works around the peer-dependency conflict
+        # between Next.js 15 (which peers on `react@^18.2.0`) and
+        # React 19 used by the @agentdesk/react dev environment. Without
+        # this flag `npm ci` aborts on the first ERESOLVE.
+        run: npm ci --legacy-peer-deps
+
+      - name: Lint SDK packages
+        # Quality gate: fail the publish if any workspace has lint errors.
+        # `--if-present` ensures workspaces without a `lint` script are
+        # skipped instead of erroring.
+        run: npm run lint --workspaces --if-present
+
+      - name: Build widget.js
+        run: npm run build:widget
+
+      - name: Build SDK packages
+        run: npm run build:sdk
+
+      - name: Publish @agentdesk/core
+        # MUST be published first: @agentdesk/react and @agentdesk/vue both
+        # declare `"@agentdesk/core": "^0.1.0"` as a runtime dependency. If we
+        # published those packages while `@agentdesk/core` was still resolved
+        # via the local `file:` workspace link, npm would tarball the wrong
+        # `main`/`types` paths and downstream consumers would fail to install.
+        # Publishing core first lets the React/Vue packages resolve it from
+        # the public registry.
+        run: npm publish --access public --provenance
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @agentdesk/react
+        run: npm publish --access public --provenance
+        working-directory: packages/react
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @agentdesk/vue
+        run: npm publish --access public --provenance
+        working-directory: packages/vue
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

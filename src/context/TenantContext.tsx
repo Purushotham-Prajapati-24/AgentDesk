@@ -32,13 +32,15 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [role, setRole] = useState<"admin" | "agent" | null>(VISUAL_AUDIT_ENABLED ? "admin" : null);
   const [loading, setLoading] = useState(!VISUAL_AUDIT_ENABLED);
 
+  const userId = user?.$id ?? null;
+
   useEffect(() => {
     const fetchTenantData = async () => {
       if (VISUAL_AUDIT_ENABLED) {
         return;
       }
 
-      if (!user) {
+      if (!userId) {
         setTenant(null);
         setRole(null);
         setLoading(false);
@@ -68,7 +70,7 @@ export const TenantProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     fetchTenantData();
-  }, [user]);
+  }, [userId]);
 
   return (
     <TenantContext.Provider value={{ tenant, role, loading }}>

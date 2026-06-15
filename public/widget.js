@@ -3,11 +3,60 @@
     const STORAGE_VERSION = "v1";
     const DEFAULT_TIMEOUT_MS = 12000;
     const MAX_MESSAGE_LENGTH = 1200;
+    const isIframeEmbed = (() => {
+        try {
+            return window.parent && window.parent !== window;
+        }
+        catch {
+            return true;
+        }
+    })();
+    function postLifecycleEvent(type) {
+        const payload = { type, botId };
+        try {
+            if (isIframeEmbed) {
+                window.parent.postMessage(payload, "*");
+            }
+            else {
+                window.postMessage(payload, window.location.origin);
+            }
+        }
+        catch {
+        }
+    }
+    function applyRemoteMode(nextMode) {
+        if (nextMode !== "launcher" && nextMode !== "inline") {
+            return;
+        }
+        if (nextMode === embedMode) {
+            postLifecycleEvent("agentdesk-set-mode-ack");
+            return;
+        }
+        embedMode = nextMode;
+        const widgetEl = document.querySelector("agentdesk-widget");
+        widgetEl === null || widgetEl === void 0 ? void 0 : widgetEl.setMode(nextMode);
+        postLifecycleEvent("agentdesk-set-mode-ack");
+    }
     const currentScript = (document.currentScript ||
         document.querySelector('script[data-bot-id]') ||
         document.querySelector('script[src*="widget.js"]'));
     const scriptUrl = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.src) ? new URL(currentScript.src, window.location.href) : null;
-    const scriptOrigin = (_a = scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin) !== null && _a !== void 0 ? _a : window.location.origin;
+    let apiOriginRaw = (_a = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.apiOrigin) === null || _a === void 0 ? void 0 : _a.trim();
+    if (apiOriginRaw) {
+        try {
+            const parsed = new URL(apiOriginRaw);
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                apiOriginRaw = undefined;
+            }
+            else {
+                apiOriginRaw = parsed.origin;
+            }
+        }
+        catch {
+            apiOriginRaw = undefined;
+        }
+    }
+    const scriptOrigin = apiOriginRaw || (scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin) || window.location.origin;
     let botId = (_c = (_b = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
     let embedMode = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.mode) === "inline" ? "inline" : "launcher";
     if (!botId && window.location.pathname.startsWith("/embed/")) {
@@ -45,6 +94,13 @@
         }
         toggle() {
             this.isOpen = !this.isOpen;
+            this.renderShell();
+            postLifecycleEvent(this.isOpen ? "agentdesk-widget-open" : "agentdesk-widget-close");
+        }
+        setMode(nextMode) {
+            if (nextMode === embedMode)
+                return;
+            embedMode = nextMode;
             this.renderShell();
         }
         async loadConfig() {
@@ -91,7 +147,14 @@
                 document.head.appendChild(script);
             }
             else {
+                let retries = 0;
+                const MAX_RETRIES = 50;
                 const checkInterval = window.setInterval(() => {
+                    retries++;
+                    if (retries > MAX_RETRIES) {
+                        window.clearInterval(checkInterval);
+                        return;
+                    }
                     const windowRef = window;
                     if (typeof windowRef.io !== "undefined") {
                         window.clearInterval(checkInterval);
@@ -176,6 +239,7 @@
             launcher.addEventListener("click", () => {
                 this.isOpen = !this.isOpen;
                 this.renderShell();
+                postLifecycleEvent(this.isOpen ? "agentdesk-widget-open" : "agentdesk-widget-close");
             });
             wrapper.append(pane, launcher);
             return wrapper;
@@ -209,11 +273,7 @@
                 close.addEventListener("click", () => {
                     this.isOpen = false;
                     this.renderShell();
-                    try {
-                        window.parent.postMessage({ type: "agentdesk-widget-close", botId }, "*");
-                    }
-                    catch {
-                    }
+                    postLifecycleEvent("agentdesk-widget-close");
                 });
                 header.append(close);
             }
@@ -388,11 +448,33 @@
             try {
                 const responseText = await requestBotReply(config, this.sessionToken, content);
                 if (responseText) {
-                    await this.typeBotMessage(responseText);
+                    const messageId = await this.typeBotMessage(responseText);
+                    if (this.socket && this.socket.connected) {
+                        try {
+                            this.socket.emit("bot-message", {
+                                message_id: messageId,
+                                content: responseText,
+                            });
+                        }
+                        catch (err) {
+                            console.error("Failed to emit bot message over socket:", err);
+                        }
+                    }
                 }
             }
             catch {
-                await this.typeBotMessage(config.fallbackMessage);
+                const messageId = await this.typeBotMessage(config.fallbackMessage);
+                if (this.socket && this.socket.connected) {
+                    try {
+                        this.socket.emit("bot-message", {
+                            message_id: messageId,
+                            content: config.fallbackMessage,
+                        });
+                    }
+                    catch (err) {
+                        console.error("Failed to emit bot message over socket:", err);
+                    }
+                }
             }
             finally {
                 this.setSendingState(false);
@@ -400,7 +482,8 @@
         }
         async typeBotMessage(content) {
             this.removeTypingIndicator();
-            const message = { id: createId(), sender: "bot", content: "" };
+            const messageId = createId();
+            const message = { id: messageId, sender: "bot", content: "" };
             this.messages.push(message);
             const row = this.appendMessageRow(message);
             const chars = Array.from(content);
@@ -412,6 +495,7 @@
                     await delay(12);
                 }
             }
+            return messageId;
         }
     }
     async function requestBotReply(config, sessionToken, message) {
@@ -1330,8 +1414,24 @@
         if (!document.body.querySelector(elementName)) {
             const mount = document.createElement(elementName);
             mount.setAttribute("data-agentdesk-mode", embedMode);
+            mount.setAttribute("data-bot-id", botId);
             document.body.append(mount);
         }
     }
+    window.addEventListener("message", (event) => {
+        if (!event.data || typeof event.data !== "object")
+            return;
+        const data = event.data;
+        if (data.type !== "agentdesk-set-mode")
+            return;
+        if (data.botId !== botId)
+            return;
+        if (data.mode !== "launcher" && data.mode !== "inline")
+            return;
+        if (event.origin && event.origin !== scriptOrigin && event.source !== window.parent) {
+            return;
+        }
+        applyRemoteMode(data.mode);
+    });
     mountWidget();
 })();

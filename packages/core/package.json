@@ -1,0 +1,43 @@
+{
+  "name": "@agentdesk/core",
+  "version": "0.1.0",
+  "description": "AgentDesk core shared types and widget ownership registry",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "homepage": "https://github.com/Purushotham-Prajapati-24/AgentDesk#readme",
+  "bugs": {
+    "url": "https://github.com/Purushotham-Prajapati-24/AgentDesk/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Purushotham-Prajapati-24/AgentDesk.git",
+    "directory": "packages/core"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "tsup": "^8",
+    "typescript": "^5"
+  }
+}
