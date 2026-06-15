@@ -47,18 +47,16 @@ export interface AgentDeskWidgetProps {
 // SDK mount (any botId) and uninstalled on the last SDK unmount (any
 // botId) — both gated by ref counts in `@agentdesk/core`.
 
-type ListenerBucket = {
-  emit: ((type: 'open' | 'close') => void) | null;
-};
+type ListenerBucket = Set<(type: 'open' | 'close') => void>;
 
 const listenerBuckets = new Map<string, ListenerBucket>();
 
 function dispatchOpen(botId: string) {
-  listenerBuckets.get(botId)?.emit?.('open');
+  listenerBuckets.get(botId)?.forEach((emit) => emit('open'));
 }
 
 function dispatchClose(botId: string) {
-  listenerBuckets.get(botId)?.emit?.('close');
+  listenerBuckets.get(botId)?.forEach((emit) => emit('close'));
 }
 
 let globalListenerInstalled = false;
@@ -121,7 +119,7 @@ function injectScript(options: {
 function removeScriptAndWidget(botId: string): void {
   findExistingScript(botId)?.remove();
   document
-    .querySelectorAll<HTMLElement>(WIDGET_ELEMENT_NAME)
+    .querySelectorAll<HTMLElement>(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`)
     .forEach((el) => el.remove());
 }
 
@@ -204,7 +202,10 @@ export const AgentDeskWidget = defineComponent({
       // events to *this* component instance. We use a closure on `emit`
       // because the emit function is not stable across re-renders.
       cachedEmit = (type: 'open' | 'close') => emit(type);
-      listenerBuckets.set(props.botId, { emit: cachedEmit });
+      if (!listenerBuckets.has(props.botId)) {
+        listenerBuckets.set(props.botId, new Set());
+      }
+      listenerBuckets.get(props.botId)!.add(cachedEmit);
 
       // Resolve the custom element so callers can immediately query
       // `document.querySelector('agentdesk-widget')` and get a real
@@ -218,7 +219,11 @@ export const AgentDeskWidget = defineComponent({
 
     const release = () => {
       if (!hasSlot || !props.botId) return;
-      listenerBuckets.delete(props.botId);
+      const bucket = listenerBuckets.get(props.botId);
+      if (cachedEmit) bucket?.delete(cachedEmit);
+      if (bucket && bucket.size === 0) {
+        listenerBuckets.delete(props.botId);
+      }
       cachedEmit = null;
       const result = releaseInstance(props.botId);
       hasSlot = false;

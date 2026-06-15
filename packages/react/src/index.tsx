@@ -169,14 +169,9 @@ function injectScript(options: {
 }
 
 function removeScriptAndWidget(botId: string): void {
-  // Remove the script tag (any matching dataset.botId).
   findExistingScript(botId)?.remove();
-  // Remove all custom elements for this bot — they might be orphaned if
-  // the user mounted multiple bots on the same page. The IIFE only ever
-  // creates one `<agentdesk-widget>` element globally, so the loop is
-  // cheap and safe.
   document
-    .querySelectorAll<HTMLElement>(WIDGET_ELEMENT_NAME)
+    .querySelectorAll<HTMLElement>(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`)
     .forEach((el) => el.remove());
 }
 
@@ -259,9 +254,9 @@ export function AgentDeskWidget({
     }
 
     return () => {
-      listenerBuckets.delete(botId);
       const release = releaseInstance(botId);
       if (release.isLastForBot) {
+        listenerBuckets.delete(botId);
         removeScriptAndWidget(botId);
       }
       if (release.mustRemoveListener) {

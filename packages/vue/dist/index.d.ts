@@ -1,13 +1,16 @@
 import * as vue from 'vue';
 import { App, PropType } from 'vue';
 import { WidgetMode } from '@agentdesk/core';
+export { WidgetMode } from '@agentdesk/core';
 
 interface AgentDeskWidgetProps {
     /** The Bot ID from your AgentDesk dashboard. Required. */
     botId: string;
     /** Override the config fetch URL. */
     configUrl?: string;
-    /** 'launcher' = floating bubble (default). 'inline' = fills container. */
+    /** 'launcher' = floating bubble (default). 'inline' = fills container.
+     *  **Dynamic updates are supported** — the SDK posts an
+     *  `agentdesk-set-mode` message when this prop changes. */
     mode?: WidgetMode;
     /** URL to widget.js. Defaults to '/widget.js'. */
     scriptSrc?: string;
@@ -78,10 +81,10 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     onOpen?: ((...args: any[]) => any) | undefined;
     onClose?: ((...args: any[]) => any) | undefined;
 }>, {
-    configUrl: string;
     mode: WidgetMode;
-    scriptSrc: string;
+    configUrl: string;
     apiOrigin: string;
+    scriptSrc: string;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 interface AgentDeskPluginOptions {
     /**

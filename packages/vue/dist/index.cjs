@@ -3,8 +3,65 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 var vue = require('vue');
+var core = require('@agentdesk/core');
 
 // src/index.ts
+var listenerBuckets = /* @__PURE__ */ new Map();
+function dispatchOpen(botId) {
+  var _a;
+  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((emit) => emit("open"));
+}
+function dispatchClose(botId) {
+  var _a;
+  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((emit) => emit("close"));
+}
+var globalListenerInstalled = false;
+var globalListenerRef = null;
+function installGlobalListener() {
+  if (globalListenerInstalled) return;
+  globalListenerInstalled = true;
+  globalListenerRef = (event) => {
+    if (!event.data || typeof event.data !== "object") return;
+    if (event.origin !== window.location.origin) return;
+    const data = event.data;
+    if (data.type !== "agentdesk-widget-open" && data.type !== "agentdesk-widget-close") return;
+    if (typeof data.botId !== "string") return;
+    if (data.type === "agentdesk-widget-open") dispatchOpen(data.botId);
+    else dispatchClose(data.botId);
+  };
+  window.addEventListener("message", globalListenerRef);
+}
+function uninstallGlobalListener() {
+  if (!globalListenerInstalled) return;
+  globalListenerInstalled = false;
+  if (globalListenerRef) {
+    window.removeEventListener("message", globalListenerRef);
+    globalListenerRef = null;
+  }
+}
+var SCRIPT_TAG = "data-agentdesk";
+function findExistingScript(botId) {
+  var _a;
+  return (_a = Array.from(
+    document.querySelectorAll(`script[${SCRIPT_TAG}]`)
+  ).find((candidate) => candidate.dataset.botId === botId)) != null ? _a : null;
+}
+function injectScript(options) {
+  const script = document.createElement("script");
+  script.src = options.scriptSrc;
+  script.async = true;
+  script.setAttribute(SCRIPT_TAG, "");
+  script.dataset.botId = options.botId;
+  script.dataset.mode = options.mode;
+  if (options.configUrl) script.dataset.configUrl = options.configUrl;
+  if (options.apiOrigin) script.dataset.apiOrigin = options.apiOrigin;
+  document.body.append(script);
+}
+function removeScriptAndWidget(botId) {
+  var _a;
+  (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
+  document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
+}
 var AgentDeskWidget = vue.defineComponent({
   name: "AgentDeskWidget",
   props: {
@@ -32,62 +89,77 @@ var AgentDeskWidget = vue.defineComponent({
   },
   emits: ["open", "close"],
   setup(props, { emit }) {
-    const scriptRef = vue.ref(null);
-    const widgetRef = vue.ref(null);
-    const loadTimeoutRef = vue.ref(null);
-    let cleanup = null;
-    vue.onMounted(() => {
-      var _a, _b;
+    let hasSlot = false;
+    let cachedEmit = null;
+    const install = () => {
+      var _a, _b, _c;
       if (!props.botId) return;
-      const SCRIPT_TAG = "data-agentdesk";
-      const existingScript = Array.from(
-        document.querySelectorAll(`script[${SCRIPT_TAG}]`)
-      ).find((candidate) => candidate.dataset.botId === props.botId);
-      if (existingScript) return;
-      const script = document.createElement("script");
-      script.src = (_a = props.scriptSrc) != null ? _a : "/widget.js";
-      script.async = true;
-      script.setAttribute(SCRIPT_TAG, "");
-      script.dataset.botId = props.botId;
-      script.dataset.mode = (_b = props.mode) != null ? _b : "launcher";
-      if (props.configUrl) script.dataset.configUrl = props.configUrl;
-      if (props.apiOrigin) script.dataset.apiOrigin = props.apiOrigin;
-      script.addEventListener("load", () => {
-        loadTimeoutRef.value = window.setTimeout(() => {
-          widgetRef.value = document.querySelector("agentdesk-widget");
-          loadTimeoutRef.value = null;
-        }, 20);
-      });
-      document.body.append(script);
-      scriptRef.value = script;
-      const handleMessage = (event) => {
-        if (event.origin !== window.location.origin) return;
-        if (!event.data || typeof event.data !== "object") return;
-        const data = event.data;
-        if (data.botId !== props.botId) return;
-        if (data.type === "agentdesk-widget-open") emit("open");
-        if (data.type === "agentdesk-widget-close") emit("close");
-      };
-      window.addEventListener("message", handleMessage);
-      cleanup = () => {
-        window.removeEventListener("message", handleMessage);
-      };
+      const acquire = core.acquireInstance(props.botId, (_a = props.mode) != null ? _a : "launcher");
+      if (acquire.mustInstallListener) {
+        installGlobalListener();
+      }
+      if (acquire.isFirstForBot) {
+        if (!findExistingScript(props.botId)) {
+          injectScript({
+            botId: props.botId,
+            mode: (_b = props.mode) != null ? _b : "launcher",
+            scriptSrc: props.scriptSrc || "/widget.js",
+            configUrl: props.configUrl || void 0,
+            apiOrigin: props.apiOrigin || void 0
+          });
+        }
+      } else if (acquire.modeChanged) {
+        core.postSetMode(props.botId, (_c = props.mode) != null ? _c : "launcher");
+      }
+      hasSlot = true;
+      cachedEmit = (type) => emit(type);
+      if (!listenerBuckets.has(props.botId)) {
+        listenerBuckets.set(props.botId, /* @__PURE__ */ new Set());
+      }
+      listenerBuckets.get(props.botId).add(cachedEmit);
+      if (typeof customElements !== "undefined") {
+        void customElements.whenDefined(core.WIDGET_ELEMENT_NAME).catch(() => {
+        });
+      }
+    };
+    const release = () => {
+      if (!hasSlot || !props.botId) return;
+      const bucket = listenerBuckets.get(props.botId);
+      if (cachedEmit) bucket == null ? void 0 : bucket.delete(cachedEmit);
+      if (bucket && bucket.size === 0) {
+        listenerBuckets.delete(props.botId);
+      }
+      cachedEmit = null;
+      const result = core.releaseInstance(props.botId);
+      hasSlot = false;
+      if (result.isLastForBot) {
+        removeScriptAndWidget(props.botId);
+      }
+      if (result.mustRemoveListener) {
+        uninstallGlobalListener();
+      }
+    };
+    vue.onMounted(() => {
+      install();
     });
     vue.onBeforeUnmount(() => {
-      var _a;
-      cleanup == null ? void 0 : cleanup();
-      cleanup = null;
-      if (loadTimeoutRef.value !== null) {
-        window.clearTimeout(loadTimeoutRef.value);
-        loadTimeoutRef.value = null;
-      }
-      (_a = scriptRef.value) == null ? void 0 : _a.remove();
-      scriptRef.value = null;
-      if (widgetRef.value && widgetRef.value.isConnected) {
-        widgetRef.value.remove();
-      }
-      widgetRef.value = null;
+      release();
     });
+    vue.onDeactivated(() => {
+      release();
+    });
+    vue.onActivated(() => {
+      install();
+    });
+    vue.watch(
+      () => props.mode,
+      (next, prev) => {
+        if (next === prev) return;
+        if (!hasSlot) return;
+        if (!props.botId) return;
+        core.postSetMode(props.botId, next != null ? next : "launcher");
+      }
+    );
     return () => vue.h("span", {
       "data-agentdesk-vue-host": props.botId,
       style: "display:none",

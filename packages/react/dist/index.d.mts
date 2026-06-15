@@ -1,4 +1,5 @@
 import { WidgetMode } from '@agentdesk/core';
+export { WidgetMode } from '@agentdesk/core';
 
 interface AgentDeskWidgetProps {
     /**
@@ -15,6 +16,10 @@ interface AgentDeskWidgetProps {
      * Display mode for the widget.
      * - `'launcher'` — floating bubble in the bottom-right corner (default).
      * - `'inline'`   — fills the nearest positioned ancestor.
+     *
+     * **Dynamic updates are supported.** When this prop changes, the SDK
+     * posts a `agentdesk-set-mode` message to the running widget so the
+     * layout updates without a full script re-injection.
      */
     mode?: WidgetMode;
     /**

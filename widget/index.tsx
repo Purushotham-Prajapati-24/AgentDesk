@@ -1655,6 +1655,7 @@
     if (!document.body.querySelector(elementName)) {
       const mount = document.createElement(elementName);
       mount.setAttribute("data-agentdesk-mode", embedMode);
+      mount.setAttribute("data-bot-id", botId);
       document.body.append(mount);
     }
   }
