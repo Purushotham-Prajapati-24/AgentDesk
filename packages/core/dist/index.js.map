@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/index.ts"],"sourcesContent":["export type WidgetMode = 'launcher' | 'inline';\n\nexport interface WidgetMessageEventData {\n  type: 'agentdesk-widget-open' | 'agentdesk-widget-close';\n  botId: string;\n}\n"],"mappings":";;;;;;;;;;;;;;;;AAAA;AAAA;","names":[]}

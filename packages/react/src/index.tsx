@@ -13,10 +13,9 @@
 // with `ssr: false`.
 
 import { useEffect, useRef } from 'react';
+import type { WidgetMode, WidgetMessageEventData } from '@agentdesk/core';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
-
-export type WidgetMode = 'launcher' | 'inline';
 
 export interface AgentDeskWidgetProps {
   /**
@@ -109,7 +108,7 @@ export function AgentDeskWidget({
     // compare `dataset.botId` directly — attribute-value selectors with
     // dynamic, bot-controlled values (and `CSS.escape`) are fragile and
     // can be spoofed by a malicious `botId`.
-    const SCRIPT_TAG = 'data-agentdesk-react';
+    const SCRIPT_TAG = 'data-agentdesk';
     const existingScript = Array.from(
       document.querySelectorAll<HTMLScriptElement>(`script[${SCRIPT_TAG}]`),
     ).find((candidate) => candidate.dataset.botId === botId);
@@ -124,10 +123,12 @@ export function AgentDeskWidget({
     if (configUrl) script.dataset.configUrl = configUrl;
     if (apiOrigin) script.dataset.apiOrigin = apiOrigin;
 
+    const loadTimeoutRef = { current: null as number | null };
     let widgetEl: Element | null = null;
     script.addEventListener('load', () => {
-      window.setTimeout(() => {
+      loadTimeoutRef.current = window.setTimeout(() => {
         widgetEl = document.querySelector('agentdesk-widget');
+        loadTimeoutRef.current = null;
       }, 20);
     });
 
@@ -140,7 +141,7 @@ export function AgentDeskWidget({
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (!event.data || typeof event.data !== 'object') return;
-      const data = event.data as { type?: unknown; botId?: unknown };
+      const data = event.data as WidgetMessageEventData;
       if (data.botId !== botId) return;
       if (data.type === 'agentdesk-widget-open') onOpenRef.current?.();
       if (data.type === 'agentdesk-widget-close') onCloseRef.current?.();
@@ -148,6 +149,10 @@ export function AgentDeskWidget({
     window.addEventListener('message', handleMessage);
 
     return () => {
+      if (loadTimeoutRef.current !== null) {
+        window.clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
       script.remove();
       if (widgetEl && widgetEl.isConnected) widgetEl.remove();
       window.removeEventListener('message', handleMessage);

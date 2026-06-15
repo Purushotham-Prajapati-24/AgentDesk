@@ -1,4 +1,5 @@
-type WidgetMode = 'launcher' | 'inline';
+import { WidgetMode } from '@agentdesk/core';
+
 interface AgentDeskWidgetProps {
     /**
      * The Bot ID from your AgentDesk dashboard.
@@ -57,4 +58,4 @@ interface AgentDeskWidgetProps {
  */
 declare function AgentDeskWidget({ botId, configUrl, mode, scriptSrc, apiOrigin, onOpen, onClose, }: AgentDeskWidgetProps): null;
 
-export { AgentDeskWidget, type AgentDeskWidgetProps, type WidgetMode };
+export { AgentDeskWidget, type AgentDeskWidgetProps };

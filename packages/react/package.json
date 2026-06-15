@@ -2,7 +2,15 @@
   "name": "@agentdesk/react",
   "version": "0.1.0",
   "description": "AgentDesk AI chat widget — React & Next.js SDK",
-  "keywords": ["agentdesk", "chat", "widget", "react", "nextjs", "support", "bot"],
+  "keywords": [
+    "agentdesk",
+    "chat",
+    "widget",
+    "react",
+    "nextjs",
+    "support",
+    "bot"
+  ],
   "license": "MIT",
   "author": "AgentDesk",
   "homepage": "https://github.com/anomalyco/AI_Support_Agent#readme",
@@ -32,20 +40,31 @@
       "require": "./dist/nextjs.cjs"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "peerDependencies": {
+    "next": ">=13.0.0",
     "react": ">=18.0.0",
-    "react-dom": ">=18.0.0",
-    "next": ">=13.0.0"
+    "react-dom": ">=18.0.0"
   },
   "peerDependenciesMeta": {
-    "react-dom": { "optional": true },
-    "next": { "optional": true }
+    "react-dom": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/react": "^19",
@@ -53,5 +72,8 @@
     "react-dom": "^19",
     "tsup": "^8",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@agentdesk/core": "^0.1.0"
   }
 }

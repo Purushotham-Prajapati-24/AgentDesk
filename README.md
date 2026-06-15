@@ -222,7 +222,54 @@ npm run dev
 
 ---
 
-## 🧩 Embedding the Widget
+## 🧩 Framework SDKs
+
+AgentDesk provides official SDKs for React and Vue to make embedding the widget seamless.
+
+### React / Next.js SDK
+
+```bash
+npm install @agentdesk/react
+```
+
+```tsx
+import { AgentDeskWidget } from '@agentdesk/react';
+// If using Next.js, import from the nextjs subpath for SSR safety:
+// import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+
+export default function App() {
+  return <AgentDeskWidget botId="YOUR_BOT_ID" />;
+}
+```
+
+**Supported Versions:**
+- React `>=18.0.0`
+- Next.js `>=13.0.0`
+
+> **Note:** If you are using an older version of React or Next.js, or encounter hoisting issues in your monorepo, you may need to configure peer dependencies or install the widget manually via script tags.
+
+### Vue 3 SDK
+
+```bash
+npm install @agentdesk/vue
+```
+
+```vue
+<script setup>
+import { AgentDeskWidget } from '@agentdesk/vue';
+</script>
+
+<template>
+  <AgentDeskWidget botId="YOUR_BOT_ID" />
+</template>
+```
+
+**Supported Versions:**
+- Vue `>=3.0.0`
+
+> **Breaking Change Notice (v0.1.0):** The `targetOrigin` used by the widget's `postMessage` events is now strictly `window.location.origin` (previously `*`). If you are embedding the widget in an iframe and listening for events via `window.parent`, your listener must be on the same origin or it will not receive messages.
+
+## 🧩 Embedding the Widget (Manual)
 
 Script launcher:
 

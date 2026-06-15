@@ -1,5 +1,5 @@
 import { AgentDeskWidgetProps } from './index.mjs';
-export { WidgetMode } from './index.mjs';
+export { WidgetMode } from '@agentdesk/core';
 import { ComponentType } from 'react';
 
 /**

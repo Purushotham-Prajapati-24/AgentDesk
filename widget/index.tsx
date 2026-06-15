@@ -58,7 +58,20 @@
   // `apiOrigin` is supplied by the host page via the `data-api-origin` attribute and
   // ultimately resolved server-side from the trusted bot config endpoint. The widget
   // uses it as the base for `messageEndpoint`, `configUrl`, and the websocket URL.
-  const scriptOrigin = (currentScript?.dataset.apiOrigin?.trim() || scriptUrl?.origin) ?? window.location.origin;
+  let apiOriginRaw = currentScript?.dataset.apiOrigin?.trim();
+  if (apiOriginRaw) {
+    try {
+      const parsed = new URL(apiOriginRaw);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        apiOriginRaw = undefined;
+      } else {
+        apiOriginRaw = parsed.origin;
+      }
+    } catch {
+      apiOriginRaw = undefined;
+    }
+  }
+  const scriptOrigin = apiOriginRaw || scriptUrl?.origin || window.location.origin;
   
   let botId = currentScript?.dataset.botId?.trim() ?? "";
   let embedMode = currentScript?.dataset.mode === "inline" ? "inline" : "launcher";

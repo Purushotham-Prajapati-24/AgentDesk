@@ -11,7 +11,7 @@ export default defineConfig({
   sourcemap: true,
   external: ['react', 'react-dom', 'next'],
   treeshake: true,
-  splitting: false,
+  splitting: true,
   // Emit `.cjs` for the CommonJS build so consumers that `require()` this
   // package resolve a real CJS file (matching the `"main"`/`"require"`
   // exports in package.json) instead of a `.js` ESM file that Node treats

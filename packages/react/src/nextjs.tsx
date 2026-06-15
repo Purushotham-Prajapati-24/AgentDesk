@@ -49,8 +49,8 @@
  * ```
  */
 
-// Re-export types so consumers don't need two imports
-export type { AgentDeskWidgetProps, WidgetMode } from './index';
+export type { AgentDeskWidgetProps } from './index';
+export type { WidgetMode } from '@agentdesk/core';
 
 import type { ComponentType } from 'react';
 import type { AgentDeskWidgetProps } from './index';

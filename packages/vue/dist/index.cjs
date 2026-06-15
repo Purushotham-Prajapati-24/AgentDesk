@@ -18,7 +18,8 @@ var AgentDeskWidget = vue.defineComponent({
     },
     mode: {
       type: String,
-      default: "launcher"
+      default: "launcher",
+      validator: (v) => ["launcher", "inline"].includes(v)
     },
     scriptSrc: {
       type: String,
@@ -33,11 +34,12 @@ var AgentDeskWidget = vue.defineComponent({
   setup(props, { emit }) {
     const scriptRef = vue.ref(null);
     const widgetRef = vue.ref(null);
+    const loadTimeoutRef = vue.ref(null);
     let cleanup = null;
     vue.onMounted(() => {
       var _a, _b;
       if (!props.botId) return;
-      const SCRIPT_TAG = "data-agentdesk-vue";
+      const SCRIPT_TAG = "data-agentdesk";
       const existingScript = Array.from(
         document.querySelectorAll(`script[${SCRIPT_TAG}]`)
       ).find((candidate) => candidate.dataset.botId === props.botId);
@@ -51,8 +53,9 @@ var AgentDeskWidget = vue.defineComponent({
       if (props.configUrl) script.dataset.configUrl = props.configUrl;
       if (props.apiOrigin) script.dataset.apiOrigin = props.apiOrigin;
       script.addEventListener("load", () => {
-        window.setTimeout(() => {
+        loadTimeoutRef.value = window.setTimeout(() => {
           widgetRef.value = document.querySelector("agentdesk-widget");
+          loadTimeoutRef.value = null;
         }, 20);
       });
       document.body.append(script);
@@ -74,6 +77,10 @@ var AgentDeskWidget = vue.defineComponent({
       var _a;
       cleanup == null ? void 0 : cleanup();
       cleanup = null;
+      if (loadTimeoutRef.value !== null) {
+        window.clearTimeout(loadTimeoutRef.value);
+        loadTimeoutRef.value = null;
+      }
       (_a = scriptRef.value) == null ? void 0 : _a.remove();
       scriptRef.value = null;
       if (widgetRef.value && widgetRef.value.isConnected) {
@@ -89,7 +96,7 @@ var AgentDeskWidget = vue.defineComponent({
   }
 });
 var AgentDeskPlugin = {
-  install(app, options = {}) {
+  install(app, options = { globalComponent: true }) {
     if (options.globalComponent !== false) {
       app.component("AgentDeskWidget", AgentDeskWidget);
     }

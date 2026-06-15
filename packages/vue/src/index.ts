@@ -8,9 +8,9 @@ import {
   type PropType,
 } from 'vue';
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+import type { WidgetMode, WidgetMessageEventData } from '@agentdesk/core';
 
-export type WidgetMode = 'launcher' | 'inline';
+// ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface AgentDeskWidgetProps {
   /** The Bot ID from your AgentDesk dashboard. Required. */
@@ -56,6 +56,7 @@ export const AgentDeskWidget = defineComponent({
     mode: {
       type: String as PropType<WidgetMode>,
       default: 'launcher' as WidgetMode,
+      validator: (v: string) => ['launcher', 'inline'].includes(v),
     },
     scriptSrc: {
       type: String as PropType<string>,
@@ -72,6 +73,7 @@ export const AgentDeskWidget = defineComponent({
   setup(props, { emit }) {
     const scriptRef = ref<HTMLScriptElement | null>(null);
     const widgetRef = ref<Element | null>(null);
+    const loadTimeoutRef = ref<number | null>(null);
 
     // Cleanup is owned by the `setup()` closure rather than attached to
     // a DOM node. Attaching arbitrary fields to script elements forces an
@@ -89,7 +91,7 @@ export const AgentDeskWidget = defineComponent({
       // and compare `dataset.botId` directly. Attribute-value selectors
       // with dynamic, bot-controlled values (and `CSS.escape`) are fragile
       // and can be spoofed by a malicious `botId`.
-      const SCRIPT_TAG = 'data-agentdesk-vue';
+      const SCRIPT_TAG = 'data-agentdesk';
       const existingScript = Array.from(
         document.querySelectorAll<HTMLScriptElement>(`script[${SCRIPT_TAG}]`),
       ).find((candidate) => candidate.dataset.botId === props.botId);
@@ -105,8 +107,9 @@ export const AgentDeskWidget = defineComponent({
       if (props.apiOrigin) script.dataset.apiOrigin = props.apiOrigin;
 
       script.addEventListener('load', () => {
-        window.setTimeout(() => {
+        loadTimeoutRef.value = window.setTimeout(() => {
           widgetRef.value = document.querySelector('agentdesk-widget');
+          loadTimeoutRef.value = null;
         }, 20);
       });
 
@@ -120,7 +123,7 @@ export const AgentDeskWidget = defineComponent({
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         if (!event.data || typeof event.data !== 'object') return;
-        const data = event.data as { type?: unknown; botId?: unknown };
+        const data = event.data as WidgetMessageEventData;
         if (data.botId !== props.botId) return;
         if (data.type === 'agentdesk-widget-open') emit('open');
         if (data.type === 'agentdesk-widget-close') emit('close');
@@ -135,6 +138,10 @@ export const AgentDeskWidget = defineComponent({
     onBeforeUnmount(() => {
       cleanup?.();
       cleanup = null;
+      if (loadTimeoutRef.value !== null) {
+        window.clearTimeout(loadTimeoutRef.value);
+        loadTimeoutRef.value = null;
+      }
       scriptRef.value?.remove();
       scriptRef.value = null;
       if (widgetRef.value && widgetRef.value.isConnected) {
@@ -186,7 +193,7 @@ export interface AgentDeskPluginOptions {
  * ```
  */
 export const AgentDeskPlugin = {
-  install(app: App, options: AgentDeskPluginOptions = {}) {
+  install(app: App, options: AgentDeskPluginOptions = { globalComponent: true }) {
     if (options.globalComponent !== false) {
       app.component('AgentDeskWidget', AgentDeskWidget);
     }

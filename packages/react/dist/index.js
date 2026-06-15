@@ -17,7 +17,7 @@ function AgentDeskWidget({
   }, [onOpen, onClose]);
   useEffect(() => {
     if (!botId) return;
-    const SCRIPT_TAG = "data-agentdesk-react";
+    const SCRIPT_TAG = "data-agentdesk";
     const existingScript = Array.from(
       document.querySelectorAll(`script[${SCRIPT_TAG}]`)
     ).find((candidate) => candidate.dataset.botId === botId);
@@ -30,10 +30,12 @@ function AgentDeskWidget({
     script.dataset.mode = mode;
     if (configUrl) script.dataset.configUrl = configUrl;
     if (apiOrigin) script.dataset.apiOrigin = apiOrigin;
+    const loadTimeoutRef = { current: null };
     let widgetEl = null;
     script.addEventListener("load", () => {
-      window.setTimeout(() => {
+      loadTimeoutRef.current = window.setTimeout(() => {
         widgetEl = document.querySelector("agentdesk-widget");
+        loadTimeoutRef.current = null;
       }, 20);
     });
     document.body.append(script);
@@ -48,6 +50,10 @@ function AgentDeskWidget({
     };
     window.addEventListener("message", handleMessage);
     return () => {
+      if (loadTimeoutRef.current !== null) {
+        window.clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
       script.remove();
       if (widgetEl && widgetEl.isConnected) widgetEl.remove();
       window.removeEventListener("message", handleMessage);

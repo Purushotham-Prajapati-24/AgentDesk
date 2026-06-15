@@ -1,7 +1,7 @@
 import * as vue from 'vue';
 import { App, PropType } from 'vue';
+import { WidgetMode } from '@agentdesk/core';
 
-type WidgetMode = 'launcher' | 'inline';
 interface AgentDeskWidgetProps {
     /** The Bot ID from your AgentDesk dashboard. Required. */
     botId: string;
@@ -40,6 +40,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     mode: {
         type: PropType<WidgetMode>;
         default: WidgetMode;
+        validator: (v: string) => boolean;
     };
     scriptSrc: {
         type: PropType<string>;
@@ -63,6 +64,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     mode: {
         type: PropType<WidgetMode>;
         default: WidgetMode;
+        validator: (v: string) => boolean;
     };
     scriptSrc: {
         type: PropType<string>;
@@ -114,4 +116,4 @@ declare const AgentDeskPlugin: {
     install(app: App, options?: AgentDeskPluginOptions): void;
 };
 
-export { AgentDeskPlugin, type AgentDeskPluginOptions, AgentDeskWidget, type AgentDeskWidgetProps, type WidgetMode, AgentDeskPlugin as default };
+export { AgentDeskPlugin, type AgentDeskPluginOptions, AgentDeskWidget, type AgentDeskWidgetProps, AgentDeskPlugin as default };
