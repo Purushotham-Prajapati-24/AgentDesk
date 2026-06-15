@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
+import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Package, Palette, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
 import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@/app/webchat-actions";
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
@@ -18,7 +18,23 @@ import { DeploySettingsForm } from "./DeploySettingsForm";
 import { FeatureToggleForm } from "./FeatureToggleForm";
 
 type SectionId = "identity" | "appearance" | "deploy" | "features";
-type DeploymentTabId = "script" | "iframe" | "react" | "vue";
+type DeploymentTabId = "script" | "iframe" | "react" | "vue" | "packages";
+
+const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_INSTALL_NAMES = {
+  core: "@agentdeskbot/core",
+  react: "@agentdeskbot/react",
+  vue: "@agentdeskbot/vue",
+} as const;
+const PACKAGE_INSTALL_ALL = `npm install ${PACKAGE_INSTALL_NAMES.core}@${PACKAGE_VERSION} \\\n  ${PACKAGE_INSTALL_NAMES.react}@${PACKAGE_VERSION} \\\n  ${PACKAGE_INSTALL_NAMES.vue}@${PACKAGE_VERSION}`;
+
+type PackageInstall = {
+  name: string;
+  version: string;
+  description: string;
+  useWhen: string;
+  installCommand: string;
+};
 
 const sections: Array<{
   id: SectionId;
@@ -82,6 +98,11 @@ const deploymentTabs: Array<{
     label: "Vue",
     summary: "Component install for Vue apps.",
   },
+  {
+    id: "packages",
+    label: "npm packages",
+    summary: "Installable SDKs for React, Vue, and adapters.",
+  },
 ];
 
 type DeploymentGuide = {
@@ -94,6 +115,7 @@ type DeploymentGuide = {
     body: string;
     example?: string;
   }>;
+  packages?: PackageInstall[];
 };
 
 const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
@@ -196,6 +218,36 @@ const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
       {
         title: "Check navigation and overlays",
         body: "Open pages with drawers, modals, or sticky footers and make sure the launcher stays reachable.",
+      },
+    ],
+  },
+  packages: {
+    title: "Install the AgentDesk widget packages",
+    intro: "Three npm packages ship the AgentDesk widget. Install only the one your framework needs.",
+    placement: "Run from the root of your host app or workspace package.",
+    highlight: "All three packages share the same version. Pin them in lockfiles to keep types in sync.",
+    steps: [],
+    packages: [
+      {
+        name: PACKAGE_INSTALL_NAMES.react,
+        version: PACKAGE_VERSION,
+        description: "React & Next.js SDK with full TypeScript types and SSR-safe App Router support.",
+        useWhen: "Use for any React 18+ or Next.js 13+ app. Import from the package root in CRA/Vite/Remix, or from /nextjs in the Next.js App Router.",
+        installCommand: `npm install ${PACKAGE_INSTALL_NAMES.react}@${PACKAGE_VERSION}`,
+      },
+      {
+        name: PACKAGE_INSTALL_NAMES.vue,
+        version: PACKAGE_VERSION,
+        description: "Vue 3 & Nuxt 3 SDK with a global plugin and zero per-file imports.",
+        useWhen: "Use for any Vue 3+ or Nuxt 3+ app. Import the component, or register AgentDeskPlugin once in your entry point.",
+        installCommand: `npm install ${PACKAGE_INSTALL_NAMES.vue}@${PACKAGE_VERSION}`,
+      },
+      {
+        name: PACKAGE_INSTALL_NAMES.core,
+        version: PACKAGE_VERSION,
+        description: "Shared TypeScript types and the widget instance registry.",
+        useWhen: "Use only when building a custom framework adapter. Most apps install core transitively via react or vue.",
+        installCommand: `npm install ${PACKAGE_INSTALL_NAMES.core}@${PACKAGE_VERSION}`,
       },
     ],
   },
@@ -487,7 +539,12 @@ export function WebChatWorkspace() {
                     <DeploymentGuidePanel guide={deploymentGuide} />
                     <div className="grid gap-2">
                       <p className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Snippet</p>
-                      <CodeBlock label={`${selectedDeploymentLabel} snippet`} value={snippets[deployTab]} />
+                      <CodeBlock label={deployTab === "packages" ? "Install all packages" : `${selectedDeploymentLabel} snippet`} value={snippets[deployTab]} />
+                      {deployTab === "packages" ? (
+                        <p className="mt-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium leading-5 text-white/55">
+                          For the full props API, lifecycle events, and SSR notes, see the package READMEs on npm.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1271,21 +1328,71 @@ function DeploymentGuidePanel({ guide }: { guide: DeploymentGuide }) {
         <p className="mt-1 text-xs font-semibold leading-5 text-[#facc15]">{guide.highlight}</p>
       </div>
 
-      <ol className="divide-y divide-white/10">
-        {guide.steps.map((step, index) => (
-          <li className="p-4 transition hover:bg-white/[0.04]" key={step.title}>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 font-mono text-xs font-semibold text-[#93c5fd]">{String(index + 1).padStart(2, "0")}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold leading-5 text-white">{step.title}</p>
-                <p className="mt-1 text-xs font-medium leading-5 text-white/60">{step.body}</p>
-                {step.example ? <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-2 font-mono text-[11px] font-semibold leading-4 text-[#bfdbfe]">{step.example}</pre> : null}
+      {guide.packages ? (
+        <ul className="divide-y divide-white/10">
+          {guide.packages.map((pkg) => (
+            <li className="p-4 transition hover:bg-white/[0.04]" key={pkg.name}>
+              <PackageInstallRow pkg={pkg} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ol className="divide-y divide-white/10">
+          {guide.steps.map((step, index) => (
+            <li className="p-4 transition hover:bg-white/[0.04]" key={step.title}>
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 font-mono text-xs font-semibold text-[#93c5fd]">{String(index + 1).padStart(2, "0")}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-5 text-white">{step.title}</p>
+                  <p className="mt-1 text-xs font-medium leading-5 text-white/60">{step.body}</p>
+                  {step.example ? <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-2 font-mono text-[11px] font-semibold leading-4 text-[#bfdbfe]">{step.example}</pre> : null}
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
+  );
+}
+
+function PackageInstallRow({ pkg }: { pkg: PackageInstall }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyInstall() {
+    await navigator.clipboard.writeText(pkg.installCommand);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-sm font-semibold text-white">{pkg.name}</span>
+        <span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] font-semibold text-white/65">
+          v{pkg.version}
+        </span>
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#93c5fd]">
+          <Package aria-hidden="true" className="h-3.5 w-3.5" />
+        </span>
+      </div>
+      <p className="text-xs font-medium leading-5 text-white/70">{pkg.description}</p>
+      <p className="text-xs font-medium leading-5 text-white/55">
+        <span className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Use when </span>
+        {pkg.useWhen}
+      </p>
+      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2">
+        <code className="min-w-0 flex-1 truncate font-mono text-[11px] font-semibold text-[#bfdbfe]">{pkg.installCommand}</code>
+        <button
+          aria-label={`Copy npm install command for ${pkg.name}`}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:border-[#60a5fa]/40 hover:bg-white/[0.1] hover:text-white"
+          onClick={() => void copyInstall()}
+          type="button"
+        >
+          {copied ? <Check aria-hidden="true" className="h-3.5 w-3.5 text-[#22c55e]" /> : <Copy aria-hidden="true" className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1329,6 +1436,7 @@ function buildSnippets(config: WebChatConfig) {
     iframe: `<iframe src="https://agentdeskbot.vercel.app/embed/${botId}?theme=${theme}" title="${config.identity.botName}" style="width:100%;height:640px;border:0"></iframe>`,
     react: `import { AgentDeskWidget } from "@agentdeskbot/widget/react";\n\n<AgentDeskWidget botId="${botId}" theme="${theme}" />`,
     vue: `<AgentDeskWidget bot-id="${botId}" theme="${theme}" />`,
+    packages: PACKAGE_INSTALL_ALL,
   };
 }
 
