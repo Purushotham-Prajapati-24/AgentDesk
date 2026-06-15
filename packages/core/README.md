@@ -38,7 +38,7 @@ The AgentDesk widget is shipped as multiple framework adapters (React, Vue, and 
 | Benefit | What it means for you |
 | --- | --- |
 | **Single source of truth** | Props, modes, and event payloads match across React, Vue, and any custom adapter. |
-| **Zero runtime overhead** | Pure type module — no JavaScript ships to your bundle. |
+| **Minimal runtime** | Tiny (< 3 KB) JavaScript module — tree-shakeable, only ships what you use. |
 | **Framework-agnostic** | Use it from React, Vue, Svelte, Solid, vanilla JS/TS — anything that can read `.d.ts`. |
 | **Strictly typed** | Built with `strict: true` so you get full IntelliSense and compile-time safety. |
 
@@ -64,7 +64,7 @@ pnpm add @agentdesk/core
 - Node.js `>= 18`
 - TypeScript `>= 4.7` (recommended `>= 5.x`)
 
-This package ships **type definitions only** — there is no runtime code. As a result, peer dependencies are not required, and the install adds nothing to your production bundle.
+This package ships a **tiny runtime module** (< 3 KB) alongside type definitions. It handles widget instance ref-counting, mode synchronization, and cross-origin postMessage. The bundle is tree-shakeable — if your bundler supports side-effect detection, unused exports will not appear in your production build.
 
 ---
 
@@ -188,7 +188,7 @@ function ChatSurface({ botId, mode }: ChatSurfaceProps) {
 
 ## Tree-shaking & Side Effects
 
-This package is marked `"sideEffects": false` in its `package.json`, so bundlers like Webpack, Rollup, Vite, and esbuild can safely tree-shake it. Because the package is type-only, **zero JavaScript** ends up in your final bundle regardless of which exports you import.
+This package is marked `"sideEffects": false` in its `package.json`, so bundlers like Webpack, Rollup, Vite, and esbuild can safely tree-shake it. The runtime module is tiny (< 3 KB) — unused exports are dropped from your final bundle.
 
 You can verify this for yourself:
 

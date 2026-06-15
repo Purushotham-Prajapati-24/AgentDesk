@@ -1,18 +1,38 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { AgentDeskWidget } from '../src/index';
 
 describe('AgentDeskWidget (Vue)', () => {
+  let messageListeners: Array<(event: MessageEvent) => void>;
+
+  beforeEach(() => {
+    // Reset shared global state so each test starts fresh
+    delete (window as Record<string, unknown>).__agentdeskGlobalListenerCount;
+    delete (window as Record<string, unknown>).__agentdeskWidgetInstances;
+    messageListeners = [];
+    const originalAdd = window.addEventListener.bind(window);
+    vi.spyOn(window, 'addEventListener').mockImplementation((type, listener) => {
+      if (type === 'message' && typeof listener === 'function') {
+        messageListeners.push(listener as (event: MessageEvent) => void);
+        return;
+      }
+      return originalAdd(type, listener as EventListenerOrEventListenerObject);
+    });
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
     vi.clearAllTimers();
+    vi.restoreAllMocks();
   });
 
   it('injects script with dedup tag', () => {
-    mount(AgentDeskWidget, { props: { botId: 'test-bot' } });
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'test-bot' } });
     const scripts = document.querySelectorAll('script[data-agentdesk]');
     expect(scripts.length).toBe(1);
     expect((scripts[0] as HTMLScriptElement).dataset.botId).toBe('test-bot');
+    wrapper.unmount();
   });
 
   it('cleans up on unmount', () => {
@@ -20,5 +40,144 @@ describe('AgentDeskWidget (Vue)', () => {
     wrapper.unmount();
     const scripts = document.querySelectorAll('script[data-agentdesk]');
     expect(scripts.length).toBe(0);
+  });
+
+  it('ref-counts multiple instances for the same botId', () => {
+    const a = mount(AgentDeskWidget, { props: { botId: 'shared-bot' } });
+    const b = mount(AgentDeskWidget, { props: { botId: 'shared-bot' } });
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(1);
+
+    a.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(1);
+
+    b.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(0);
+  });
+
+  const SAME_ORIGIN_EVENT = { origin: window.location.origin };
+
+  it('emits "open" when receiving an open event for the matching botId', async () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'event-bot' } });
+    // The SDK wires emits directly, so we use the `wrapper.emitted()` capture API instead.
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-open', botId: 'event-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(1);
+    expect(wrapper.emitted('close')).toBeUndefined();
+
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-close', botId: 'event-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('close')?.length).toBe(1);
+    wrapper.unmount();
+  });
+
+  it('ignores messages for a different botId', async () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'my-bot' } });
+
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-open', botId: 'some-other-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('sends postMessage when mode changes', async () => {
+    const postMessageSpy = vi.spyOn(window, 'postMessage');
+    const wrapper = mount(AgentDeskWidget, {
+      props: { botId: 'mode-bot', mode: 'launcher' },
+    });
+    expect(postMessageSpy).not.toHaveBeenCalled();
+
+    await wrapper.setProps({ mode: 'inline' });
+    await nextTick();
+
+    expect(postMessageSpy).toHaveBeenCalledWith(
+      { type: 'agentdesk-set-mode', botId: 'mode-bot', mode: 'inline' },
+      window.location.origin,
+    );
+    postMessageSpy.mockRestore();
+    wrapper.unmount();
+  });
+
+  it('ignores events from a different origin', async () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'origin-bot' } });
+
+    // First verify same-origin events work
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-open', botId: 'origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(1);
+
+    // Now fire from a different origin — should be ignored
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://evil-site.com',
+        data: { type: 'agentdesk-widget-open', botId: 'origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(1);
+
+    wrapper.unmount();
+  });
+
+  it('supports mount/unmount/remount cycle (keep-alive resiliency)', () => {
+    // Simulates the pattern that KeepAlive uses: mount → deactivate → activate
+    const a = mount(AgentDeskWidget, { props: { botId: 'cycle-bot' } });
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(1);
+
+    a.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(0);
+
+    // Re-mount — should inject a fresh script
+    const b = mount(AgentDeskWidget, { props: { botId: 'cycle-bot' } });
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(1);
+
+    b.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(0);
+  });
+
+  it('is SSR-safe — renders hidden span without accessing window', () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'ssr-bot' } });
+    const host = wrapper.find('[data-agentdesk-vue-host]');
+    expect(host.exists()).toBe(true);
+    expect(host.attributes('aria-hidden')).toBe('true');
+    expect(host.attributes('style')).toMatch(/display\s*:\s*none/);
+    wrapper.unmount();
+  });
+
+  it('ignores messages with an unknown shape', async () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'shape-bot' } });
+
+    messageListeners[0](new MessageEvent('message', { ...SAME_ORIGIN_EVENT, data: null }));
+    messageListeners[0](
+      new MessageEvent('message', { ...SAME_ORIGIN_EVENT, data: 'not-an-object' }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', { ...SAME_ORIGIN_EVENT, data: { type: 'unrelated' } }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')).toBeUndefined();
+    expect(wrapper.emitted('close')).toBeUndefined();
+    wrapper.unmount();
   });
 });

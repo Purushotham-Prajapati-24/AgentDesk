@@ -3,6 +3,40 @@
     const STORAGE_VERSION = "v1";
     const DEFAULT_TIMEOUT_MS = 12000;
     const MAX_MESSAGE_LENGTH = 1200;
+    const isIframeEmbed = (() => {
+        try {
+            return window.parent && window.parent !== window;
+        }
+        catch {
+            return true;
+        }
+    })();
+    function postLifecycleEvent(type) {
+        const payload = { type, botId };
+        try {
+            if (isIframeEmbed) {
+                window.parent.postMessage(payload, "*");
+            }
+            else {
+                window.postMessage(payload, window.location.origin);
+            }
+        }
+        catch {
+        }
+    }
+    function applyRemoteMode(nextMode) {
+        if (nextMode !== "launcher" && nextMode !== "inline") {
+            return;
+        }
+        if (nextMode === embedMode) {
+            postLifecycleEvent("agentdesk-set-mode-ack");
+            return;
+        }
+        embedMode = nextMode;
+        const widgetEl = document.querySelector("agentdesk-widget");
+        widgetEl === null || widgetEl === void 0 ? void 0 : widgetEl.setMode(nextMode);
+        postLifecycleEvent("agentdesk-set-mode-ack");
+    }
     const currentScript = (document.currentScript ||
         document.querySelector('script[data-bot-id]') ||
         document.querySelector('script[src*="widget.js"]'));
@@ -61,6 +95,13 @@
         toggle() {
             this.isOpen = !this.isOpen;
             this.renderShell();
+            postLifecycleEvent(this.isOpen ? "agentdesk-widget-open" : "agentdesk-widget-close");
+        }
+        setMode(nextMode) {
+            if (nextMode === embedMode)
+                return;
+            embedMode = nextMode;
+            this.renderShell();
         }
         async loadConfig() {
             try {
@@ -106,7 +147,14 @@
                 document.head.appendChild(script);
             }
             else {
+                let retries = 0;
+                const MAX_RETRIES = 50;
                 const checkInterval = window.setInterval(() => {
+                    retries++;
+                    if (retries > MAX_RETRIES) {
+                        window.clearInterval(checkInterval);
+                        return;
+                    }
                     const windowRef = window;
                     if (typeof windowRef.io !== "undefined") {
                         window.clearInterval(checkInterval);
@@ -191,20 +239,7 @@
             launcher.addEventListener("click", () => {
                 this.isOpen = !this.isOpen;
                 this.renderShell();
-                if (this.isOpen) {
-                    try {
-                        window.postMessage({ type: "agentdesk-widget-open", botId }, window.location.origin);
-                    }
-                    catch {
-                    }
-                }
-                else {
-                    try {
-                        window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
-                    }
-                    catch {
-                    }
-                }
+                postLifecycleEvent(this.isOpen ? "agentdesk-widget-open" : "agentdesk-widget-close");
             });
             wrapper.append(pane, launcher);
             return wrapper;
@@ -238,11 +273,7 @@
                 close.addEventListener("click", () => {
                     this.isOpen = false;
                     this.renderShell();
-                    try {
-                        window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
-                    }
-                    catch {
-                    }
+                    postLifecycleEvent("agentdesk-widget-close");
                 });
                 header.append(close);
             }
@@ -1386,5 +1417,20 @@
             document.body.append(mount);
         }
     }
+    window.addEventListener("message", (event) => {
+        if (!event.data || typeof event.data !== "object")
+            return;
+        const data = event.data;
+        if (data.type !== "agentdesk-set-mode")
+            return;
+        if (data.botId !== botId)
+            return;
+        if (data.mode !== "launcher" && data.mode !== "inline")
+            return;
+        if (event.origin && event.origin !== scriptOrigin && event.source !== window.parent) {
+            return;
+        }
+        applyRemoteMode(data.mode);
+    });
     mountWidget();
 })();

@@ -5,6 +5,9 @@
 // triggering a "useState/useEffect not allowed in Server Components"
 // error. The directive is a no-op for other React bundlers (CRA, Vite,
 // Remix, etc.) — Next.js is the only consumer that interprets it.
+// (The directive is also re-injected via tsup's `banner` option as a
+// belt-and-braces measure, because esbuild strips bare-string directives
+// in some configurations.)
 //
 // If you are NOT using Next.js, you can safely ignore this directive; it
 // will be stripped by your bundler. If you ARE using Next.js with the
@@ -13,9 +16,18 @@
 // with `ssr: false`.
 
 import { useEffect, useRef } from 'react';
-import type { WidgetMode, WidgetMessageEventData } from '@agentdesk/core';
+import {
+  WIDGET_ELEMENT_NAME,
+  acquireInstance,
+  releaseInstance,
+  postSetMode,
+  type WidgetMode,
+  type WidgetMessageEventData,
+} from '@agentdesk/core';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
+
+export type { WidgetMode } from '@agentdesk/core';
 
 export interface AgentDeskWidgetProps {
   /**
@@ -34,6 +46,10 @@ export interface AgentDeskWidgetProps {
    * Display mode for the widget.
    * - `'launcher'` — floating bubble in the bottom-right corner (default).
    * - `'inline'`   — fills the nearest positioned ancestor.
+   *
+   * **Dynamic updates are supported.** When this prop changes, the SDK
+   * posts a `agentdesk-set-mode` message to the running widget so the
+   * layout updates without a full script re-injection.
    */
   mode?: WidgetMode;
 
@@ -61,6 +77,107 @@ export interface AgentDeskWidgetProps {
    * Called when the user closes the chat widget.
    */
   onClose?: () => void;
+}
+
+// ─── Shared global message listener ──────────────────────────────────────────
+//
+// We register a single `window.message` listener for the lifetime of the
+// page (across all botIds) instead of one-per-component. The listener
+// iterates over the live registry and forwards `agentdesk-widget-open` /
+// `agentdesk-widget-close` events to the `onOpen` / `onClose` callbacks
+// of the component instance that owns the matching botId.
+//
+// The listener is installed on the *first* SDK mount (any botId) and
+// torn down on the *last* SDK unmount (any botId). Reference counting
+// lives in `@agentdesk/core` (`acquireInstance` / `releaseInstance`).
+//
+// We do not pass a real `WeakMap<botId, callback>` because consumers may
+// change callback identities on every render — using refs inside each
+// component (see `useAgentDeskListeners` below) keeps the dispatch logic
+// side-effect free.
+
+type ListenerBucket = {
+  onOpen?: () => void;
+  onClose?: () => void;
+};
+
+const listenerBuckets = new Map<string, ListenerBucket>();
+
+function dispatchOpen(botId: string) {
+  listenerBuckets.get(botId)?.onOpen?.();
+}
+
+function dispatchClose(botId: string) {
+  listenerBuckets.get(botId)?.onClose?.();
+}
+
+let globalListenerInstalled = false;
+let globalListenerRef: ((event: MessageEvent) => void) | null = null;
+
+function installGlobalListener() {
+  if (globalListenerInstalled) return;
+  globalListenerInstalled = true;
+  globalListenerRef = (event: MessageEvent) => {
+    if (!event.data || typeof event.data !== 'object') return;
+    if (event.origin !== window.location.origin) return;
+    const data = event.data as Partial<WidgetMessageEventData>;
+    if (data.type !== 'agentdesk-widget-open' && data.type !== 'agentdesk-widget-close') return;
+    if (typeof data.botId !== 'string') return;
+    if (data.type === 'agentdesk-widget-open') dispatchOpen(data.botId);
+    else dispatchClose(data.botId);
+  };
+  window.addEventListener('message', globalListenerRef);
+}
+
+function uninstallGlobalListener() {
+  if (!globalListenerInstalled) return;
+  globalListenerInstalled = false;
+  if (globalListenerRef) {
+    window.removeEventListener('message', globalListenerRef);
+    globalListenerRef = null;
+  }
+}
+
+// ─── Script injection helpers ────────────────────────────────────────────────
+
+const SCRIPT_TAG = 'data-agentdesk';
+
+function findExistingScript(botId: string): HTMLScriptElement | null {
+  return (
+    Array.from(
+      document.querySelectorAll<HTMLScriptElement>(`script[${SCRIPT_TAG}]`),
+    ).find((candidate) => candidate.dataset.botId === botId) ?? null
+  );
+}
+
+function injectScript(options: {
+  botId: string;
+  mode: WidgetMode;
+  scriptSrc: string;
+  configUrl?: string;
+  apiOrigin?: string;
+}): void {
+  const script = document.createElement('script');
+  script.src = options.scriptSrc;
+  script.async = true;
+  script.setAttribute(SCRIPT_TAG, '');
+  script.dataset.botId = options.botId;
+  script.dataset.mode = options.mode;
+  if (options.configUrl) script.dataset.configUrl = options.configUrl;
+  if (options.apiOrigin) script.dataset.apiOrigin = options.apiOrigin;
+  document.body.append(script);
+}
+
+function removeScriptAndWidget(botId: string): void {
+  // Remove the script tag (any matching dataset.botId).
+  findExistingScript(botId)?.remove();
+  // Remove all custom elements for this bot — they might be orphaned if
+  // the user mounted multiple bots on the same page. The IIFE only ever
+  // creates one `<agentdesk-widget>` element globally, so the loop is
+  // cheap and safe.
+  document
+    .querySelectorAll<HTMLElement>(WIDGET_ELEMENT_NAME)
+    .forEach((el) => el.remove());
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -91,74 +208,82 @@ export function AgentDeskWidget({
   onOpen,
   onClose,
 }: AgentDeskWidgetProps): null {
-  // Keep callbacks in refs so the effect closure never goes stale
+  // Keep callbacks in refs so the effect closure never goes stale across
+  // re-renders. The shared dispatch function reads the latest refs.
   const onOpenRef = useRef<(() => void) | undefined>(onOpen);
   const onCloseRef = useRef<(() => void) | undefined>(onClose);
 
+  // Sync refs to the latest callback identity after every render so the
+  // shared message listener always dispatches to the most recent functions.
+  // A `useEffect` without deps runs after every committed render, which is
+  // the correct timing for ref syncing (React 19's `react-hooks/refs` rule
+  // forbids assigning `.current` in the render body).
   useEffect(() => {
     onOpenRef.current = onOpen;
     onCloseRef.current = onClose;
-  }, [onOpen, onClose]);
+  });
 
+  // Mount/unmount lifecycle: ref-count the widget so multiple components
+  // pointing at the same botId (StrictMode double-invoke, HMR, two
+  // <AgentDeskWidget> trees) share a single script injection. The
+  // script is only removed when the *last* instance for the botId unmounts.
   useEffect(() => {
     if (!botId) return;
 
-    // Deduplication: skip if a script for this botId is already injected.
-    // We iterate over our own tagged scripts (using a fixed selector) and
-    // compare `dataset.botId` directly — attribute-value selectors with
-    // dynamic, bot-controlled values (and `CSS.escape`) are fragile and
-    // can be spoofed by a malicious `botId`.
-    const SCRIPT_TAG = 'data-agentdesk';
-    const existingScript = Array.from(
-      document.querySelectorAll<HTMLScriptElement>(`script[${SCRIPT_TAG}]`),
-    ).find((candidate) => candidate.dataset.botId === botId);
-    if (existingScript) return;
+    const acquire = acquireInstance(botId, mode);
+    if (acquire.mustInstallListener) {
+      installGlobalListener();
+    }
+    if (acquire.isFirstForBot) {
+      if (!findExistingScript(botId)) {
+        injectScript({ botId, mode, scriptSrc, configUrl, apiOrigin });
+      }
+    } else if (acquire.modeChanged) {
+      // Another instance for this botId is already alive with a
+      // different mode — forward the update so the widget can re-render
+      // without re-injection.
+      postSetMode(botId, mode);
+    }
 
-    const script = document.createElement('script');
-    script.src = scriptSrc;
-    script.async = true;
-    script.setAttribute(SCRIPT_TAG, '');
-    script.dataset.botId = botId;
-    script.dataset.mode = mode;
-    if (configUrl) script.dataset.configUrl = configUrl;
-    if (apiOrigin) script.dataset.apiOrigin = apiOrigin;
+    // Register this component's callbacks in the shared dispatch table.
+    const bucket: ListenerBucket = { onOpen: onOpenRef.current, onClose: onCloseRef.current };
+    listenerBuckets.set(botId, bucket);
 
-    const loadTimeoutRef = { current: null as number | null };
-    let widgetEl: Element | null = null;
-    script.addEventListener('load', () => {
-      loadTimeoutRef.current = window.setTimeout(() => {
-        widgetEl = document.querySelector('agentdesk-widget');
-        loadTimeoutRef.current = null;
-      }, 20);
-    });
-
-    document.body.append(script);
-
-    // Listen for open/close events emitted via postMessage by the IIFE.
-    // The widget posts to `window` (not `window.parent`) with a specific
-    // targetOrigin, so we validate both `event.origin` and the payload
-    // before invoking consumer callbacks.
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (!event.data || typeof event.data !== 'object') return;
-      const data = event.data as WidgetMessageEventData;
-      if (data.botId !== botId) return;
-      if (data.type === 'agentdesk-widget-open') onOpenRef.current?.();
-      if (data.type === 'agentdesk-widget-close') onCloseRef.current?.();
-    };
-    window.addEventListener('message', handleMessage);
+    // Wait for the custom element to be defined so callers can
+    // immediately read `document.querySelector('agentdesk-widget')` and
+    // get a real (upgraded) element. We don't poll with setTimeout.
+    if (typeof customElements !== 'undefined') {
+      void customElements.whenDefined(WIDGET_ELEMENT_NAME).catch(() => {
+        // ignore — the element may never be defined if the script fails
+      });
+    }
 
     return () => {
-      if (loadTimeoutRef.current !== null) {
-        window.clearTimeout(loadTimeoutRef.current);
-        loadTimeoutRef.current = null;
+      listenerBuckets.delete(botId);
+      const release = releaseInstance(botId);
+      if (release.isLastForBot) {
+        removeScriptAndWidget(botId);
       }
-      script.remove();
-      if (widgetEl && widgetEl.isConnected) widgetEl.remove();
-      window.removeEventListener('message', handleMessage);
+      if (release.mustRemoveListener) {
+        uninstallGlobalListener();
+      }
     };
-  }, [botId, configUrl, mode, scriptSrc, apiOrigin]);
+  }, [botId, mode, scriptSrc, configUrl, apiOrigin]);
+
+  // Separate effect: dynamic mode propagation. When `mode` changes for a
+  // botId that already has the script injected, we forward the update
+  // via postMessage so the widget re-renders in place. We only do this
+  // when the entry exists in the registry (i.e. the previous effect
+  // already ran) so the first render is handled by the mount effect.
+  const isFirstModeRender = useRef(true);
+  useEffect(() => {
+    if (isFirstModeRender.current) {
+      isFirstModeRender.current = false;
+      return;
+    }
+    if (!botId) return;
+    postSetMode(botId, mode);
+  }, [mode, botId]);
 
   return null;
 }
-

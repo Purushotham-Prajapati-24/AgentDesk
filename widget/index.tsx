@@ -49,6 +49,72 @@
   const DEFAULT_TIMEOUT_MS = 12000;
   const MAX_MESSAGE_LENGTH = 1200;
 
+  // True when the widget is executing inside an `<iframe>` (i.e. via the
+  // `/embed/[botId]` route) and false when it was injected directly into
+  // the host page via a `<script src=".../widget.js">` tag. Detection is
+  // done by comparing `window` against `window.self`/`window.top`, which is
+  // the only reliable way (cross-origin frames throw on `frameElement`).
+  const isIframeEmbed = (() => {
+    try {
+      return window.parent && window.parent !== window;
+    } catch {
+      // Cross-origin parent: `window.parent` throws a DOMException. Treat
+      // that as "we are in an iframe" — same origin policy is what we're
+      // trying to work around.
+      return true;
+    }
+  })();
+
+  /**
+   * Broadcast a widget lifecycle event to the host page.
+   *
+   * The widget can be embedded two ways:
+   *  1. **Direct script** — the host page loads `/widget.js` itself, and
+   *     the React/Vue SDK listens on the *same* `window`. We use a
+   *     specific `targetOrigin` to avoid leaking events to unrelated
+   *     origins in cross-origin embeds.
+   *  2. **Iframe (`/embed/[botId]`)** — the widget runs inside an iframe
+   *     on a separate origin, and the SDK on the parent listens via
+   *     `window.addEventListener('message', …)`. `window.parent` is the
+   *     only way to reach the listener, and the parent may be on a
+   *     different origin, so we fall back to `"*"` and rely on `event.source`
+   *     validation on the receiving side.
+   */
+  function postLifecycleEvent(type: "agentdesk-widget-open" | "agentdesk-widget-close" | "agentdesk-set-mode-ack") {
+    const payload = { type, botId };
+    try {
+      if (isIframeEmbed) {
+        window.parent.postMessage(payload, "*");
+      } else {
+        window.postMessage(payload, window.location.origin);
+      }
+    } catch {
+      // ignore — postMessage can throw in detached frames
+    }
+  }
+
+  /**
+   * Apply a mode change received from the host SDK via `postMessage`.
+   *
+   * The SDK sends `{ type: "agentdesk-set-mode", botId, mode }` when the
+   * `mode` prop changes dynamically. The widget updates its internal
+   * `embedMode`, re-renders the shell, and acknowledges success so the SDK
+   * can resolve any pending `setMode` promise.
+   */
+  function applyRemoteMode(nextMode: "launcher" | "inline") {
+    if (nextMode !== "launcher" && nextMode !== "inline") {
+      return;
+    }
+    if (nextMode === embedMode) {
+      postLifecycleEvent("agentdesk-set-mode-ack");
+      return;
+    }
+    embedMode = nextMode;
+    const widgetEl = document.querySelector<AgentDeskWidget>("agentdesk-widget");
+    widgetEl?.setMode(nextMode);
+    postLifecycleEvent("agentdesk-set-mode-ack");
+  }
+
   const currentScript = (
     document.currentScript ||
     document.querySelector('script[data-bot-id]') ||
@@ -74,7 +140,12 @@
   const scriptOrigin = apiOriginRaw || scriptUrl?.origin || window.location.origin;
   
   let botId = currentScript?.dataset.botId?.trim() ?? "";
-  let embedMode = currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
+  // `embedMode` is `let` (not `const`) so the host SDK can update it at
+  // runtime via the `agentdesk-set-mode` postMessage protocol — see
+  // `applyRemoteMode` below. The initial value comes from the `data-mode`
+  // attribute on the script tag (or the iframe URL path fallback).
+  let embedMode: "launcher" | "inline" =
+    currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
 
   // Fallback for Next.js / React 19 script hoisting on the embed page
   if (!botId && window.location.pathname.startsWith("/embed/")) {
@@ -128,6 +199,13 @@
     toggle() {
       this.isOpen = !this.isOpen;
       this.renderShell();
+      postLifecycleEvent(this.isOpen ? "agentdesk-widget-open" : "agentdesk-widget-close");
+    }
+
+    setMode(nextMode: "launcher" | "inline") {
+      if (nextMode === embedMode) return;
+      embedMode = nextMode;
+      this.renderShell();
     }
 
     private async loadConfig() {
@@ -142,7 +220,7 @@
           throw new Error("Widget configuration mismatch");
         }
 
-      this.config = normalizeConfig(body.data);
+        this.config = normalizeConfig(body.data);
       } catch {
         this.config = buildFallbackConfig(botId);
       }
@@ -178,7 +256,14 @@
         script.onload = () => void this.connectSocket(config);
         document.head.appendChild(script);
       } else {
+        let retries = 0;
+        const MAX_RETRIES = 50;
         const checkInterval = window.setInterval(() => {
+          retries++;
+          if (retries > MAX_RETRIES) {
+            window.clearInterval(checkInterval);
+            return;
+          }
           const windowRef = window as unknown as {
             io?: (url: string, options?: unknown) => SocketInstance;
           };
@@ -276,23 +361,10 @@
       launcher.addEventListener("click", () => {
         this.isOpen = !this.isOpen;
         this.renderShell();
-        // The widget IIFE executes inside the host page (not an iframe), so the
-        // React/Vue SDK event listeners are on the same `window`. Use a
-        // specific targetOrigin instead of "*" to avoid leaking the message
-        // to unrelated origins in cross-origin embeds.
-        if (this.isOpen) {
-          try {
-            window.postMessage({ type: "agentdesk-widget-open", botId }, window.location.origin);
-          } catch {
-            // ignore
-          }
-        } else {
-          try {
-            window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
-          } catch {
-            // ignore
-          }
-        }
+        // Lifecycle event dispatch is delegated to `postLifecycleEvent` so
+        // iframe and direct-script embeds are both handled correctly. See
+        // the helper's JSDoc for the routing rules.
+        postLifecycleEvent(this.isOpen ? "agentdesk-widget-open" : "agentdesk-widget-close");
       });
 
       wrapper.append(pane, launcher);
@@ -331,11 +403,7 @@
         close.addEventListener("click", () => {
           this.isOpen = false;
           this.renderShell();
-          try {
-            window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
-          } catch {
-            // ignore
-          }
+          postLifecycleEvent("agentdesk-widget-close");
         });
         header.append(close);
       }
@@ -1590,6 +1658,35 @@
       document.body.append(mount);
     }
   }
+
+  // Listen for dynamic mode updates from the host SDK. This is the
+  // "control" channel — the SDK sends `{ type: "agentdesk-set-mode", botId,
+  // mode }` when the React/Vue `mode` prop changes, and we update
+  // `embedMode` and re-render. We validate `event.origin` against the
+  // configured `scriptOrigin` to reject spoofed messages from unrelated
+  // tabs, and we validate the payload shape (including `botId`) before
+  // mutating any state. We do NOT echo a `*` from iframe embeds through
+  // the host SDK — the listener in the host already filters by
+  // `event.source` when needed.
+  window.addEventListener("message", (event: MessageEvent) => {
+    if (!event.data || typeof event.data !== "object") return;
+    const data = event.data as { type?: unknown; botId?: unknown; mode?: unknown };
+    if (data.type !== "agentdesk-set-mode") return;
+    if (data.botId !== botId) return;
+    if (data.mode !== "launcher" && data.mode !== "inline") return;
+    // For direct-script embeds the SDK is on the same origin as the
+    // widget, so we can validate `event.origin` strictly. For iframe
+    // embeds `event.origin` is the iframe's origin (which equals
+    // `scriptOrigin`), so the same check still works. We only relax the
+    // check if the message was sent with `event.source` pointing at
+    // `window.parent` — i.e. the parent page sent the message down to us
+    // — in which case `event.origin` is the parent's origin (not
+    // `scriptOrigin`) and we accept it after confirming the botId.
+    if (event.origin && event.origin !== scriptOrigin && event.source !== window.parent) {
+      return;
+    }
+    applyRemoteMode(data.mode);
+  });
 
   mountWidget();
 })();

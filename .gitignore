@@ -15,6 +15,9 @@
 /out/
 /build
 
+# Workspace package build output (tsup, rollup, esbuild)
+packages/*/dist/
+
 # TypeScript build cache
 *.tsbuildinfo
 next-env.d.ts
@@ -85,3 +88,6 @@ QODER.md
 .codex
 debug.log
 .codex-security-scans
+diff.txt
+packages/react/dist/index.cjs.map
+packages/vue/dist/index.cjs.map

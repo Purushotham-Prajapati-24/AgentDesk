@@ -13,13 +13,13 @@
   ],
   "license": "MIT",
   "author": "AgentDesk",
-  "homepage": "https://github.com/anomalyco/AI_Support_Agent#readme",
+  "homepage": "https://github.com/Purushotham-Prajapati-24/AgentDesk#readme",
   "bugs": {
-    "url": "https://github.com/anomalyco/AI_Support_Agent/issues"
+    "url": "https://github.com/Purushotham-Prajapati-24/AgentDesk/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/anomalyco/AI_Support_Agent.git",
+    "url": "git+https://github.com/Purushotham-Prajapati-24/AgentDesk.git",
     "directory": "packages/react"
   },
   "engines": {
@@ -49,9 +49,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node ../../scripts/inject-use-client.mjs dist",
     "dev": "tsup --watch",
-    "lint": "eslint src --ext .ts,.tsx"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "next": ">=13.0.0",

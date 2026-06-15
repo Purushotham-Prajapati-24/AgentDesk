@@ -54,6 +54,19 @@ jobs:
       - name: Build SDK packages
         run: npm run build:sdk
 
+      - name: Publish @agentdesk/core
+        # MUST be published first: @agentdesk/react and @agentdesk/vue both
+        # declare `"@agentdesk/core": "^0.1.0"` as a runtime dependency. If we
+        # published those packages while `@agentdesk/core` was still resolved
+        # via the local `file:` workspace link, npm would tarball the wrong
+        # `main`/`types` paths and downstream consumers would fail to install.
+        # Publishing core first lets the React/Vue packages resolve it from
+        # the public registry.
+        run: npm publish --access public --provenance
+        working-directory: packages/core
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish @agentdesk/react
         run: npm publish --access public --provenance
         working-directory: packages/react

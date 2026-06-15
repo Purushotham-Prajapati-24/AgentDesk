@@ -9,7 +9,6 @@ export default defineConfig({
   external: ['vue'],
   treeshake: true,
   splitting: false,
-  // Suppress "named and default exports together" warning — intentional for plugin pattern
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' };
   },
