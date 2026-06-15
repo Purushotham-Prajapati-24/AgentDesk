@@ -1,6 +1,6 @@
 import { AgentDeskWidgetProps } from './index.js';
 export { WidgetMode } from './index.js';
-import React from 'react';
+import { ComponentType } from 'react';
 
 /**
  * @agentdesk/react — Next.js subpath export
@@ -9,6 +9,14 @@ import React from 'react';
  * `ssr: false` to prevent "window is not defined" errors during server-side
  * rendering. Import from this path when using the App Router or Pages Router
  * in Next.js.
+ *
+ * Why `next/dynamic` and not `React.lazy`?
+ * - `React.lazy` still pre-renders the inner component on the server when
+ *   wrapped in `<Suspense>`, and on some older Node runtimes it can throw
+ *   because `Suspense` server semantics are not implemented.
+ * - `next/dynamic` with `ssr: false` is the only reliable way to guarantee
+ *   the widget module is never executed on the server. Next.js's bundler
+ *   recognizes the call and emits a Client Component boundary.
  *
  * @example
  * ```tsx
@@ -43,6 +51,15 @@ import React from 'react';
  * ```
  */
 
-declare function AgentDeskWidget(props: AgentDeskWidgetProps): React.ReactElement | null;
+/**
+ * `AgentDeskWidget` — Next.js-friendly wrapper that disables SSR for the
+ * underlying React widget by deferring the inner module load to the client.
+ *
+ * `next` is declared as an optional peer dependency in `package.json` and
+ * is `external` in the tsup config, so this module preserves the import
+ * at runtime. If you are bundling for a non-Next.js environment, import
+ * from `@agentdesk/react` instead.
+ */
+declare const AgentDeskWidget: ComponentType<AgentDeskWidgetProps>;
 
-export { AgentDeskWidget, AgentDeskWidgetProps };
+export { AgentDeskWidget, AgentDeskWidgetProps, AgentDeskWidget as default };

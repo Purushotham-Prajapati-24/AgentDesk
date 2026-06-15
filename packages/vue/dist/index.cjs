@@ -32,38 +32,54 @@ var AgentDeskWidget = vue.defineComponent({
   emits: ["open", "close"],
   setup(props, { emit }) {
     const scriptRef = vue.ref(null);
+    const widgetRef = vue.ref(null);
+    let cleanup = null;
     vue.onMounted(() => {
       var _a, _b;
       if (!props.botId) return;
-      const dedupeAttr = `data-agentdesk-vue-${CSS.escape(props.botId)}`;
-      if (document.querySelector(`script[${dedupeAttr}]`)) return;
+      const SCRIPT_TAG = "data-agentdesk-vue";
+      const existingScript = Array.from(
+        document.querySelectorAll(`script[${SCRIPT_TAG}]`)
+      ).find((candidate) => candidate.dataset.botId === props.botId);
+      if (existingScript) return;
       const script = document.createElement("script");
       script.src = (_a = props.scriptSrc) != null ? _a : "/widget.js";
       script.async = true;
-      script.setAttribute(dedupeAttr, "");
+      script.setAttribute(SCRIPT_TAG, "");
       script.dataset.botId = props.botId;
       script.dataset.mode = (_b = props.mode) != null ? _b : "launcher";
       if (props.configUrl) script.dataset.configUrl = props.configUrl;
       if (props.apiOrigin) script.dataset.apiOrigin = props.apiOrigin;
+      script.addEventListener("load", () => {
+        window.setTimeout(() => {
+          widgetRef.value = document.querySelector("agentdesk-widget");
+        }, 20);
+      });
       document.body.append(script);
       scriptRef.value = script;
       const handleMessage = (event) => {
         if (event.origin !== window.location.origin) return;
-        if (!event.data || event.data.botId !== props.botId) return;
-        if (event.data.type === "agentdesk-widget-open") emit("open");
-        if (event.data.type === "agentdesk-widget-close") emit("close");
+        if (!event.data || typeof event.data !== "object") return;
+        const data = event.data;
+        if (data.botId !== props.botId) return;
+        if (data.type === "agentdesk-widget-open") emit("open");
+        if (data.type === "agentdesk-widget-close") emit("close");
       };
       window.addEventListener("message", handleMessage);
-      script._adCleanup = () => {
+      cleanup = () => {
         window.removeEventListener("message", handleMessage);
       };
     });
     vue.onBeforeUnmount(() => {
       var _a;
-      const script = scriptRef.value;
-      (_a = script == null ? void 0 : script._adCleanup) == null ? void 0 : _a.call(script);
-      script == null ? void 0 : script.remove();
-      document.querySelectorAll("agentdesk-widget").forEach((el) => el.remove());
+      cleanup == null ? void 0 : cleanup();
+      cleanup = null;
+      (_a = scriptRef.value) == null ? void 0 : _a.remove();
+      scriptRef.value = null;
+      if (widgetRef.value && widgetRef.value.isConnected) {
+        widgetRef.value.remove();
+      }
+      widgetRef.value = null;
     });
     return () => vue.h("span", {
       "data-agentdesk-vue-host": props.botId,

@@ -1,4 +1,6 @@
-import { useRef, useEffect } from 'react';
+'use strict';
+
+var react = require('react');
 
 function AgentDeskWidget({
   botId,
@@ -9,13 +11,13 @@ function AgentDeskWidget({
   onOpen,
   onClose
 }) {
-  const onOpenRef = useRef(onOpen);
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
+  const onOpenRef = react.useRef(onOpen);
+  const onCloseRef = react.useRef(onClose);
+  react.useEffect(() => {
     onOpenRef.current = onOpen;
     onCloseRef.current = onClose;
   }, [onOpen, onClose]);
-  useEffect(() => {
+  react.useEffect(() => {
     if (!botId) return;
     const SCRIPT_TAG = "data-agentdesk-react";
     const existingScript = Array.from(
@@ -56,6 +58,6 @@ function AgentDeskWidget({
   return null;
 }
 
-export { AgentDeskWidget };
-//# sourceMappingURL=index.js.map
-//# sourceMappingURL=index.js.map
+exports.AgentDeskWidget = AgentDeskWidget;
+//# sourceMappingURL=index.cjs.map
+//# sourceMappingURL=index.cjs.map

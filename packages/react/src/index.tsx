@@ -1,5 +1,17 @@
 'use client';
 
+// NOTE: The `'use client'` directive is required for Next.js App Router
+// consumers to import this component from a Server Component without
+// triggering a "useState/useEffect not allowed in Server Components"
+// error. The directive is a no-op for other React bundlers (CRA, Vite,
+// Remix, etc.) — Next.js is the only consumer that interprets it.
+//
+// If you are NOT using Next.js, you can safely ignore this directive; it
+// will be stripped by your bundler. If you ARE using Next.js with the
+// Pages Router or want full SSR safety, import from
+// `@agentdesk/react/nextjs` instead — that subpath uses `next/dynamic`
+// with `ssr: false`.
+
 import { useEffect, useRef } from 'react';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -81,8 +93,8 @@ export function AgentDeskWidget({
   onClose,
 }: AgentDeskWidgetProps): null {
   // Keep callbacks in refs so the effect closure never goes stale
-  const onOpenRef = useRef(onOpen);
-  const onCloseRef = useRef(onClose);
+  const onOpenRef = useRef<(() => void) | undefined>(onOpen);
+  const onCloseRef = useRef<(() => void) | undefined>(onClose);
 
   useEffect(() => {
     onOpenRef.current = onOpen;
@@ -92,36 +104,56 @@ export function AgentDeskWidget({
   useEffect(() => {
     if (!botId) return;
 
-    // Deduplication: skip if a script for this botId is already injected
-    const dedupeAttr = `data-agentdesk-react-${CSS.escape(botId)}`;
-    if (document.querySelector(`script[${dedupeAttr}]`)) return;
+    // Deduplication: skip if a script for this botId is already injected.
+    // We iterate over our own tagged scripts (using a fixed selector) and
+    // compare `dataset.botId` directly — attribute-value selectors with
+    // dynamic, bot-controlled values (and `CSS.escape`) are fragile and
+    // can be spoofed by a malicious `botId`.
+    const SCRIPT_TAG = 'data-agentdesk-react';
+    const existingScript = Array.from(
+      document.querySelectorAll<HTMLScriptElement>(`script[${SCRIPT_TAG}]`),
+    ).find((candidate) => candidate.dataset.botId === botId);
+    if (existingScript) return;
 
     const script = document.createElement('script');
     script.src = scriptSrc;
     script.async = true;
-    script.setAttribute(dedupeAttr, '');
+    script.setAttribute(SCRIPT_TAG, '');
     script.dataset.botId = botId;
     script.dataset.mode = mode;
     if (configUrl) script.dataset.configUrl = configUrl;
     if (apiOrigin) script.dataset.apiOrigin = apiOrigin;
 
+    let widgetEl: Element | null = null;
+    script.addEventListener('load', () => {
+      window.setTimeout(() => {
+        widgetEl = document.querySelector('agentdesk-widget');
+      }, 20);
+    });
+
     document.body.append(script);
 
-    // Listen for open/close events emitted via postMessage by the IIFE
+    // Listen for open/close events emitted via postMessage by the IIFE.
+    // The widget posts to `window` (not `window.parent`) with a specific
+    // targetOrigin, so we validate both `event.origin` and the payload
+    // before invoking consumer callbacks.
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.botId !== botId) return;
-      if (event.data.type === 'agentdesk-widget-open') onOpenRef.current?.();
-      if (event.data.type === 'agentdesk-widget-close') onCloseRef.current?.();
+      if (!event.data || typeof event.data !== 'object') return;
+      const data = event.data as { type?: unknown; botId?: unknown };
+      if (data.botId !== botId) return;
+      if (data.type === 'agentdesk-widget-open') onOpenRef.current?.();
+      if (data.type === 'agentdesk-widget-close') onCloseRef.current?.();
     };
     window.addEventListener('message', handleMessage);
 
     return () => {
       script.remove();
-      document.querySelectorAll('agentdesk-widget').forEach((el) => el.remove());
+      if (widgetEl && widgetEl.isConnected) widgetEl.remove();
       window.removeEventListener('message', handleMessage);
     };
   }, [botId, configUrl, mode, scriptSrc, apiOrigin]);
 
   return null;
 }
+

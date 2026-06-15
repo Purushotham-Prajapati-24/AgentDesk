@@ -1,7 +1,5 @@
-'use strict';
-
-var react = require('react');
-var jsxRuntime = require('react/jsx-runtime');
+import { useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -27,36 +25,47 @@ function AgentDeskWidget({
   onOpen,
   onClose
 }) {
-  const onOpenRef = react.useRef(onOpen);
-  const onCloseRef = react.useRef(onClose);
-  react.useEffect(() => {
+  const onOpenRef = useRef(onOpen);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
     onOpenRef.current = onOpen;
     onCloseRef.current = onClose;
   }, [onOpen, onClose]);
-  react.useEffect(() => {
+  useEffect(() => {
     if (!botId) return;
-    const dedupeAttr = `data-agentdesk-react-${CSS.escape(botId)}`;
-    if (document.querySelector(`script[${dedupeAttr}]`)) return;
+    const SCRIPT_TAG = "data-agentdesk-react";
+    const existingScript = Array.from(
+      document.querySelectorAll(`script[${SCRIPT_TAG}]`)
+    ).find((candidate) => candidate.dataset.botId === botId);
+    if (existingScript) return;
     const script = document.createElement("script");
     script.src = scriptSrc;
     script.async = true;
-    script.setAttribute(dedupeAttr, "");
+    script.setAttribute(SCRIPT_TAG, "");
     script.dataset.botId = botId;
     script.dataset.mode = mode;
     if (configUrl) script.dataset.configUrl = configUrl;
     if (apiOrigin) script.dataset.apiOrigin = apiOrigin;
+    let widgetEl = null;
+    script.addEventListener("load", () => {
+      window.setTimeout(() => {
+        widgetEl = document.querySelector("agentdesk-widget");
+      }, 20);
+    });
     document.body.append(script);
     const handleMessage = (event) => {
       var _a, _b;
       if (event.origin !== window.location.origin) return;
-      if (!event.data || event.data.botId !== botId) return;
-      if (event.data.type === "agentdesk-widget-open") (_a = onOpenRef.current) == null ? void 0 : _a.call(onOpenRef);
-      if (event.data.type === "agentdesk-widget-close") (_b = onCloseRef.current) == null ? void 0 : _b.call(onCloseRef);
+      if (!event.data || typeof event.data !== "object") return;
+      const data = event.data;
+      if (data.botId !== botId) return;
+      if (data.type === "agentdesk-widget-open") (_a = onOpenRef.current) == null ? void 0 : _a.call(onOpenRef);
+      if (data.type === "agentdesk-widget-close") (_b = onCloseRef.current) == null ? void 0 : _b.call(onCloseRef);
     };
     window.addEventListener("message", handleMessage);
     return () => {
       script.remove();
-      document.querySelectorAll("agentdesk-widget").forEach((el) => el.remove());
+      if (widgetEl && widgetEl.isConnected) widgetEl.remove();
       window.removeEventListener("message", handleMessage);
     };
   }, [botId, configUrl, mode, scriptSrc, apiOrigin]);
@@ -67,13 +76,12 @@ var init_src = __esm({
     "use client";
   }
 });
-var LazyWidget = react.lazy(
-  () => Promise.resolve().then(() => (init_src(), src_exports)).then((mod) => ({ default: mod.AgentDeskWidget }))
+var AgentDeskWidget2 = dynamic(
+  () => Promise.resolve().then(() => (init_src(), src_exports)).then((mod) => ({ default: mod.AgentDeskWidget })),
+  { ssr: false }
 );
-function AgentDeskWidget2(props) {
-  return /* @__PURE__ */ jsxRuntime.jsx(react.Suspense, { fallback: null, children: /* @__PURE__ */ jsxRuntime.jsx(LazyWidget, { ...props }) });
-}
+var nextjs_default = AgentDeskWidget2;
 
-exports.AgentDeskWidget = AgentDeskWidget2;
+export { AgentDeskWidget2 as AgentDeskWidget, nextjs_default as default };
 //# sourceMappingURL=nextjs.js.map
 //# sourceMappingURL=nextjs.js.map

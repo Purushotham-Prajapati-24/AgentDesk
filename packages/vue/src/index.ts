@@ -71,46 +71,76 @@ export const AgentDeskWidget = defineComponent({
 
   setup(props, { emit }) {
     const scriptRef = ref<HTMLScriptElement | null>(null);
+    const widgetRef = ref<Element | null>(null);
+
+    // Cleanup is owned by the `setup()` closure rather than attached to
+    // a DOM node. Attaching arbitrary fields to script elements forces an
+    // escape via `(script as any)` and makes the lifetime of the cleanup
+    // function unclear (the script element can be removed before we want
+    // to tear down the listener). A closure-scoped reference is type-safe
+    // and lets `onBeforeUnmount` run as soon as Vue disposes the instance.
+    let cleanup: (() => void) | null = null;
 
     onMounted(() => {
       if (!props.botId) return;
 
-      // Deduplication guard — prevents double-injecting on re-mount
-      const dedupeAttr = `data-agentdesk-vue-${CSS.escape(props.botId)}`;
-      if (document.querySelector(`script[${dedupeAttr}]`)) return;
+      // Deduplication guard — prevents double-injecting on re-mount.
+      // We iterate over our own tagged scripts (using a fixed selector)
+      // and compare `dataset.botId` directly. Attribute-value selectors
+      // with dynamic, bot-controlled values (and `CSS.escape`) are fragile
+      // and can be spoofed by a malicious `botId`.
+      const SCRIPT_TAG = 'data-agentdesk-vue';
+      const existingScript = Array.from(
+        document.querySelectorAll<HTMLScriptElement>(`script[${SCRIPT_TAG}]`),
+      ).find((candidate) => candidate.dataset.botId === props.botId);
+      if (existingScript) return;
 
       const script = document.createElement('script');
       script.src = props.scriptSrc ?? '/widget.js';
       script.async = true;
-      script.setAttribute(dedupeAttr, '');
+      script.setAttribute(SCRIPT_TAG, '');
       script.dataset.botId = props.botId;
       script.dataset.mode = props.mode ?? 'launcher';
       if (props.configUrl) script.dataset.configUrl = props.configUrl;
       if (props.apiOrigin) script.dataset.apiOrigin = props.apiOrigin;
 
+      script.addEventListener('load', () => {
+        window.setTimeout(() => {
+          widgetRef.value = document.querySelector('agentdesk-widget');
+        }, 20);
+      });
+
       document.body.append(script);
       scriptRef.value = script;
 
-      // Listen for postMessage events from the widget IIFE
+      // Listen for postMessage events from the widget IIFE. The widget
+      // posts to `window` (not `window.parent`) with a specific
+      // targetOrigin, so we validate both `event.origin` and the payload
+      // before forwarding to the consumer.
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
-        if (!event.data || event.data.botId !== props.botId) return;
-        if (event.data.type === 'agentdesk-widget-open') emit('open');
-        if (event.data.type === 'agentdesk-widget-close') emit('close');
+        if (!event.data || typeof event.data !== 'object') return;
+        const data = event.data as { type?: unknown; botId?: unknown };
+        if (data.botId !== props.botId) return;
+        if (data.type === 'agentdesk-widget-open') emit('open');
+        if (data.type === 'agentdesk-widget-close') emit('close');
       };
       window.addEventListener('message', handleMessage);
 
-      // Store cleanup reference on the script element
-      (script as HTMLScriptElement & { _adCleanup?: () => void })._adCleanup = () => {
+      cleanup = () => {
         window.removeEventListener('message', handleMessage);
       };
     });
 
     onBeforeUnmount(() => {
-      const script = scriptRef.value as HTMLScriptElement & { _adCleanup?: () => void } | null;
-      script?._adCleanup?.();
-      script?.remove();
-      document.querySelectorAll('agentdesk-widget').forEach((el) => el.remove());
+      cleanup?.();
+      cleanup = null;
+      scriptRef.value?.remove();
+      scriptRef.value = null;
+      if (widgetRef.value && widgetRef.value.isConnected) {
+        widgetRef.value.remove();
+      }
+      widgetRef.value = null;
     });
 
     // Render a hidden host element so Vue can track the component in the tree
@@ -164,3 +194,4 @@ export const AgentDeskPlugin = {
 };
 
 export default AgentDeskPlugin;
+

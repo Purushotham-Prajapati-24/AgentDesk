@@ -6,14 +6,15 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   // Override default ignores of eslint-config-next.
+  // Note: only `**/dist/**` is included (not the bare `dist/**`) so a
+  // future top-level `dist/` directory at the repo root is still
+  // linted, while every package's `dist/` output is skipped.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     ".codex-security-scans/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
-    "dist/**",
     "**/dist/**",
   ]),
 ]);

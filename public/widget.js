@@ -178,7 +178,14 @@
                 this.renderShell();
                 if (this.isOpen) {
                     try {
-                        window.parent.postMessage({ type: "agentdesk-widget-open", botId }, "*");
+                        window.postMessage({ type: "agentdesk-widget-open", botId }, window.location.origin);
+                    }
+                    catch {
+                    }
+                }
+                else {
+                    try {
+                        window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
                     }
                     catch {
                     }
@@ -217,7 +224,7 @@
                     this.isOpen = false;
                     this.renderShell();
                     try {
-                        window.parent.postMessage({ type: "agentdesk-widget-close", botId }, "*");
+                        window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
                     }
                     catch {
                     }

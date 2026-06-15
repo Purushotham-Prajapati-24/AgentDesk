@@ -4,6 +4,19 @@
   "description": "AgentDesk AI chat widget — Vue 3 SDK",
   "keywords": ["agentdesk", "chat", "widget", "vue", "vue3", "nuxt", "support", "bot"],
   "license": "MIT",
+  "author": "AgentDesk",
+  "homepage": "https://github.com/anomalyco/AI_Support_Agent#readme",
+  "bugs": {
+    "url": "https://github.com/anomalyco/AI_Support_Agent/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anomalyco/AI_Support_Agent.git",
+    "directory": "packages/vue"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,7 +30,8 @@
   "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "lint": "eslint src --ext .ts,.tsx"
   },
   "peerDependencies": {
     "vue": ">=3.0.0"

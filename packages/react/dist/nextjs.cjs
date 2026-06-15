@@ -1,5 +1,29 @@
-import { useRef, useEffect } from 'react';
+'use strict';
 
+Object.defineProperty(exports, '__esModule', { value: true });
+
+var react = require('react');
+var dynamic = require('next/dynamic');
+
+function _interopDefault (e) { return e && e.__esModule ? e : { default: e }; }
+
+var dynamic__default = /*#__PURE__*/_interopDefault(dynamic);
+
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// src/index.tsx
+var src_exports = {};
+__export(src_exports, {
+  AgentDeskWidget: () => AgentDeskWidget
+});
 function AgentDeskWidget({
   botId,
   configUrl,
@@ -9,13 +33,13 @@ function AgentDeskWidget({
   onOpen,
   onClose
 }) {
-  const onOpenRef = useRef(onOpen);
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
+  const onOpenRef = react.useRef(onOpen);
+  const onCloseRef = react.useRef(onClose);
+  react.useEffect(() => {
     onOpenRef.current = onOpen;
     onCloseRef.current = onClose;
   }, [onOpen, onClose]);
-  useEffect(() => {
+  react.useEffect(() => {
     if (!botId) return;
     const SCRIPT_TAG = "data-agentdesk-react";
     const existingScript = Array.from(
@@ -55,7 +79,18 @@ function AgentDeskWidget({
   }, [botId, configUrl, mode, scriptSrc, apiOrigin]);
   return null;
 }
+var init_src = __esm({
+  "src/index.tsx"() {
+    "use client";
+  }
+});
+var AgentDeskWidget2 = dynamic__default.default(
+  () => Promise.resolve().then(() => (init_src(), src_exports)).then((mod) => ({ default: mod.AgentDeskWidget })),
+  { ssr: false }
+);
+var nextjs_default = AgentDeskWidget2;
 
-export { AgentDeskWidget };
-//# sourceMappingURL=index.js.map
-//# sourceMappingURL=index.js.map
+exports.AgentDeskWidget = AgentDeskWidget2;
+exports.default = nextjs_default;
+//# sourceMappingURL=nextjs.cjs.map
+//# sourceMappingURL=nextjs.cjs.map

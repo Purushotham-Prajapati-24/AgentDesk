@@ -50,11 +50,14 @@
   const MAX_MESSAGE_LENGTH = 1200;
 
   const currentScript = (
-    document.currentScript || 
-    document.querySelector('script[data-bot-id]') || 
+    document.currentScript ||
+    document.querySelector('script[data-bot-id]') ||
     document.querySelector('script[src*="widget.js"]')
   ) as HTMLScriptElement | null;
   const scriptUrl = currentScript?.src ? new URL(currentScript.src, window.location.href) : null;
+  // `apiOrigin` is supplied by the host page via the `data-api-origin` attribute and
+  // ultimately resolved server-side from the trusted bot config endpoint. The widget
+  // uses it as the base for `messageEndpoint`, `configUrl`, and the websocket URL.
   const scriptOrigin = (currentScript?.dataset.apiOrigin?.trim() || scriptUrl?.origin) ?? window.location.origin;
   
   let botId = currentScript?.dataset.botId?.trim() ?? "";
@@ -260,9 +263,19 @@
       launcher.addEventListener("click", () => {
         this.isOpen = !this.isOpen;
         this.renderShell();
+        // The widget IIFE executes inside the host page (not an iframe), so the
+        // React/Vue SDK event listeners are on the same `window`. Use a
+        // specific targetOrigin instead of "*" to avoid leaking the message
+        // to unrelated origins in cross-origin embeds.
         if (this.isOpen) {
           try {
-            window.parent.postMessage({ type: "agentdesk-widget-open", botId }, "*");
+            window.postMessage({ type: "agentdesk-widget-open", botId }, window.location.origin);
+          } catch {
+            // ignore
+          }
+        } else {
+          try {
+            window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
           } catch {
             // ignore
           }
@@ -306,7 +319,7 @@
           this.isOpen = false;
           this.renderShell();
           try {
-            window.parent.postMessage({ type: "agentdesk-widget-close", botId }, "*");
+            window.postMessage({ type: "agentdesk-widget-close", botId }, window.location.origin);
           } catch {
             // ignore
           }
