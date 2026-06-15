@@ -55,7 +55,7 @@
     document.querySelector('script[src*="widget.js"]')
   ) as HTMLScriptElement | null;
   const scriptUrl = currentScript?.src ? new URL(currentScript.src, window.location.href) : null;
-  const scriptOrigin = scriptUrl?.origin ?? window.location.origin;
+  const scriptOrigin = (currentScript?.dataset.apiOrigin?.trim() || scriptUrl?.origin) ?? window.location.origin;
   
   let botId = currentScript?.dataset.botId?.trim() ?? "";
   let embedMode = currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
@@ -260,6 +260,13 @@
       launcher.addEventListener("click", () => {
         this.isOpen = !this.isOpen;
         this.renderShell();
+        if (this.isOpen) {
+          try {
+            window.parent.postMessage({ type: "agentdesk-widget-open", botId }, "*");
+          } catch {
+            // ignore
+          }
+        }
       });
 
       wrapper.append(pane, launcher);

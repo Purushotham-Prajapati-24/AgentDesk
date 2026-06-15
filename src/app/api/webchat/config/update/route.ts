@@ -95,8 +95,10 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-    } catch (error: any) {
-      if (error?.code === 404 || error?.status === 404 || error?.message?.includes("not found")) {
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const err = error as any;
+      if (err?.code === 404 || err?.status === 404 || err?.message?.includes("not found")) {
         return NextResponse.json(
           {
             success: false,
@@ -114,7 +116,7 @@ export async function POST(request: Request) {
           success: false,
           error: {
             code: "DATABASE_ERROR",
-            message: error?.message ?? "An error occurred while fetching the bot document.",
+            message: err?.message ?? "An error occurred while fetching the bot document.",
           },
         },
         { status: 500 },

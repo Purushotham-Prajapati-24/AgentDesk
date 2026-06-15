@@ -1,0 +1,30 @@
+{
+  "name": "@agentdesk/vue",
+  "version": "0.1.0",
+  "description": "AgentDesk AI chat widget — Vue 3 SDK",
+  "keywords": ["agentdesk", "chat", "widget", "vue", "vue3", "nuxt", "support", "bot"],
+  "license": "MIT",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
+  "peerDependencies": {
+    "vue": ">=3.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8",
+    "typescript": "^5",
+    "vue": "^3"
+  }
+}

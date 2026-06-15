@@ -2,10 +2,14 @@
   "name": "agentdesk",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "dev:ws": "npm --prefix websocket-server start",
-    "build": "npm run build:widget && next build",
+    "build": "npm run build:widget && npm run build:sdk && next build",
+    "build:sdk": "npm run build --workspaces --if-present",
     "build:widget": "node scripts/build-widget.mjs",
     "qdrant:hybrid": "node --env-file=.env.local scripts/create-qdrant-hybrid.mjs",
     "setup:ingestion": "node --env-file=.env.local scripts/setup-ingestion-schema.mjs",
@@ -47,6 +51,7 @@
     "eslint-config-next": "16.2.6",
     "playwright": "^1.60.0",
     "tailwindcss": "^4",
+    "tsup": "^8.5.1",
     "typescript": "^5"
   }
 }

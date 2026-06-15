@@ -1,5 +1,5 @@
 (() => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const STORAGE_VERSION = "v1";
     const DEFAULT_TIMEOUT_MS = 12000;
     const MAX_MESSAGE_LENGTH = 1200;
@@ -7,8 +7,8 @@
         document.querySelector('script[data-bot-id]') ||
         document.querySelector('script[src*="widget.js"]'));
     const scriptUrl = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.src) ? new URL(currentScript.src, window.location.href) : null;
-    const scriptOrigin = (_a = scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin) !== null && _a !== void 0 ? _a : window.location.origin;
-    let botId = (_c = (_b = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _b === void 0 ? void 0 : _b.trim()) !== null && _c !== void 0 ? _c : "";
+    const scriptOrigin = (_b = (((_a = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.apiOrigin) === null || _a === void 0 ? void 0 : _a.trim()) || (scriptUrl === null || scriptUrl === void 0 ? void 0 : scriptUrl.origin))) !== null && _b !== void 0 ? _b : window.location.origin;
+    let botId = (_d = (_c = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.botId) === null || _c === void 0 ? void 0 : _c.trim()) !== null && _d !== void 0 ? _d : "";
     let embedMode = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.mode) === "inline" ? "inline" : "launcher";
     if (!botId && window.location.pathname.startsWith("/embed/")) {
         const segments = window.location.pathname.split("/");
@@ -18,7 +18,7 @@
             embedMode = "inline";
         }
     }
-    const configUrl = ((_d = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.configUrl) === null || _d === void 0 ? void 0 : _d.trim()) || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
+    const configUrl = ((_e = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.configUrl) === null || _e === void 0 ? void 0 : _e.trim()) || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
     if (!botId) {
         return;
     }
@@ -176,6 +176,13 @@
             launcher.addEventListener("click", () => {
                 this.isOpen = !this.isOpen;
                 this.renderShell();
+                if (this.isOpen) {
+                    try {
+                        window.parent.postMessage({ type: "agentdesk-widget-open", botId }, "*");
+                    }
+                    catch {
+                    }
+                }
             });
             wrapper.append(pane, launcher);
             return wrapper;
@@ -388,11 +395,33 @@
             try {
                 const responseText = await requestBotReply(config, this.sessionToken, content);
                 if (responseText) {
-                    await this.typeBotMessage(responseText);
+                    const messageId = await this.typeBotMessage(responseText);
+                    if (this.socket && this.socket.connected) {
+                        try {
+                            this.socket.emit("bot-message", {
+                                message_id: messageId,
+                                content: responseText,
+                            });
+                        }
+                        catch (err) {
+                            console.error("Failed to emit bot message over socket:", err);
+                        }
+                    }
                 }
             }
             catch {
-                await this.typeBotMessage(config.fallbackMessage);
+                const messageId = await this.typeBotMessage(config.fallbackMessage);
+                if (this.socket && this.socket.connected) {
+                    try {
+                        this.socket.emit("bot-message", {
+                            message_id: messageId,
+                            content: config.fallbackMessage,
+                        });
+                    }
+                    catch (err) {
+                        console.error("Failed to emit bot message over socket:", err);
+                    }
+                }
             }
             finally {
                 this.setSendingState(false);
@@ -400,7 +429,8 @@
         }
         async typeBotMessage(content) {
             this.removeTypingIndicator();
-            const message = { id: createId(), sender: "bot", content: "" };
+            const messageId = createId();
+            const message = { id: messageId, sender: "bot", content: "" };
             this.messages.push(message);
             const row = this.appendMessageRow(message);
             const chars = Array.from(content);
@@ -412,6 +442,7 @@
                     await delay(12);
                 }
             }
+            return messageId;
         }
     }
     async function requestBotReply(config, sessionToken, message) {
