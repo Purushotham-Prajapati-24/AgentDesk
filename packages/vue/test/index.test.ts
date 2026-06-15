@@ -8,8 +8,8 @@ describe('AgentDeskWidget (Vue)', () => {
 
   beforeEach(() => {
     // Reset shared global state so each test starts fresh
-    delete (window as Record<string, unknown>).__agentdeskGlobalListenerCount;
-    delete (window as Record<string, unknown>).__agentdeskWidgetInstances;
+    delete (window as unknown as Record<string, unknown>).__agentdeskGlobalListenerCount;
+    delete (window as unknown as Record<string, unknown>).__agentdeskWidgetInstances;
     messageListeners = [];
     const originalAdd = window.addEventListener.bind(window);
     vi.spyOn(window, 'addEventListener').mockImplementation((type, listener) => {
