@@ -2,7 +2,7 @@
 /**
  * inject-use-client.mjs
  *
- * Post-build step for `@agentdesk/react`. Walks the bundled `dist/`
+ * Post-build step for `@agentdeskbot/react`. Walks the bundled `dist/`
  * directory and prepends the `'use client';` directive to every emitted
  * `.js` and `.cjs` file. This is required because esbuild (the bundler
  * tsup wraps) only preserves KNOWN module-level directives (`'use strict'`,

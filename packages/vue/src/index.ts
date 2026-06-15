@@ -17,11 +17,11 @@ import {
   postSetMode,
   type WidgetMode,
   type WidgetMessageEventData,
-} from '@agentdesk/core';
+} from '@agentdeskbot/core';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-export type { WidgetMode } from '@agentdesk/core';
+export type { WidgetMode } from '@agentdeskbot/core';
 
 export interface AgentDeskWidgetProps {
   /** The Bot ID from your AgentDesk dashboard. Required. */
@@ -45,7 +45,7 @@ export interface AgentDeskWidgetProps {
 // dispatches `agentdesk-widget-open` / `agentdesk-widget-close` events to
 // the matching component's emit. The listener is installed on the first
 // SDK mount (any botId) and uninstalled on the last SDK unmount (any
-// botId) — both gated by ref counts in `@agentdesk/core`.
+// botId) — both gated by ref counts in `@agentdeskbot/core`.
 
 type ListenerBucket = Set<(type: 'open' | 'close') => void>;
 
@@ -131,7 +131,7 @@ function removeScriptAndWidget(botId: string): void {
  * @example
  * ```vue
  * <script setup>
- * import { AgentDeskWidget } from '@agentdesk/vue';
+ * import { AgentDeskWidget } from '@agentdeskbot/vue';
  * </script>
  *
  * <template>
@@ -311,7 +311,7 @@ export interface AgentDeskPluginOptions {
  * ```ts
  * // main.ts
  * import { createApp } from 'vue';
- * import { AgentDeskPlugin } from '@agentdesk/vue';
+ * import { AgentDeskPlugin } from '@agentdeskbot/vue';
  * import App from './App.vue';
  *
  * createApp(App)

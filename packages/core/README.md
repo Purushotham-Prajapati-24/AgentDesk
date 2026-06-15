@@ -1,14 +1,14 @@
 <div align="center">
 
-# `@agentdesk/core`
+# `@agentdeskbot/core`
 
 **Shared TypeScript types for the AgentDesk widget ecosystem.**
 
-The contract layer that powers [`@agentdesk/react`](https://www.npmjs.com/package/@agentdesk/react) and [`@agentdesk/vue`](https://www.npmjs.com/package/@agentdesk/vue).
+The contract layer that powers [`@agentdeskbot/react`](https://www.npmjs.com/package/@agentdeskbot/react) and [`@agentdeskbot/vue`](https://www.npmjs.com/package/@agentdeskbot/vue).
 
-[![npm version](https://img.shields.io/npm/v/@agentdesk/core?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdesk/core)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@agentdesk/core?color=success)](https://bundlephobia.com/package/@agentdesk/core)
-[![license](https://img.shields.io/npm/l/@agentdesk/core?color=blue)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/@agentdeskbot/core?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdeskbot/core)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@agentdeskbot/core?color=success)](https://bundlephobia.com/package/@agentdeskbot/core)
+[![license](https://img.shields.io/npm/l/@agentdeskbot/core?color=blue)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
 </div>
@@ -17,7 +17,7 @@ The contract layer that powers [`@agentdesk/react`](https://www.npmjs.com/packag
 
 ## Table of Contents
 
-- [Why `@agentdesk/core`?](#why-agentdeskcore)
+- [Why `@agentdeskbot/core`?](#why-agentdeskcore)
 - [Installation](#installation)
 - [Exports](#exports)
   - [`WidgetMode`](#widgetmode)
@@ -31,7 +31,7 @@ The contract layer that powers [`@agentdesk/react`](https://www.npmjs.com/packag
 
 ---
 
-## Why `@agentdesk/core`?
+## Why `@agentdeskbot/core`?
 
 The AgentDesk widget is shipped as multiple framework adapters (React, Vue, and any future adapters). To keep these adapters in lock-step — and to let **you** consume the same well-typed contract in your own integrations — all shared TypeScript surface lives here.
 
@@ -42,7 +42,7 @@ The AgentDesk widget is shipped as multiple framework adapters (React, Vue, and 
 | **Framework-agnostic** | Use it from React, Vue, Svelte, Solid, vanilla JS/TS — anything that can read `.d.ts`. |
 | **Strictly typed** | Built with `strict: true` so you get full IntelliSense and compile-time safety. |
 
-> If you just want to embed the chat widget, you probably don't need this package directly — install [`@agentdesk/react`](https://www.npmjs.com/package/@agentdesk/react) or [`@agentdesk/vue`](https://www.npmjs.com/package/@agentdesk/vue) instead. This package is for **adapter authors** and **advanced consumers** building custom integrations.
+> If you just want to embed the chat widget, you probably don't need this package directly — install [`@agentdeskbot/react`](https://www.npmjs.com/package/@agentdeskbot/react) or [`@agentdeskbot/vue`](https://www.npmjs.com/package/@agentdeskbot/vue) instead. This package is for **adapter authors** and **advanced consumers** building custom integrations.
 
 ---
 
@@ -50,13 +50,13 @@ The AgentDesk widget is shipped as multiple framework adapters (React, Vue, and 
 
 ```bash
 # npm
-npm install @agentdesk/core
+npm install @agentdeskbot/core
 
 # yarn
-yarn add @agentdesk/core
+yarn add @agentdeskbot/core
 
 # pnpm
-pnpm add @agentdesk/core
+pnpm add @agentdeskbot/core
 ```
 
 **Requirements**
@@ -91,7 +91,7 @@ Controls how the widget is rendered on the host page.
 | `'inline'` | The widget fills the nearest positioned ancestor element — useful for embedding the chat directly inside a page section, modal, or side panel. |
 
 ```ts
-import type { WidgetMode } from '@agentdesk/core';
+import type { WidgetMode } from '@agentdeskbot/core';
 
 const mode: WidgetMode = 'inline';
 ```
@@ -106,7 +106,7 @@ The shape of the payload posted by the AgentDesk widget IIFE to `window` via `po
 | `botId` | `string` | The bot ID this event pertains to — useful when multiple bots are mounted on the same page. |
 
 ```ts
-import type { WidgetMessageEventData } from '@agentdesk/core';
+import type { WidgetMessageEventData } from '@agentdeskbot/core';
 
 window.addEventListener('message', (event: MessageEvent) => {
   if (event.origin !== window.location.origin) return;
@@ -133,7 +133,7 @@ If you are building a custom framework adapter (Svelte, Solid, vanilla, etc.) an
 
 ```ts
 // my-agentdesk-adapter/src/index.ts
-import type { WidgetMode, WidgetMessageEventData } from '@agentdesk/core';
+import type { WidgetMode, WidgetMessageEventData } from '@agentdeskbot/core';
 
 export interface MyAdapterProps {
   botId: string;
@@ -146,7 +146,7 @@ export interface MyAdapterProps {
 ### 2. Listening to widget lifecycle events
 
 ```ts
-import type { WidgetMessageEventData } from '@agentdesk/core';
+import type { WidgetMessageEventData } from '@agentdeskbot/core';
 
 function attachLifecycleListener(botId: string) {
   const handler = (event: MessageEvent) => {
@@ -172,7 +172,7 @@ function attachLifecycleListener(botId: string) {
 ### 3. Reusing the type in your own chat surface
 
 ```ts
-import type { WidgetMode } from '@agentdesk/core';
+import type { WidgetMode } from '@agentdeskbot/core';
 
 interface ChatSurfaceProps {
   botId: string;
@@ -193,7 +193,7 @@ This package is marked `"sideEffects": false` in its `package.json`, so bundlers
 You can verify this for yourself:
 
 ```bash
-npx bundlephobia @agentdesk/core
+npx bundlephobia @agentdeskbot/core
 ```
 
 ---
@@ -226,7 +226,7 @@ dist/
 
 ## Versioning & Compatibility
 
-`@agentdesk/core` follows [Semantic Versioning](https://semver.org/):
+`@agentdeskbot/core` follows [Semantic Versioning](https://semver.org/):
 
 - **Patch** releases (e.g. `0.1.1`) — internal refactors, comment/doc fixes, no API change.
 - **Minor** releases (e.g. `0.2.0`) — backwards-compatible additions to the public type surface.
@@ -253,8 +253,8 @@ Bug reports, feature requests, and pull requests are welcome.
 
 | Package | Description |
 | --- | --- |
-| [`@agentdesk/react`](https://www.npmjs.com/package/@agentdesk/react) | React & Next.js SDK for the AgentDesk widget. |
-| [`@agentdesk/vue`](https://www.npmjs.com/package/@agentdesk/vue) | Vue 3 & Nuxt 3 SDK for the AgentDesk widget. |
+| [`@agentdeskbot/react`](https://www.npmjs.com/package/@agentdeskbot/react) | React & Next.js SDK for the AgentDesk widget. |
+| [`@agentdeskbot/vue`](https://www.npmjs.com/package/@agentdeskbot/vue) | Vue 3 & Nuxt 3 SDK for the AgentDesk widget. |
 
 ---
 

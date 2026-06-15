@@ -229,13 +229,13 @@ AgentDesk provides official SDKs for React and Vue to make embedding the widget 
 ### React / Next.js SDK
 
 ```bash
-npm install @agentdesk/react
+npm install @agentdeskbot/react
 ```
 
 ```tsx
-import { AgentDeskWidget } from '@agentdesk/react';
+import { AgentDeskWidget } from '@agentdeskbot/react';
 // If using Next.js, import from the nextjs subpath for SSR safety:
-// import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+// import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
 
 export default function App() {
   return <AgentDeskWidget botId="YOUR_BOT_ID" />;
@@ -251,12 +251,12 @@ export default function App() {
 ### Vue 3 SDK
 
 ```bash
-npm install @agentdesk/vue
+npm install @agentdeskbot/vue
 ```
 
 ```vue
 <script setup>
-import { AgentDeskWidget } from '@agentdesk/vue';
+import { AgentDeskWidget } from '@agentdeskbot/vue';
 </script>
 
 <template>

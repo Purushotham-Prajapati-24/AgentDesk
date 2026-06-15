@@ -1,15 +1,15 @@
 <div align="center">
 
-# `@agentdesk/vue`
+# `@agentdeskbot/vue`
 
 **Drop-in Vue 3 & Nuxt 3 SDK for the AgentDesk AI chat widget.**
 
 Embed a fully-typed, RAG-grounded support bot in your Vue app in under 30 seconds — no manual `onMounted` boilerplate, no plugin setup required, SSR-safe for Nuxt out of the box.
 
-[![npm version](https://img.shields.io/npm/v/@agentdesk/vue?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdesk/vue)
-[![npm downloads](https://img.shields.io/npm/dm/@agentdesk/vue?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdesk/vue)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@agentdesk/vue?color=success)](https://bundlephobia.com/package/@agentdesk/vue)
-[![license](https://img.shields.io/npm/l/@agentdesk/vue?color=blue)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/@agentdeskbot/vue?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdeskbot/vue)
+[![npm downloads](https://img.shields.io/npm/dm/@agentdeskbot/vue?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdeskbot/vue)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@agentdeskbot/vue?color=success)](https://bundlephobia.com/package/@agentdeskbot/vue)
+[![license](https://img.shields.io/npm/l/@agentdeskbot/vue?color=blue)](./LICENSE)
 [![Vue](https://img.shields.io/badge/Vue-3.x-42b883?logo=vue.js&logoColor=white)](https://vuejs.org)
 [![Nuxt](https://img.shields.io/badge/Nuxt-3.x-00DC82?logo=nuxtdotjs&logoColor=white)](https://nuxt.com)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -59,7 +59,7 @@ Embed a fully-typed, RAG-grounded support bot in your Vue app in under 30 second
 
 ```vue
 <script setup lang="ts">
-import { AgentDeskWidget } from '@agentdesk/vue';
+import { AgentDeskWidget } from '@agentdeskbot/vue';
 </script>
 
 <template>
@@ -76,13 +76,13 @@ That's it. The widget will mount as a floating launcher bubble in the bottom-rig
 
 ```bash
 # npm
-npm install @agentdesk/vue
+npm install @agentdeskbot/vue
 
 # yarn
-yarn add @agentdesk/vue
+yarn add @agentdeskbot/vue
 
 # pnpm
-pnpm add @agentdesk/vue
+pnpm add @agentdeskbot/vue
 ```
 
 **Peer dependencies** *(automatically installed alongside in modern setups)*
@@ -102,7 +102,7 @@ pnpm add @agentdesk/vue
 ```vue
 <!-- src/App.vue -->
 <script setup lang="ts">
-import { AgentDeskWidget } from '@agentdesk/vue';
+import { AgentDeskWidget } from '@agentdeskbot/vue';
 </script>
 
 <template>
@@ -118,7 +118,7 @@ Register once in your app's entry point and use `<AgentDeskWidget>` anywhere —
 ```ts
 // src/main.ts
 import { createApp } from 'vue';
-import { AgentDeskPlugin } from '@agentdesk/vue';
+import { AgentDeskPlugin } from '@agentdeskbot/vue';
 import App from './App.vue';
 
 createApp(App)
@@ -136,7 +136,7 @@ createApp(App)
 #### Plugin options
 
 ```ts
-import { AgentDeskPlugin } from '@agentdesk/vue';
+import { AgentDeskPlugin } from '@agentdeskbot/vue';
 
 app.use(AgentDeskPlugin, {
   // Set to false to register the plugin without auto-registering the
@@ -156,7 +156,7 @@ Create a **client-only** plugin so the widget is never executed during SSR. The 
 
 ```ts
 // plugins/agentdesk.client.ts
-import { AgentDeskPlugin } from '@agentdesk/vue';
+import { AgentDeskPlugin } from '@agentdeskbot/vue';
 
 export default defineNuxtPlugin((nuxtApp) => {
   nuxtApp.vueApp.use(AgentDeskPlugin);
@@ -211,7 +211,7 @@ If your AgentDesk backend runs on a **different domain** than the page embedding
 ### `WidgetMode` reference
 
 ```ts
-import type { WidgetMode } from '@agentdesk/vue'; // re-exported from @agentdesk/core
+import type { WidgetMode } from '@agentdeskbot/vue'; // re-exported from @agentdeskbot/core
 
 type WidgetMode = 'launcher' | 'inline';
 ```
@@ -386,8 +386,8 @@ The official React and Vue SDKs handle this for you — no action is required un
 
 | Package | Description |
 | --- | --- |
-| [`@agentdesk/core`](https://www.npmjs.com/package/@agentdesk/core) | Shared TypeScript types (used internally). |
-| [`@agentdesk/react`](https://www.npmjs.com/package/@agentdesk/react) | React & Next.js SDK for the same widget. |
+| [`@agentdeskbot/core`](https://www.npmjs.com/package/@agentdeskbot/core) | Shared TypeScript types (used internally). |
+| [`@agentdeskbot/react`](https://www.npmjs.com/package/@agentdeskbot/react) | React & Next.js SDK for the same widget. |
 
 ---
 

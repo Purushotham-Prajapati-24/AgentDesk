@@ -1,15 +1,15 @@
 <div align="center">
 
-# `@agentdesk/react`
+# `@agentdeskbot/react`
 
 **Drop-in React & Next.js SDK for the AgentDesk AI chat widget.**
 
 Embed a fully-typed, RAG-grounded support bot in your React app in under 30 seconds — no `<script>` tag wrangling, no `useEffect` boilerplate, no SSR gymnastics.
 
-[![npm version](https://img.shields.io/npm/v/@agentdesk/react?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdesk/react)
-[![npm downloads](https://img.shields.io/npm/dm/@agentdesk/react?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdesk/react)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@agentdesk/react?color=success)](https://bundlephobia.com/package/@agentdesk/react)
-[![license](https://img.shields.io/npm/l/@agentdesk/react?color=blue)](./LICENSE)
+[![npm version](https://img.shields.io/npm/v/@agentdeskbot/react?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdeskbot/react)
+[![npm downloads](https://img.shields.io/npm/dm/@agentdeskbot/react?color=cb3837&logo=npm&logoColor=white)](https://www.npmjs.com/package/@agentdeskbot/react)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@agentdeskbot/react?color=success)](https://bundlephobia.com/package/@agentdeskbot/react)
+[![license](https://img.shields.io/npm/l/@agentdeskbot/react?color=blue)](./LICENSE)
 [![React](https://img.shields.io/badge/React-%E2%89%A518-149eca?logo=react&logoColor=white)](https://react.dev)
 [![Next.js](https://img.shields.io/badge/Next.js-%E2%89%A513-000000?logo=next.js&logoColor=white)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -57,7 +57,7 @@ Embed a fully-typed, RAG-grounded support bot in your React app in under 30 seco
 ## Quick Start
 
 ```tsx
-import { AgentDeskWidget } from '@agentdesk/react';
+import { AgentDeskWidget } from '@agentdeskbot/react';
 
 export default function App() {
   return (
@@ -77,13 +77,13 @@ That's it. The widget will mount as a floating launcher bubble in the bottom-rig
 
 ```bash
 # npm
-npm install @agentdesk/react
+npm install @agentdeskbot/react
 
 # yarn
-yarn add @agentdesk/react
+yarn add @agentdeskbot/react
 
 # pnpm
-pnpm add @agentdesk/react
+pnpm add @agentdeskbot/react
 ```
 
 **Peer dependencies** *(automatically installed alongside in modern setups)*
@@ -104,7 +104,7 @@ pnpm add @agentdesk/react
 
 ```tsx
 // src/App.tsx
-import { AgentDeskWidget } from '@agentdesk/react';
+import { AgentDeskWidget } from '@agentdeskbot/react';
 
 export default function App() {
   return (
@@ -124,7 +124,7 @@ For App Router projects, import from the **`/nextjs` subpath**. This wrapper use
 
 ```tsx
 // app/layout.tsx
-import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -145,7 +145,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```tsx
 // pages/_app.tsx
 import type { AppProps } from 'next/app';
-import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
@@ -191,7 +191,7 @@ If your AgentDesk backend runs on a **different domain** than the page embedding
 ### `WidgetMode` reference
 
 ```ts
-import type { WidgetMode } from '@agentdesk/react'; // re-exported from @agentdesk/core
+import type { WidgetMode } from '@agentdeskbot/react'; // re-exported from @agentdeskbot/core
 
 type WidgetMode = 'launcher' | 'inline';
 ```
@@ -310,11 +310,11 @@ React tree mount
 <details>
 <summary><strong>"window is not defined" in Next.js</strong></summary>
 
-You are importing from `@agentdesk/react` in a Server Component context. Switch to the `/nextjs` subpath:
+You are importing from `@agentdeskbot/react` in a Server Component context. Switch to the `/nextjs` subpath:
 
 ```diff
-- import { AgentDeskWidget } from '@agentdesk/react';
-+ import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+- import { AgentDeskWidget } from '@agentdeskbot/react';
++ import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
 ```
 
 </details>
@@ -354,8 +354,8 @@ The official React and Vue SDKs handle this for you — no action is required un
 
 | Package | Description |
 | --- | --- |
-| [`@agentdesk/core`](https://www.npmjs.com/package/@agentdesk/core) | Shared TypeScript types (used internally). |
-| [`@agentdesk/vue`](https://www.npmjs.com/package/@agentdesk/vue) | Vue 3 & Nuxt 3 SDK for the same widget. |
+| [`@agentdeskbot/core`](https://www.npmjs.com/package/@agentdeskbot/core) | Shared TypeScript types (used internally). |
+| [`@agentdeskbot/vue`](https://www.npmjs.com/package/@agentdeskbot/vue) | Vue 3 & Nuxt 3 SDK for the same widget. |
 
 ---
 

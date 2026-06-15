@@ -1,5 +1,5 @@
 {
-  "name": "@agentdesk/vue",
+  "name": "@agentdeskbot/vue",
   "version": "0.1.0",
   "description": "AgentDesk AI chat widget — Vue 3 SDK",
   "keywords": [
@@ -60,6 +60,6 @@
     "vue": "^3"
   },
   "dependencies": {
-    "@agentdesk/core": "^0.1.0"
+    "@agentdeskbot/core": "^0.1.0"
   }
 }

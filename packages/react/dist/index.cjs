@@ -2,7 +2,7 @@
 'use strict';
 
 var react = require('react');
-var core = require('@agentdesk/core');
+var core = require('@agentdeskbot/core');
 
 var listenerBuckets = /* @__PURE__ */ new Map();
 function dispatchOpen(botId) {

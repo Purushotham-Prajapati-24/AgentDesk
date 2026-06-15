@@ -1,5 +1,5 @@
 import { defineComponent, onMounted, onBeforeUnmount, onDeactivated, onActivated, watch, h } from 'vue';
-import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdesk/core';
+import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
 
 // src/index.ts
 var listenerBuckets = /* @__PURE__ */ new Map();

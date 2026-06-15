@@ -1,5 +1,5 @@
-import { WidgetMode } from '@agentdesk/core';
-export { WidgetMode } from '@agentdesk/core';
+import { WidgetMode } from '@agentdeskbot/core';
+export { WidgetMode } from '@agentdeskbot/core';
 
 interface AgentDeskWidgetProps {
     /**
@@ -49,7 +49,7 @@ interface AgentDeskWidgetProps {
  *
  * @example
  * ```tsx
- * import { AgentDeskWidget } from '@agentdesk/react';
+ * import { AgentDeskWidget } from '@agentdeskbot/react';
  *
  * export default function App() {
  *   return (

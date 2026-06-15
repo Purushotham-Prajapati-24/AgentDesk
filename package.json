@@ -9,14 +9,14 @@
     "dev": "next dev",
     "dev:ws": "npm --prefix websocket-server start",
     "build": "npm run build:widget && npm run build:sdk && next build",
-    "build:sdk": "npm run build -w @agentdesk/core && npm run build -w @agentdesk/react -w @agentdesk/vue",
+    "build:sdk": "npm run build -w @agentdeskbot/core && npm run build -w @agentdeskbot/react -w @agentdeskbot/vue",
     "build:widget": "node scripts/build-widget.mjs",
     "qdrant:hybrid": "node --env-file=.env.local scripts/create-qdrant-hybrid.mjs",
     "setup:ingestion": "node --env-file=.env.local scripts/setup-ingestion-schema.mjs",
     "start": "next start",
     "test": "node --experimental-strip-types --test test/*.test.mjs",
     "test:sdk": "vitest run",
-    "typecheck": "npm run typecheck -w @agentdesk/core && npm run typecheck -w @agentdesk/react -w @agentdesk/vue",
+    "typecheck": "npm run typecheck -w @agentdeskbot/core && npm run typecheck -w @agentdeskbot/react -w @agentdeskbot/vue",
     "lint": "eslint"
   },
   "dependencies": {
