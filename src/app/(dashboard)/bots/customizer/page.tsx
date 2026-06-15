@@ -368,7 +368,7 @@ function buildEmbedSnippets(botId: string) {
   return {
     script: `<script src="https://agentdeskbot.vercel.app/widget.js" data-bot-id="${safeBotId}" async></script>`,
     iframe: `<iframe src="https://agentdeskbot.vercel.app/embed/${safeBotId}" title="AgentDesk support" style="width:100%;height:640px;border:0"></iframe>`,
-    react: `import { AgentDeskWidget } from "@agentdesk/widget/react";\n\n<AgentDeskWidget botId="${safeBotId}" />`,
+    react: `import { AgentDeskWidget } from "@agentdeskbot/widget/react";\n\n<AgentDeskWidget botId="${safeBotId}" />`,
     vue: `const AgentDeskWidget = createAgentDeskVueComponent(Vue);\n\n<AgentDeskWidget bot-id="${safeBotId}" />`,
   };
 }

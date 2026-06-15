@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useEffect } from 'react';
-import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdesk/core';
+import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
 
 var listenerBuckets = /* @__PURE__ */ new Map();
 function dispatchOpen(botId) {

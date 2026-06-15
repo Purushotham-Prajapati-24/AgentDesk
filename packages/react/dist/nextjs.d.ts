@@ -1,9 +1,9 @@
 import { AgentDeskWidgetProps } from './index.js';
-export { WidgetMode } from '@agentdesk/core';
+export { WidgetMode } from '@agentdeskbot/core';
 import { ComponentType } from 'react';
 
 /**
- * @agentdesk/react — Next.js subpath export
+ * @agentdeskbot/react — Next.js subpath export
  *
  * This entry point wraps the AgentDeskWidget in Next.js `dynamic()` with
  * `ssr: false` to prevent "window is not defined" errors during server-side
@@ -21,7 +21,7 @@ import { ComponentType } from 'react';
  * @example
  * ```tsx
  * // app/layout.tsx  (App Router)
- * import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+ * import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
  *
  * export default function RootLayout({ children }) {
  *   return (
@@ -38,7 +38,7 @@ import { ComponentType } from 'react';
  * @example
  * ```tsx
  * // pages/_app.tsx  (Pages Router)
- * import { AgentDeskWidget } from '@agentdesk/react/nextjs';
+ * import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
  *
  * export default function MyApp({ Component, pageProps }) {
  *   return (
@@ -58,7 +58,7 @@ import { ComponentType } from 'react';
  * `next` is declared as an optional peer dependency in `package.json` and
  * is `external` in the tsup config, so this module preserves the import
  * at runtime. If you are bundling for a non-Next.js environment, import
- * from `@agentdesk/react` instead.
+ * from `@agentdeskbot/react` instead.
  */
 declare const AgentDeskWidget: ComponentType<AgentDeskWidgetProps>;
 

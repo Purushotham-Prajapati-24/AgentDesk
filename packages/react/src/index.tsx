@@ -12,7 +12,7 @@
 // If you are NOT using Next.js, you can safely ignore this directive; it
 // will be stripped by your bundler. If you ARE using Next.js with the
 // Pages Router or want full SSR safety, import from
-// `@agentdesk/react/nextjs` instead — that subpath uses `next/dynamic`
+// `@agentdeskbot/react/nextjs` instead — that subpath uses `next/dynamic`
 // with `ssr: false`.
 
 import { useEffect, useRef } from 'react';
@@ -23,11 +23,11 @@ import {
   postSetMode,
   type WidgetMode,
   type WidgetMessageEventData,
-} from '@agentdesk/core';
+} from '@agentdeskbot/core';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
-export type { WidgetMode } from '@agentdesk/core';
+export type { WidgetMode } from '@agentdeskbot/core';
 
 export interface AgentDeskWidgetProps {
   /**
@@ -89,7 +89,7 @@ export interface AgentDeskWidgetProps {
 //
 // The listener is installed on the *first* SDK mount (any botId) and
 // torn down on the *last* SDK unmount (any botId). Reference counting
-// lives in `@agentdesk/core` (`acquireInstance` / `releaseInstance`).
+// lives in `@agentdeskbot/core` (`acquireInstance` / `releaseInstance`).
 //
 // We do not pass a real `WeakMap<botId, callback>` because consumers may
 // change callback identities on every render — using refs inside each
@@ -182,7 +182,7 @@ function removeScriptAndWidget(botId: string): void {
  *
  * @example
  * ```tsx
- * import { AgentDeskWidget } from '@agentdesk/react';
+ * import { AgentDeskWidget } from '@agentdeskbot/react';
  *
  * export default function App() {
  *   return (

@@ -156,7 +156,7 @@ const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
       {
         title: "Create a small client component",
         body: "Keep the widget in a small browser-only component instead of mixing it into page content.",
-        example: '"use client";\nimport { AgentDeskWidget } from "@agentdesk/widget/react";\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="YOUR_BOT_ID" theme="production" />;\n}',
+        example: '"use client";\nimport { AgentDeskWidget } from "@agentdeskbot/widget/react";\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="YOUR_BOT_ID" theme="production" />;\n}',
       },
       {
         title: "Place it in the app shell",
@@ -182,7 +182,7 @@ const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
       {
         title: "Import or register the component",
         body: "Add the widget to the shared layout that wraps your pages.",
-        example: '<script setup>\nimport { AgentDeskWidget } from "@agentdesk/widget/vue";\n</script>',
+        example: '<script setup>\nimport { AgentDeskWidget } from "@agentdeskbot/widget/vue";\n</script>',
       },
       {
         title: "Place it after the router view",
@@ -1327,7 +1327,7 @@ function buildSnippets(config: WebChatConfig) {
   return {
     script: `<script src="https://agentdeskbot.vercel.app/widget.js" data-bot-id="${botId}" data-theme="${theme}" async></script>`,
     iframe: `<iframe src="https://agentdeskbot.vercel.app/embed/${botId}?theme=${theme}" title="${config.identity.botName}" style="width:100%;height:640px;border:0"></iframe>`,
-    react: `import { AgentDeskWidget } from "@agentdesk/widget/react";\n\n<AgentDeskWidget botId="${botId}" theme="${theme}" />`,
+    react: `import { AgentDeskWidget } from "@agentdeskbot/widget/react";\n\n<AgentDeskWidget botId="${botId}" theme="${theme}" />`,
     vue: `<AgentDeskWidget bot-id="${botId}" theme="${theme}" />`,
   };
 }

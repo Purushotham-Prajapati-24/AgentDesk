@@ -3,7 +3,7 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 var vue = require('vue');
-var core = require('@agentdesk/core');
+var core = require('@agentdeskbot/core');
 
 // src/index.ts
 var listenerBuckets = /* @__PURE__ */ new Map();

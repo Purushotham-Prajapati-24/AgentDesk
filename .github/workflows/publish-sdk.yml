@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         # `--legacy-peer-deps` works around the peer-dependency conflict
         # between Next.js 15 (which peers on `react@^18.2.0`) and
-        # React 19 used by the @agentdesk/react dev environment. Without
+        # React 19 used by the @agentdeskbot/react dev environment. Without
         # this flag `npm ci` aborts on the first ERESOLVE.
         run: npm ci --legacy-peer-deps
 
@@ -54,10 +54,10 @@ jobs:
       - name: Build SDK packages
         run: npm run build:sdk
 
-      - name: Publish @agentdesk/core
-        # MUST be published first: @agentdesk/react and @agentdesk/vue both
-        # declare `"@agentdesk/core": "^0.1.0"` as a runtime dependency. If we
-        # published those packages while `@agentdesk/core` was still resolved
+      - name: Publish @agentdeskbot/core
+        # MUST be published first: @agentdeskbot/react and @agentdeskbot/vue both
+        # declare `"@agentdeskbot/core": "^0.1.0"` as a runtime dependency. If we
+        # published those packages while `@agentdeskbot/core` was still resolved
         # via the local `file:` workspace link, npm would tarball the wrong
         # `main`/`types` paths and downstream consumers would fail to install.
         # Publishing core first lets the React/Vue packages resolve it from
@@ -67,13 +67,13 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @agentdesk/react
+      - name: Publish @agentdeskbot/react
         run: npm publish --access public --provenance
         working-directory: packages/react
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish @agentdesk/vue
+      - name: Publish @agentdeskbot/vue
         run: npm publish --access public --provenance
         working-directory: packages/vue
         env:

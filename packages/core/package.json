@@ -1,5 +1,5 @@
 {
-  "name": "@agentdesk/core",
+  "name": "@agentdeskbot/core",
   "version": "0.1.0",
   "description": "AgentDesk core shared types and widget ownership registry",
   "license": "MIT",

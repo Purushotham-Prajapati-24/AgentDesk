@@ -1,7 +1,7 @@
 import * as vue from 'vue';
 import { App, PropType } from 'vue';
-import { WidgetMode } from '@agentdesk/core';
-export { WidgetMode } from '@agentdesk/core';
+import { WidgetMode } from '@agentdeskbot/core';
+export { WidgetMode } from '@agentdeskbot/core';
 
 interface AgentDeskWidgetProps {
     /** The Bot ID from your AgentDesk dashboard. Required. */
@@ -23,7 +23,7 @@ interface AgentDeskWidgetProps {
  * @example
  * ```vue
  * <script setup>
- * import { AgentDeskWidget } from '@agentdesk/vue';
+ * import { AgentDeskWidget } from '@agentdeskbot/vue';
  * </script>
  *
  * <template>
@@ -100,7 +100,7 @@ interface AgentDeskPluginOptions {
  * ```ts
  * // main.ts
  * import { createApp } from 'vue';
- * import { AgentDeskPlugin } from '@agentdesk/vue';
+ * import { AgentDeskPlugin } from '@agentdeskbot/vue';
  * import App from './App.vue';
  *
  * createApp(App)
