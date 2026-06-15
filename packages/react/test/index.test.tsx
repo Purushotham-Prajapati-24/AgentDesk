@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { AgentDeskWidget } from '../src/index';
 
 describe('AgentDeskWidget (React)', () => {
@@ -149,6 +150,101 @@ describe('AgentDeskWidget (React)', () => {
     // Component always returns null; it never accesses DOM during render.
     const { container } = render(<AgentDeskWidget botId="ssr-bot" />);
     expect(container.innerHTML).toBe('');
+  });
+
+  it('logs a warning and returns null when window is undefined', () => {
+    const originalWindow = global.window;
+    // @ts-expect-error - deleting window to simulate server environment
+    delete global.window;
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const html = renderToString(<AgentDeskWidget botId="ssr-bot" />);
+      expect(html).toBe('');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("AgentDeskWidget was rendered on the server")
+      );
+    } finally {
+      global.window = originalWindow;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('injects scripts with default SaaS endpoints', () => {
+    render(<AgentDeskWidget botId="saas-bot" />);
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.src).toBe('https://agentdeskbot.vercel.app/widget.js');
+    expect(script.dataset.apiOrigin).toBe('https://agentdeskbot.vercel.app');
+  });
+
+  it('injects optional styling, positioning, and security attributes', () => {
+    render(
+      <AgentDeskWidget
+        botId="attrs-bot"
+        theme="webchat-v1"
+        cspNonce="xyz123"
+        position="bottom-left"
+        className="my-custom-container"
+      />
+    );
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.dataset.theme).toBe('webchat-v1');
+    expect(script.dataset.cspNonce).toBe('xyz123');
+    expect(script.getAttribute('nonce')).toBe('xyz123');
+    expect(script.dataset.position).toBe('bottom-left');
+    expect(script.dataset.className).toBe('my-custom-container');
+  });
+
+  it('invokes new lifecycle callbacks correctly', () => {
+    const onReady = vi.fn();
+    const onError = vi.fn();
+    const onMessageSent = vi.fn();
+    const onWidgetInjected = vi.fn();
+
+    render(
+      <AgentDeskWidget
+        botId="callbacks-bot"
+        onReady={onReady}
+        onError={onError}
+        onMessageSent={onMessageSent}
+        onWidgetInjected={onWidgetInjected}
+      />
+    );
+
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-ready', botId: 'callbacks-bot' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-error', botId: 'callbacks-bot', message: 'Config failed' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-message-sent', botId: 'callbacks-bot', text: 'hello' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-injected', botId: 'callbacks-bot' },
+        }),
+      );
+    });
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith({ message: 'Config failed' });
+    expect(onMessageSent).toHaveBeenCalledWith({ text: 'hello' });
+    expect(onWidgetInjected).toHaveBeenCalledTimes(1);
   });
 
   it('ignores messages with an unknown shape', () => {

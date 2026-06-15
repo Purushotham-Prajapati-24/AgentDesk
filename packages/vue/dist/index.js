@@ -3,13 +3,9 @@ import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } fr
 
 // src/index.ts
 var listenerBuckets = /* @__PURE__ */ new Map();
-function dispatchOpen(botId) {
+function dispatchEvent(botId, eventName, payload) {
   var _a;
-  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((emit) => emit("open"));
-}
-function dispatchClose(botId) {
-  var _a;
-  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((emit) => emit("close"));
+  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((emit) => emit(eventName, payload));
 }
 var globalListenerInstalled = false;
 var globalListenerRef = null;
@@ -20,10 +16,27 @@ function installGlobalListener() {
     if (!event.data || typeof event.data !== "object") return;
     if (event.origin !== window.location.origin) return;
     const data = event.data;
-    if (data.type !== "agentdesk-widget-open" && data.type !== "agentdesk-widget-close") return;
     if (typeof data.botId !== "string") return;
-    if (data.type === "agentdesk-widget-open") dispatchOpen(data.botId);
-    else dispatchClose(data.botId);
+    switch (data.type) {
+      case "agentdesk-widget-open":
+        dispatchEvent(data.botId, "open");
+        break;
+      case "agentdesk-widget-close":
+        dispatchEvent(data.botId, "close");
+        break;
+      case "agentdesk-widget-ready":
+        dispatchEvent(data.botId, "ready");
+        break;
+      case "agentdesk-widget-error":
+        dispatchEvent(data.botId, "error", { message: data.message || "Unknown error" });
+        break;
+      case "agentdesk-widget-message-sent":
+        dispatchEvent(data.botId, "message-sent", { text: data.text || "" });
+        break;
+      case "agentdesk-widget-injected":
+        dispatchEvent(data.botId, "injected");
+        break;
+    }
   };
   window.addEventListener("message", globalListenerRef);
 }
@@ -51,6 +64,13 @@ function injectScript(options) {
   script.dataset.mode = options.mode;
   if (options.configUrl) script.dataset.configUrl = options.configUrl;
   if (options.apiOrigin) script.dataset.apiOrigin = options.apiOrigin;
+  if (options.theme) script.dataset.theme = options.theme;
+  if (options.cspNonce) {
+    script.dataset.cspNonce = options.cspNonce;
+    script.setAttribute("nonce", options.cspNonce);
+  }
+  if (options.position) script.dataset.position = options.position;
+  if (options.className) script.dataset.className = options.className;
   document.body.append(script);
 }
 function removeScriptAndWidget(botId) {
@@ -76,15 +96,38 @@ var AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String,
-      default: "/widget.js"
+      default: "https://agentdeskbot.vercel.app/widget.js"
     },
     apiOrigin: {
+      type: String,
+      default: "https://agentdeskbot.vercel.app"
+    },
+    theme: {
+      type: String,
+      default: ""
+    },
+    cspNonce: {
+      type: String,
+      default: ""
+    },
+    position: {
+      type: String,
+      default: "bottom-right",
+      validator: (v) => ["bottom-right", "bottom-left", "top-right", "top-left"].includes(v)
+    },
+    className: {
       type: String,
       default: ""
     }
   },
-  emits: ["open", "close"],
+  emits: ["open", "close", "ready", "error", "message-sent", "injected"],
   setup(props, { emit }) {
+    if (typeof window === "undefined") {
+      console.warn(
+        "[AgentDesk] AgentDeskWidget was initialized in a non-browser environment. Ensure it is only rendered on the client side."
+      );
+      return () => null;
+    }
     let hasSlot = false;
     let cachedEmit = null;
     const install = () => {
@@ -99,16 +142,27 @@ var AgentDeskWidget = defineComponent({
           injectScript({
             botId: props.botId,
             mode: (_b = props.mode) != null ? _b : "launcher",
-            scriptSrc: props.scriptSrc || "/widget.js",
+            scriptSrc: props.scriptSrc || "https://agentdeskbot.vercel.app/widget.js",
             configUrl: props.configUrl || void 0,
-            apiOrigin: props.apiOrigin || void 0
+            apiOrigin: props.apiOrigin || void 0,
+            theme: props.theme || void 0,
+            cspNonce: props.cspNonce || void 0,
+            position: props.position || void 0,
+            className: props.className || void 0
           });
         }
       } else if (acquire.modeChanged) {
         postSetMode(props.botId, (_c = props.mode) != null ? _c : "launcher");
       }
       hasSlot = true;
-      cachedEmit = (type) => emit(type);
+      cachedEmit = (type, payload) => {
+        const emitType = type;
+        if (payload !== void 0) {
+          emit(emitType, payload);
+        } else {
+          emit(emitType);
+        }
+      };
       if (!listenerBuckets.has(props.botId)) {
         listenerBuckets.set(props.botId, /* @__PURE__ */ new Set());
       }

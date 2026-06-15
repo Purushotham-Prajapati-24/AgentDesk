@@ -80,8 +80,18 @@
    *     different origin, so we fall back to `"*"` and rely on `event.source`
    *     validation on the receiving side.
    */
-  function postLifecycleEvent(type: "agentdesk-widget-open" | "agentdesk-widget-close" | "agentdesk-set-mode-ack") {
-    const payload = { type, botId };
+  function postLifecycleEvent(
+    type:
+      | "agentdesk-widget-open"
+      | "agentdesk-widget-close"
+      | "agentdesk-set-mode-ack"
+      | "agentdesk-widget-ready"
+      | "agentdesk-widget-error"
+      | "agentdesk-widget-message-sent"
+      | "agentdesk-widget-injected",
+    extra: { message?: string; text?: string } = {}
+  ) {
+    const payload = { type, botId, ...extra };
     try {
       if (isIframeEmbed) {
         window.parent.postMessage(payload, "*");
@@ -147,6 +157,11 @@
   let embedMode: "launcher" | "inline" =
     currentScript?.dataset.mode === "inline" ? "inline" : "launcher";
 
+  const themeParam = currentScript?.dataset.theme?.trim();
+  const cspNonce = currentScript?.dataset.cspNonce?.trim();
+  const position = currentScript?.dataset.position?.trim();
+  const className = currentScript?.dataset.className?.trim();
+
   // Fallback for Next.js / React 19 script hoisting on the embed page
   if (!botId && window.location.pathname.startsWith("/embed/")) {
     const segments = window.location.pathname.split("/");
@@ -157,7 +172,7 @@
     }
   }
 
-  const configUrl = currentScript?.dataset.configUrl?.trim() || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}`;
+  const configUrl = currentScript?.dataset.configUrl?.trim() || `${scriptOrigin}/api/widget/config/${encodeURIComponent(botId)}${themeParam ? `?theme=${encodeURIComponent(themeParam)}` : ""}`;
 
   if (!botId) {
     return;
@@ -221,7 +236,8 @@
         }
 
         this.config = normalizeConfig(body.data);
-      } catch {
+      } catch (err) {
+        postLifecycleEvent("agentdesk-widget-error", { message: err instanceof Error ? err.message : String(err) });
         this.config = buildFallbackConfig(botId);
       }
 
@@ -242,6 +258,7 @@
       }
       this.renderShell();
       this.initSocket(this.config);
+      postLifecycleEvent("agentdesk-widget-ready");
     }
 
     private initSocket(this: AgentDeskWidget, config: WidgetConfig) {
@@ -253,6 +270,9 @@
       if (!document.querySelector(`script[src="${scriptUrl}"]`)) {
         const script = document.createElement("script");
         script.src = scriptUrl;
+        if (cspNonce) {
+          script.setAttribute("nonce", cspNonce);
+        }
         script.onload = () => void this.connectSocket(config);
         document.head.appendChild(script);
       } else {
@@ -287,6 +307,7 @@
 
       const isHealthy = await checkLiveHandoffHealth(wsUrl);
       if (!isHealthy) {
+        postLifecycleEvent("agentdesk-widget-error", { message: "WebSocket handoff server health check failed" });
         return;
       }
 
@@ -320,6 +341,7 @@
         }
       } catch (err) {
         console.error("Failed to connect to live handoff socket:", err);
+        postLifecycleEvent("agentdesk-widget-error", { message: err instanceof Error ? err.message : String(err) });
       }
     }
 
@@ -335,7 +357,9 @@
 
     private createWidget(config: WidgetConfig) {
       const wrapper = createElement("section", `ad-widget ${embedMode}`);
+      wrapper.setAttribute("part", "widget");
       const pane = createElement("div", `ad-chat-pane${this.isOpen || embedMode === "inline" ? " active" : ""}`);
+      pane.setAttribute("part", "pane");
       pane.setAttribute("aria-live", "polite");
 
       pane.append(this.createHeader(config), this.createMessageList(), this.createQuickActions(), this.createForm(config));
@@ -346,6 +370,7 @@
       }
 
       const launcher = createElement("button", "ad-launcher-button");
+      launcher.setAttribute("part", "launcher");
       launcher.type = "button";
       launcher.setAttribute("aria-label", this.isOpen ? "Close support chat" : "Open support chat");
       if (this.isOpen) {
@@ -591,6 +616,7 @@
       saveMessages(this.messages);
       this.appendMessageRow(userMessage);
       this.setSendingState(true);
+      postLifecycleEvent("agentdesk-widget-message-sent", { text: content });
 
       // Emit over WebSocket for real-time live agent view
       if (this.socket && this.socket.connected) {
@@ -1068,6 +1094,9 @@
 
   function createStyles(theme: WidgetTheme) {
     const style = document.createElement("style");
+    if (cspNonce) {
+      style.setAttribute("nonce", cspNonce);
+    }
     style.textContent = `
       :host {
         --ad-bg-primary: hsl(${theme.backgroundHsl});
@@ -1101,6 +1130,57 @@
         position: fixed;
         right: 0;
         top: 0;
+      }
+
+      :host([data-agentdesk-position="bottom-left"]) .ad-widget {
+        bottom: 24px;
+        left: 24px;
+        right: auto;
+      }
+      :host([data-agentdesk-position="bottom-left"]) .ad-chat-pane {
+        bottom: 80px;
+        left: 0;
+        right: auto;
+      }
+      :host([data-agentdesk-position="bottom-left"]) .ad-launcher-button {
+        left: 0;
+        right: auto;
+      }
+
+      :host([data-agentdesk-position="top-right"]) .ad-widget {
+        top: 24px;
+        bottom: auto;
+        right: 24px;
+      }
+      :host([data-agentdesk-position="top-right"]) .ad-chat-pane {
+        top: 80px;
+        bottom: auto;
+        right: 0;
+        transform: translateY(-24px) scale(0.96);
+      }
+      :host([data-agentdesk-position="top-right"]) .ad-chat-pane.active {
+        transform: translateY(0) scale(1);
+      }
+
+      :host([data-agentdesk-position="top-left"]) .ad-widget {
+        top: 24px;
+        bottom: auto;
+        left: 24px;
+        right: auto;
+      }
+      :host([data-agentdesk-position="top-left"]) .ad-chat-pane {
+        top: 80px;
+        bottom: auto;
+        left: 0;
+        right: auto;
+        transform: translateY(-24px) scale(0.96);
+      }
+      :host([data-agentdesk-position="top-left"]) .ad-chat-pane.active {
+        transform: translateY(0) scale(1);
+      }
+      :host([data-agentdesk-position="top-left"]) .ad-launcher-button {
+        left: 0;
+        right: auto;
       }
 
       * { box-sizing: border-box; }
@@ -1656,7 +1736,14 @@
       const mount = document.createElement(elementName);
       mount.setAttribute("data-agentdesk-mode", embedMode);
       mount.setAttribute("data-bot-id", botId);
+      if (className) {
+        mount.className = className;
+      }
+      if (position) {
+        mount.setAttribute("data-agentdesk-position", position);
+      }
       document.body.append(mount);
+      postLifecycleEvent("agentdesk-widget-injected");
     }
   }
 

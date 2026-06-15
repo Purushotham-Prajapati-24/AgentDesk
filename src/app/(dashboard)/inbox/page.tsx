@@ -302,7 +302,7 @@ export default function InboxPage() {
           createdAt: message.createdAt,
         })),
       );
-    } catch (messageError) {
+    } catch {
       setMessages([]);
     } finally {
       setMessageLoading(false);

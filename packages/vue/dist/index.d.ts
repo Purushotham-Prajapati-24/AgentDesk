@@ -12,10 +12,18 @@ interface AgentDeskWidgetProps {
      *  **Dynamic updates are supported** — the SDK posts an
      *  `agentdesk-set-mode` message when this prop changes. */
     mode?: WidgetMode;
-    /** URL to widget.js. Defaults to '/widget.js'. */
+    /** URL to widget.js. Defaults to 'https://agentdeskbot.vercel.app/widget.js'. */
     scriptSrc?: string;
     /** Base URL of your AgentDesk backend (for cross-origin embeds). */
     apiOrigin?: string;
+    /** Optional theme name for the widget (e.g. 'webchat-v1'). */
+    theme?: string;
+    /** Optional Content Security Policy (CSP) nonce to apply to the injected script and dynamically created styles. */
+    cspNonce?: string;
+    /** Optional fixed positioning override. */
+    position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+    /** Optional custom HTML class name to apply to the host container. */
+    className?: string;
 }
 /**
  * AgentDeskWidget — Vue 3 component that embeds the AgentDesk AI chat widget.
@@ -53,9 +61,26 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
         type: PropType<string>;
         default: string;
     };
-}>, () => vue.VNode<vue.RendererNode, vue.RendererElement, {
+    theme: {
+        type: PropType<string>;
+        default: string;
+    };
+    cspNonce: {
+        type: PropType<string>;
+        default: string;
+    };
+    position: {
+        type: PropType<"bottom-right" | "bottom-left" | "top-right" | "top-left">;
+        default: string;
+        validator: (v: string) => boolean;
+    };
+    className: {
+        type: PropType<string>;
+        default: string;
+    };
+}>, (() => null) | (() => vue.VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
-}>, {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, ("open" | "close")[], "open" | "close", vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+}>), {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, ("close" | "error" | "open" | "ready" | "message-sent" | "injected")[], "close" | "error" | "open" | "ready" | "message-sent" | "injected", vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     botId: {
         type: PropType<string>;
         required: true;
@@ -77,13 +102,38 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
         type: PropType<string>;
         default: string;
     };
+    theme: {
+        type: PropType<string>;
+        default: string;
+    };
+    cspNonce: {
+        type: PropType<string>;
+        default: string;
+    };
+    position: {
+        type: PropType<"bottom-right" | "bottom-left" | "top-right" | "top-left">;
+        default: string;
+        validator: (v: string) => boolean;
+    };
+    className: {
+        type: PropType<string>;
+        default: string;
+    };
 }>> & Readonly<{
-    onOpen?: ((...args: any[]) => any) | undefined;
     onClose?: ((...args: any[]) => any) | undefined;
+    onError?: ((...args: any[]) => any) | undefined;
+    onOpen?: ((...args: any[]) => any) | undefined;
+    onReady?: ((...args: any[]) => any) | undefined;
+    "onMessage-sent"?: ((...args: any[]) => any) | undefined;
+    onInjected?: ((...args: any[]) => any) | undefined;
 }>, {
     mode: WidgetMode;
     configUrl: string;
     apiOrigin: string;
+    theme: string;
+    cspNonce: string;
+    position: "bottom-right" | "bottom-left" | "top-right" | "top-left";
+    className: string;
     scriptSrc: string;
 }, {}, {}, {}, string, vue.ComponentProvideOptions, true, {}, any>;
 interface AgentDeskPluginOptions {
@@ -93,28 +143,6 @@ interface AgentDeskPluginOptions {
      */
     globalComponent?: boolean;
 }
-/**
- * AgentDeskPlugin — install the widget as a global Vue component.
- *
- * @example
- * ```ts
- * // main.ts
- * import { createApp } from 'vue';
- * import { AgentDeskPlugin } from '@agentdeskbot/vue';
- * import App from './App.vue';
- *
- * createApp(App)
- *   .use(AgentDeskPlugin)
- *   .mount('#app');
- * ```
- *
- * After installing, you can use `<AgentDeskWidget>` anywhere without importing:
- * ```vue
- * <template>
- *   <AgentDeskWidget bot-id="your-bot-id" />
- * </template>
- * ```
- */
 declare const AgentDeskPlugin: {
     install(app: App, options?: AgentDeskPluginOptions): void;
 };

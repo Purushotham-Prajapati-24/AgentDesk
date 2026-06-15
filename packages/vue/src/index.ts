@@ -32,31 +32,28 @@ export interface AgentDeskWidgetProps {
    *  **Dynamic updates are supported** — the SDK posts an
    *  `agentdesk-set-mode` message when this prop changes. */
   mode?: WidgetMode;
-  /** URL to widget.js. Defaults to '/widget.js'. */
+  /** URL to widget.js. Defaults to 'https://agentdeskbot.vercel.app/widget.js'. */
   scriptSrc?: string;
   /** Base URL of your AgentDesk backend (for cross-origin embeds). */
   apiOrigin?: string;
+  /** Optional theme name for the widget (e.g. 'webchat-v1'). */
+  theme?: string;
+  /** Optional Content Security Policy (CSP) nonce to apply to the injected script and dynamically created styles. */
+  cspNonce?: string;
+  /** Optional fixed positioning override. */
+  position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  /** Optional custom HTML class name to apply to the host container. */
+  className?: string;
 }
 
 // ─── Shared global message listener ──────────────────────────────────────────
-//
-// See packages/react/src/index.tsx for the full design notes. We keep a
-// single `window.message` listener for the lifetime of the page that
-// dispatches `agentdesk-widget-open` / `agentdesk-widget-close` events to
-// the matching component's emit. The listener is installed on the first
-// SDK mount (any botId) and uninstalled on the last SDK unmount (any
-// botId) — both gated by ref counts in `@agentdeskbot/core`.
 
-type ListenerBucket = Set<(type: 'open' | 'close') => void>;
+type ListenerBucket = Set<(type: string, payload?: unknown) => void>;
 
 const listenerBuckets = new Map<string, ListenerBucket>();
 
-function dispatchOpen(botId: string) {
-  listenerBuckets.get(botId)?.forEach((emit) => emit('open'));
-}
-
-function dispatchClose(botId: string) {
-  listenerBuckets.get(botId)?.forEach((emit) => emit('close'));
+function dispatchEvent(botId: string, eventName: string, payload?: unknown) {
+  listenerBuckets.get(botId)?.forEach((emit) => emit(eventName, payload));
 }
 
 let globalListenerInstalled = false;
@@ -69,10 +66,28 @@ function installGlobalListener() {
     if (!event.data || typeof event.data !== 'object') return;
     if (event.origin !== window.location.origin) return;
     const data = event.data as Partial<WidgetMessageEventData>;
-    if (data.type !== 'agentdesk-widget-open' && data.type !== 'agentdesk-widget-close') return;
     if (typeof data.botId !== 'string') return;
-    if (data.type === 'agentdesk-widget-open') dispatchOpen(data.botId);
-    else dispatchClose(data.botId);
+
+    switch (data.type) {
+      case 'agentdesk-widget-open':
+        dispatchEvent(data.botId, 'open');
+        break;
+      case 'agentdesk-widget-close':
+        dispatchEvent(data.botId, 'close');
+        break;
+      case 'agentdesk-widget-ready':
+        dispatchEvent(data.botId, 'ready');
+        break;
+      case 'agentdesk-widget-error':
+        dispatchEvent(data.botId, 'error', { message: (data as { message?: string }).message || 'Unknown error' });
+        break;
+      case 'agentdesk-widget-message-sent':
+        dispatchEvent(data.botId, 'message-sent', { text: (data as { text?: string }).text || '' });
+        break;
+      case 'agentdesk-widget-injected':
+        dispatchEvent(data.botId, 'injected');
+        break;
+    }
   };
   window.addEventListener('message', globalListenerRef);
 }
@@ -104,6 +119,10 @@ function injectScript(options: {
   scriptSrc: string;
   configUrl?: string;
   apiOrigin?: string;
+  theme?: string;
+  cspNonce?: string;
+  position?: string;
+  className?: string;
 }): void {
   const script = document.createElement('script');
   script.src = options.scriptSrc;
@@ -113,6 +132,13 @@ function injectScript(options: {
   script.dataset.mode = options.mode;
   if (options.configUrl) script.dataset.configUrl = options.configUrl;
   if (options.apiOrigin) script.dataset.apiOrigin = options.apiOrigin;
+  if (options.theme) script.dataset.theme = options.theme;
+  if (options.cspNonce) {
+    script.dataset.cspNonce = options.cspNonce;
+    script.setAttribute('nonce', options.cspNonce);
+  }
+  if (options.position) script.dataset.position = options.position;
+  if (options.className) script.dataset.className = options.className;
   document.body.append(script);
 }
 
@@ -158,24 +184,44 @@ export const AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String as PropType<string>,
-      default: '/widget.js',
+      default: 'https://agentdeskbot.vercel.app/widget.js',
     },
     apiOrigin: {
+      type: String as PropType<string>,
+      default: 'https://agentdeskbot.vercel.app',
+    },
+    theme: {
+      type: String as PropType<string>,
+      default: '',
+    },
+    cspNonce: {
+      type: String as PropType<string>,
+      default: '',
+    },
+    position: {
+      type: String as PropType<'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'>,
+      default: 'bottom-right',
+      validator: (v: string) => ['bottom-right', 'bottom-left', 'top-right', 'top-left'].includes(v),
+    },
+    className: {
       type: String as PropType<string>,
       default: '',
     },
   },
 
-  emits: ['open', 'close'],
+  emits: ['open', 'close', 'ready', 'error', 'message-sent', 'injected'],
 
   setup(props, { emit }) {
-    // Tracks whether this instance is currently holding a slot in the
-    // global registry. We toggle this in onMounted / onBeforeUnmount and
-    // also clear it in onDeactivated (for `<keep-alive>`) so the slot is
-    // released while the cached component is hidden, then re-acquired
-    // when the cached component is re-activated.
+    if (typeof window === 'undefined') {
+      console.warn(
+        "[AgentDesk] AgentDeskWidget was initialized in a non-browser environment. " +
+        "Ensure it is only rendered on the client side."
+      );
+      return () => null;
+    }
+
     let hasSlot = false;
-    let cachedEmit: ((type: 'open' | 'close') => void) | null = null;
+    let cachedEmit: ((type: string, payload?: unknown) => void) | null = null;
 
     const install = () => {
       if (!props.botId) return;
@@ -188,9 +234,13 @@ export const AgentDeskWidget = defineComponent({
           injectScript({
             botId: props.botId,
             mode: props.mode ?? 'launcher',
-            scriptSrc: props.scriptSrc || '/widget.js',
+            scriptSrc: props.scriptSrc || 'https://agentdeskbot.vercel.app/widget.js',
             configUrl: props.configUrl || undefined,
             apiOrigin: props.apiOrigin || undefined,
+            theme: props.theme || undefined,
+            cspNonce: props.cspNonce || undefined,
+            position: props.position || undefined,
+            className: props.className || undefined,
           });
         }
       } else if (acquire.modeChanged) {
@@ -198,21 +248,22 @@ export const AgentDeskWidget = defineComponent({
       }
       hasSlot = true;
 
-      // Register the emit bridge so the shared listener can forward
-      // events to *this* component instance. We use a closure on `emit`
-      // because the emit function is not stable across re-renders.
-      cachedEmit = (type: 'open' | 'close') => emit(type);
+      cachedEmit = (type: string, payload?: unknown) => {
+        const emitType = type as 'open' | 'close' | 'ready' | 'error' | 'message-sent' | 'injected';
+        if (payload !== undefined) {
+          emit(emitType, payload);
+        } else {
+          emit(emitType);
+        }
+      };
       if (!listenerBuckets.has(props.botId)) {
         listenerBuckets.set(props.botId, new Set());
       }
       listenerBuckets.get(props.botId)!.add(cachedEmit);
 
-      // Resolve the custom element so callers can immediately query
-      // `document.querySelector('agentdesk-widget')` and get a real
-      // (upgraded) element. We do not poll with setTimeout.
       if (typeof customElements !== 'undefined') {
         void customElements.whenDefined(WIDGET_ELEMENT_NAME).catch(() => {
-          // ignore — the element may never be defined if the script fails
+          // ignore
         });
       }
     };
@@ -243,23 +294,6 @@ export const AgentDeskWidget = defineComponent({
       release();
     });
 
-    // ─── <keep-alive> support ────────────────────────────────────────────
-    //
-    // Vue's `<keep-alive>` caches a component when it is hidden and
-    // re-activates it later. While cached, the original DOM (and our
-    // injected <script>) is still alive, so we don't *need* to release
-    // and re-acquire the registry slot. However, a cached component is
-    // not visible to the user, and downstream listeners (e.g. an
-    // analytics tracker wired to onOpen/onClose) will still receive
-    // events as long as our shared listener is installed. To avoid
-    // ghost events, we:
-    //   • on `onDeactivated` — release the registry slot (and the script
-    //     if this was the last instance for the botId) and detach the
-    //     per-bot listener bucket.
-    //   • on `onActivated`   — re-acquire the slot and re-attach the
-    //     listener bucket. We also re-inject the script if it was torn
-    //     down during the deactivation phase.
-
     onDeactivated(() => {
       release();
     });
@@ -268,12 +302,6 @@ export const AgentDeskWidget = defineComponent({
       install();
     });
 
-    // ─── Dynamic mode propagation ───────────────────────────────────────
-    //
-    // Vue's `watch` defaults to `{ deep: false, immediate: false }` which
-    // is what we want — we only fire when `mode` actually changes after
-    // the first render. We guard against firing before mount by checking
-    // `hasSlot` (the first render is handled by the mount lifecycle).
     watch(
       () => props.mode,
       (next, prev) => {
@@ -284,7 +312,6 @@ export const AgentDeskWidget = defineComponent({
       },
     );
 
-    // Render a hidden host element so Vue can track the component in the tree
     return () =>
       h('span', {
         'data-agentdesk-vue-host': props.botId,
@@ -304,36 +331,8 @@ export interface AgentDeskPluginOptions {
   globalComponent?: boolean;
 }
 
-/**
- * AgentDeskPlugin — install the widget as a global Vue component.
- *
- * @example
- * ```ts
- * // main.ts
- * import { createApp } from 'vue';
- * import { AgentDeskPlugin } from '@agentdeskbot/vue';
- * import App from './App.vue';
- *
- * createApp(App)
- *   .use(AgentDeskPlugin)
- *   .mount('#app');
- * ```
- *
- * After installing, you can use `<AgentDeskWidget>` anywhere without importing:
- * ```vue
- * <template>
- *   <AgentDeskWidget bot-id="your-bot-id" />
- * </template>
- * ```
- */
 export const AgentDeskPlugin = {
   install(app: App, options: AgentDeskPluginOptions = { globalComponent: true }) {
-    // Truthiness check is intentionally explicit: we want to register
-    // the global component whenever the caller has NOT explicitly opted
-    // out with `{ globalComponent: false }`. We do NOT treat `undefined`
-    // (option omitted) as `false` — that would silently regress the
-    // documented default of `true`. A literal `false` is the only way to
-    // skip global registration.
     if (options.globalComponent !== false) {
       app.component('AgentDeskWidget', AgentDeskWidget);
     }

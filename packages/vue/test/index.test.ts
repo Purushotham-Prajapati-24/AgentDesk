@@ -165,6 +165,94 @@ describe('AgentDeskWidget (Vue)', () => {
     wrapper.unmount();
   });
 
+  it('logs a warning when window is undefined', () => {
+    const originalWindow = global.window;
+    // @ts-expect-error - deleting window to simulate server environment
+    delete global.window;
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const setupResult = (AgentDeskWidget.setup as (
+        props: { botId: string; mode?: string },
+        ctx: { emit: (...args: unknown[]) => void }
+      ) => () => unknown)({ botId: 'ssr-warn-bot', mode: 'launcher' }, { emit: () => {} });
+      expect(setupResult()).toBeNull();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("AgentDeskWidget was initialized in a non-browser environment")
+      );
+    } finally {
+      global.window = originalWindow;
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('injects scripts with default SaaS endpoints', () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'saas-bot' } });
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.src).toBe('https://agentdeskbot.vercel.app/widget.js');
+    expect(script.dataset.apiOrigin).toBe('https://agentdeskbot.vercel.app');
+    wrapper.unmount();
+  });
+
+  it('injects optional attributes on the script element', () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'attrs-bot',
+        theme: 'webchat-v1',
+        cspNonce: 'xyz123',
+        position: 'bottom-left',
+        className: 'my-custom-container',
+      },
+    });
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.dataset.theme).toBe('webchat-v1');
+    expect(script.dataset.cspNonce).toBe('xyz123');
+    expect(script.getAttribute('nonce')).toBe('xyz123');
+    expect(script.dataset.position).toBe('bottom-left');
+    expect(script.dataset.className).toBe('my-custom-container');
+    wrapper.unmount();
+  });
+
+  it('emits all new lifecycle events correctly', async () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'callbacks-bot' } });
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-ready', botId: 'callbacks-bot' },
+      }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-error', botId: 'callbacks-bot', message: 'Fail' },
+      }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-message-sent', botId: 'callbacks-bot', text: 'hi' },
+      }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-injected', botId: 'callbacks-bot' },
+      }),
+    );
+
+    await nextTick();
+    expect(wrapper.emitted('ready')?.length).toBe(1);
+    expect(wrapper.emitted('error')?.[0]).toEqual([{ message: 'Fail' }]);
+    expect(wrapper.emitted('message-sent')?.[0]).toEqual([{ text: 'hi' }]);
+    expect(wrapper.emitted('injected')?.length).toBe(1);
+    wrapper.unmount();
+  });
+
   it('ignores messages with an unknown shape', async () => {
     const wrapper = mount(AgentDeskWidget, { props: { botId: 'shape-bot' } });
 
