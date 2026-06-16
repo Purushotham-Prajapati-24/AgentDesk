@@ -74,6 +74,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -z "${PR_TITLE:-}" ]; then
+            echo "Error: PR_TITLE environment variable is empty."
+            exit 1
+          fi
+
+          if [ -z "${OLLAMA_API_KEY:-}" ]; then
+            echo "Error: OLLAMA_API_KEY secret is not set."
+            exit 1
+          fi
+
           SYSTEM_PROMPT=$(cat <<'EOF'
           You are an expert code reviewer. Analyze the pull request diff.
           Point out critical logical bugs, security gaps, performance bottlenecks, or syntax formatting issues.

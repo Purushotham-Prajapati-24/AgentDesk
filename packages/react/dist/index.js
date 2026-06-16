@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useEffect } from 'react';
-import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
+import { acquireInstance, WIDGET_ELEMENT_NAME, releaseInstance, postSetMode } from '@agentdeskbot/core';
 
 var listenerBuckets = /* @__PURE__ */ new Map();
 var globalListenerInstalled = false;
@@ -11,11 +11,18 @@ function installGlobalListener() {
   globalListenerRef = (event) => {
     var _a, _b, _c, _d, _e, _f;
     if (!event.data || typeof event.data !== "object") return;
-    if (event.origin !== window.location.origin) return;
     const data = event.data;
     if (typeof data.botId !== "string") return;
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
+    const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
+    if (bucket.apiOrigin) {
+      try {
+        allowedOrigins.add(new URL(bucket.apiOrigin).origin);
+      } catch {
+      }
+    }
+    if (!allowedOrigins.has(event.origin)) return;
     switch (data.type) {
       case "agentdesk-widget-open":
         (_a = bucket.onOpen) == null ? void 0 : _a.call(bucket);
@@ -81,8 +88,8 @@ function AgentDeskWidget({
   botId,
   configUrl,
   mode = "launcher",
-  scriptSrc = "https://agentdeskbot.vercel.app/widget.js",
-  apiOrigin = "https://agentdeskbot.vercel.app",
+  scriptSrc = "/widget.js",
+  apiOrigin,
   theme,
   cspNonce,
   position,
@@ -129,10 +136,9 @@ function AgentDeskWidget({
           className
         });
       }
-    } else if (acquire.modeChanged) {
-      postSetMode(botId, mode);
     }
     const bucket = {
+      apiOrigin,
       onOpen: onOpenRef.current,
       onClose: onCloseRef.current,
       onReady: onReadyRef.current,
@@ -155,7 +161,7 @@ function AgentDeskWidget({
         uninstallGlobalListener();
       }
     };
-  }, [botId, mode, scriptSrc, configUrl, apiOrigin, theme, cspNonce, position, className]);
+  }, [botId, scriptSrc, configUrl, apiOrigin]);
   const isFirstModeRender = useRef(true);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -166,6 +172,39 @@ function AgentDeskWidget({
     if (!botId) return;
     postSetMode(botId, mode);
   }, [mode, botId]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!botId) return;
+    const script = findExistingScript(botId);
+    if (script) {
+      if (theme) script.dataset.theme = theme;
+      else delete script.dataset.theme;
+      if (position) script.dataset.position = position;
+      else delete script.dataset.position;
+      if (className) script.dataset.className = className;
+      else delete script.dataset.className;
+      if (cspNonce) {
+        script.dataset.cspNonce = cspNonce;
+        script.setAttribute("nonce", cspNonce);
+      } else {
+        delete script.dataset.cspNonce;
+        script.removeAttribute("nonce");
+      }
+    }
+    const widgetEl = document.querySelector(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
+    if (widgetEl) {
+      if (className) {
+        widgetEl.className = className;
+      } else {
+        widgetEl.removeAttribute("class");
+      }
+      if (position) {
+        widgetEl.setAttribute("data-agentdesk-position", position);
+      } else {
+        widgetEl.removeAttribute("data-agentdesk-position");
+      }
+    }
+  }, [botId, theme, position, className, cspNonce]);
   if (typeof window === "undefined") {
     console.warn(
       "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."

@@ -276,9 +276,9 @@ export const AgentDeskWidget = defineComponent({
         apiOrigin: props.apiOrigin || undefined,
         emit: (type: EmitName, payload?: unknown) => {
           if (payload !== undefined) {
-            emit(type as any, payload);
+            emit(type as Parameters<typeof emit>[0], payload);
           } else {
-            emit(type as any);
+            emit(type as Parameters<typeof emit>[0]);
           }
         },
       };
@@ -336,6 +336,55 @@ export const AgentDeskWidget = defineComponent({
         if (!props.botId) return;
         postSetMode(props.botId, next ?? 'launcher');
       },
+    );
+
+    watch(
+      [
+        () => props.theme,
+        () => props.position,
+        () => props.className,
+        () => props.cspNonce,
+      ],
+      ([theme, position, className, cspNonce]) => {
+        if (!hasSlot || !props.botId) return;
+
+        // Sync script dataset
+        const script = findExistingScript(props.botId);
+        if (script) {
+          if (theme) script.dataset.theme = theme;
+          else delete script.dataset.theme;
+
+          if (position) script.dataset.position = position;
+          else delete script.dataset.position;
+
+          if (className) script.dataset.className = className;
+          else delete script.dataset.className;
+
+          if (cspNonce) {
+            script.dataset.cspNonce = cspNonce;
+            script.setAttribute('nonce', cspNonce);
+          } else {
+            delete script.dataset.cspNonce;
+            script.removeAttribute('nonce');
+          }
+        }
+
+        // Sync custom element attributes
+        const widgetEl = document.querySelector<HTMLElement>(`${WIDGET_ELEMENT_NAME}[data-bot-id="${props.botId}"]`);
+        if (widgetEl) {
+          if (className) {
+            widgetEl.className = className;
+          } else {
+            widgetEl.removeAttribute('class');
+          }
+
+          if (position) {
+            widgetEl.setAttribute('data-agentdesk-position', position);
+          } else {
+            widgetEl.removeAttribute('data-agentdesk-position');
+          }
+        }
+      }
     );
 
     return () =>

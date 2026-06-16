@@ -12,9 +12,9 @@ interface AgentDeskWidgetProps {
      *  **Dynamic updates are supported** — the SDK posts an
      *  `agentdesk-set-mode` message when this prop changes. */
     mode?: WidgetMode;
-    /** URL to widget.js. Defaults to 'https://agentdeskbot.vercel.app/widget.js'. */
+    /** URL to widget.js. Defaults to '/widget.js'. */
     scriptSrc?: string;
-    /** Base URL of your AgentDesk backend (for cross-origin embeds). */
+    /** Base URL of your AgentDesk backend (for cross-origin embeds). Defaults to undefined (same-origin). */
     apiOrigin?: string;
     /** Optional theme name for the widget (e.g. 'webchat-v1'). */
     theme?: string;
@@ -59,7 +59,6 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
     apiOrigin: {
         type: PropType<string>;
-        default: string;
     };
     theme: {
         type: PropType<string>;
@@ -80,7 +79,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
 }>, (() => null) | (() => vue.VNode<vue.RendererNode, vue.RendererElement, {
     [key: string]: any;
-}>), {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, ("close" | "error" | "open" | "ready" | "message-sent" | "injected")[], "close" | "error" | "open" | "ready" | "message-sent" | "injected", vue.PublicProps, Readonly<vue.ExtractPropTypes<{
+}>), {}, {}, {}, vue.ComponentOptionsMixin, vue.ComponentOptionsMixin, ("open" | "close" | "ready" | "error" | "message-sent" | "injected")[], "open" | "close" | "ready" | "error" | "message-sent" | "injected", vue.PublicProps, Readonly<vue.ExtractPropTypes<{
     botId: {
         type: PropType<string>;
         required: true;
@@ -100,7 +99,6 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
     apiOrigin: {
         type: PropType<string>;
-        default: string;
     };
     theme: {
         type: PropType<string>;
@@ -120,16 +118,15 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
         default: string;
     };
 }>> & Readonly<{
-    onClose?: ((...args: any[]) => any) | undefined;
-    onError?: ((...args: any[]) => any) | undefined;
     onOpen?: ((...args: any[]) => any) | undefined;
+    onClose?: ((...args: any[]) => any) | undefined;
     onReady?: ((...args: any[]) => any) | undefined;
+    onError?: ((...args: any[]) => any) | undefined;
     "onMessage-sent"?: ((...args: any[]) => any) | undefined;
     onInjected?: ((...args: any[]) => any) | undefined;
 }>, {
     mode: WidgetMode;
     configUrl: string;
-    apiOrigin: string;
     theme: string;
     cspNonce: string;
     position: "bottom-right" | "bottom-left" | "top-right" | "top-left";

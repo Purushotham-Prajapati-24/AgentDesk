@@ -302,7 +302,8 @@ export default function InboxPage() {
           createdAt: message.createdAt,
         })),
       );
-    } catch {
+    } catch (err) {
+      console.error("[Inbox] Failed to list conversation messages for room:", err);
       setMessages([]);
     } finally {
       setMessageLoading(false);

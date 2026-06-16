@@ -2,14 +2,16 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { AgentDeskWidget } from '../src/index';
+import { type AgentDeskWidgetGlobals } from '@agentdeskbot/core';
 
 describe('AgentDeskWidget (Vue)', () => {
   let messageListeners: Array<(event: MessageEvent) => void>;
 
   beforeEach(() => {
     // Reset shared global state so each test starts fresh
-    delete (window as unknown as Record<string, unknown>).__agentdeskGlobalListenerCount;
-    delete (window as unknown as Record<string, unknown>).__agentdeskWidgetInstances;
+    const windowRef = window as Window & AgentDeskWidgetGlobals;
+    delete windowRef.__agentdeskGlobalListenerCount;
+    delete windowRef.__agentdeskWidgetInstances;
     messageListeners = [];
     const originalAdd = window.addEventListener.bind(window);
     vi.spyOn(window, 'addEventListener').mockImplementation((type, listener) => {

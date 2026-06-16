@@ -9,7 +9,7 @@ var core = require('@agentdeskbot/core');
 var listenerBuckets = /* @__PURE__ */ new Map();
 function dispatchEvent(botId, eventName, payload) {
   var _a;
-  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((emit) => emit(eventName, payload));
+  (_a = listenerBuckets.get(botId)) == null ? void 0 : _a.forEach((entry) => entry.emit(eventName, payload));
 }
 var globalListenerInstalled = false;
 var globalListenerRef = null;
@@ -18,9 +18,25 @@ function installGlobalListener() {
   globalListenerInstalled = true;
   globalListenerRef = (event) => {
     if (!event.data || typeof event.data !== "object") return;
-    if (event.origin !== window.location.origin) return;
     const data = event.data;
     if (typeof data.botId !== "string") return;
+    const bucket = listenerBuckets.get(data.botId);
+    if (!bucket) return;
+    let originAllowed = false;
+    for (const entry of bucket) {
+      const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
+      if (entry.apiOrigin) {
+        try {
+          allowedOrigins.add(new URL(entry.apiOrigin).origin);
+        } catch {
+        }
+      }
+      if (allowedOrigins.has(event.origin)) {
+        originAllowed = true;
+        break;
+      }
+    }
+    if (!originAllowed) return;
     switch (data.type) {
       case "agentdesk-widget-open":
         dispatchEvent(data.botId, "open");
@@ -100,11 +116,10 @@ var AgentDeskWidget = vue.defineComponent({
     },
     scriptSrc: {
       type: String,
-      default: "https://agentdeskbot.vercel.app/widget.js"
+      default: "/widget.js"
     },
     apiOrigin: {
-      type: String,
-      default: "https://agentdeskbot.vercel.app"
+      type: String
     },
     theme: {
       type: String,
@@ -133,7 +148,7 @@ var AgentDeskWidget = vue.defineComponent({
       return () => null;
     }
     let hasSlot = false;
-    let cachedEmit = null;
+    let entry = null;
     const install = () => {
       var _a, _b, _c;
       if (!props.botId) return;
@@ -146,7 +161,7 @@ var AgentDeskWidget = vue.defineComponent({
           injectScript({
             botId: props.botId,
             mode: (_b = props.mode) != null ? _b : "launcher",
-            scriptSrc: props.scriptSrc || "https://agentdeskbot.vercel.app/widget.js",
+            scriptSrc: props.scriptSrc || "/widget.js",
             configUrl: props.configUrl || void 0,
             apiOrigin: props.apiOrigin || void 0,
             theme: props.theme || void 0,
@@ -159,18 +174,20 @@ var AgentDeskWidget = vue.defineComponent({
         core.postSetMode(props.botId, (_c = props.mode) != null ? _c : "launcher");
       }
       hasSlot = true;
-      cachedEmit = (type, payload) => {
-        const emitType = type;
-        if (payload !== void 0) {
-          emit(emitType, payload);
-        } else {
-          emit(emitType);
+      entry = {
+        apiOrigin: props.apiOrigin || void 0,
+        emit: (type, payload) => {
+          if (payload !== void 0) {
+            emit(type, payload);
+          } else {
+            emit(type);
+          }
         }
       };
       if (!listenerBuckets.has(props.botId)) {
         listenerBuckets.set(props.botId, /* @__PURE__ */ new Set());
       }
-      listenerBuckets.get(props.botId).add(cachedEmit);
+      listenerBuckets.get(props.botId).add(entry);
       if (typeof customElements !== "undefined") {
         void customElements.whenDefined(core.WIDGET_ELEMENT_NAME).catch(() => {
         });
@@ -179,11 +196,11 @@ var AgentDeskWidget = vue.defineComponent({
     const release = () => {
       if (!hasSlot || !props.botId) return;
       const bucket = listenerBuckets.get(props.botId);
-      if (cachedEmit) bucket == null ? void 0 : bucket.delete(cachedEmit);
+      if (entry) bucket == null ? void 0 : bucket.delete(entry);
       if (bucket && bucket.size === 0) {
         listenerBuckets.delete(props.botId);
       }
-      cachedEmit = null;
+      entry = null;
       const result = core.releaseInstance(props.botId);
       hasSlot = false;
       if (result.isLastForBot) {
@@ -212,6 +229,46 @@ var AgentDeskWidget = vue.defineComponent({
         if (!hasSlot) return;
         if (!props.botId) return;
         core.postSetMode(props.botId, next != null ? next : "launcher");
+      }
+    );
+    vue.watch(
+      [
+        () => props.theme,
+        () => props.position,
+        () => props.className,
+        () => props.cspNonce
+      ],
+      ([theme, position, className, cspNonce]) => {
+        if (!hasSlot || !props.botId) return;
+        const script = findExistingScript(props.botId);
+        if (script) {
+          if (theme) script.dataset.theme = theme;
+          else delete script.dataset.theme;
+          if (position) script.dataset.position = position;
+          else delete script.dataset.position;
+          if (className) script.dataset.className = className;
+          else delete script.dataset.className;
+          if (cspNonce) {
+            script.dataset.cspNonce = cspNonce;
+            script.setAttribute("nonce", cspNonce);
+          } else {
+            delete script.dataset.cspNonce;
+            script.removeAttribute("nonce");
+          }
+        }
+        const widgetEl = document.querySelector(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${props.botId}"]`);
+        if (widgetEl) {
+          if (className) {
+            widgetEl.className = className;
+          } else {
+            widgetEl.removeAttribute("class");
+          }
+          if (position) {
+            widgetEl.setAttribute("data-agentdesk-position", position);
+          } else {
+            widgetEl.removeAttribute("data-agentdesk-position");
+          }
+        }
       }
     );
     return () => vue.h("span", {

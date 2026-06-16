@@ -1449,15 +1449,39 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+function escapeHtmlAttr(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function escapeJsString(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r");
+}
+
 function buildSnippets(config: WebChatConfig) {
   const botId = config.deploy.botId || "YOUR_BOT_ID";
   const theme = config.deploy.themeId || config.deploy.versionTag;
 
+  const escapedBotId = escapeHtmlAttr(botId);
+  const escapedTheme = escapeHtmlAttr(theme);
+  const escapedBotName = escapeHtmlAttr(config.identity.botName);
+
+  const jsBotId = escapeJsString(botId);
+  const jsTheme = escapeJsString(theme);
+
   return {
-    script: `<script\n  src="https://agentdeskbot.vercel.app/widget.js"\n  data-bot-id="${botId}"\n  data-theme="${theme}"\n  async>\n</script>\n\n<!-- Cross-origin / self-hosted: also add data-api-origin -->\n<!-- data-api-origin="https://your-backend.com" -->`,
-    iframe: `<iframe\n  src="https://agentdeskbot.vercel.app/embed/${botId}?theme=${encodeURIComponent(theme)}"\n  title="${config.identity.botName} support chat"\n  style="width:100%;height:640px;border:0"\n  loading="lazy"\n  allow="clipboard-write">\n</iframe>`,
-    react: `// 1. Install: npm install @agentdeskbot/react@${PACKAGE_VERSION}\n// 2. Add this component to your root layout\n\n"use client"; // omit when using @agentdeskbot/react/nextjs\nimport { AgentDeskWidget } from "@agentdeskbot/react";\n// Next.js App Router → import from "@agentdeskbot/react/nextjs" instead\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="${botId}" theme="${theme}" />;\n}`,
-    vue: `<!-- 1. Install: npm install @agentdeskbot/vue@${PACKAGE_VERSION} -->\n<!-- 2. Add to your App.vue or default layout -->\n\n<script setup>\nimport { AgentDeskWidget } from "@agentdeskbot/vue";\n// Global alternative: app.use(AgentDeskPlugin) in main.ts\n</script>\n\n<template>\n  <RouterView />\n  <AgentDeskWidget bot-id="${botId}" theme="${theme}" />\n</template>`,
+    script: `<script\n  src="https://agentdeskbot.vercel.app/widget.js"\n  data-bot-id="${escapedBotId}"\n  data-theme="${escapedTheme}"\n  async>\n</script>\n\n<!-- Cross-origin / self-hosted: also add data-api-origin -->\n<!-- data-api-origin="https://your-backend.com" -->`,
+    iframe: `<iframe\n  src="https://agentdeskbot.vercel.app/embed/${encodeURIComponent(botId)}?theme=${encodeURIComponent(theme)}"\n  title="${escapedBotName} support chat"\n  style="width:100%;height:640px;border:0"\n  loading="lazy"\n  allow="clipboard-write">\n</iframe>`,
+    react: `// 1. Install: npm install @agentdeskbot/react@${PACKAGE_VERSION}\n// 2. Add this component to your root layout\n\n"use client"; // omit when using @agentdeskbot/react/nextjs\nimport { AgentDeskWidget } from "@agentdeskbot/react";\n// Next.js App Router → import from "@agentdeskbot/react/nextjs" instead\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="${jsBotId}" theme="${jsTheme}" />;\n}`,
+    vue: `<!-- 1. Install: npm install @agentdeskbot/vue@${PACKAGE_VERSION} -->\n<!-- 2. Add to your App.vue or default layout -->\n\n<script setup>\nimport { AgentDeskWidget } from "@agentdeskbot/vue";\n// Global alternative: app.use(AgentDeskPlugin) in main.ts\n</script>\n\n<template>\n  <RouterView />\n  <AgentDeskWidget bot-id="${escapedBotId}" theme="${escapedTheme}" />\n</template>`,
     packages: PACKAGE_INSTALL_ALL,
   };
 }

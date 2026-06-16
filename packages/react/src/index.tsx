@@ -317,6 +317,8 @@ export function AgentDeskWidget({
     if (typeof window === 'undefined') return;
     if (!botId) return;
 
+    // Acquire registry slot. Note that we pass the initial mode here,
+    // but any subsequent mode changes are handled dynamically by the mode effect.
     const acquire = acquireInstance(botId, mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
@@ -335,8 +337,6 @@ export function AgentDeskWidget({
           className,
         });
       }
-    } else if (acquire.modeChanged) {
-      postSetMode(botId, mode);
     }
 
     // Register this component's callbacks in the shared dispatch table.
@@ -367,7 +367,7 @@ export function AgentDeskWidget({
         uninstallGlobalListener();
       }
     };
-  }, [botId, mode, scriptSrc, configUrl, apiOrigin, theme, cspNonce, position, className]);
+  }, [botId, scriptSrc, configUrl, apiOrigin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Separate effect: dynamic mode propagation.
   const isFirstModeRender = useRef(true);
@@ -380,6 +380,49 @@ export function AgentDeskWidget({
     if (!botId) return;
     postSetMode(botId, mode);
   }, [mode, botId]);
+
+  // Separate effect: dynamic styling propagation (theme, position, className, cspNonce).
+  // This updates the script dataset and custom element attributes directly, avoiding
+  // disruptive unmount/re-mount cycles.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!botId) return;
+
+    const script = findExistingScript(botId);
+    if (script) {
+      if (theme) script.dataset.theme = theme;
+      else delete script.dataset.theme;
+
+      if (position) script.dataset.position = position;
+      else delete script.dataset.position;
+
+      if (className) script.dataset.className = className;
+      else delete script.dataset.className;
+
+      if (cspNonce) {
+        script.dataset.cspNonce = cspNonce;
+        script.setAttribute('nonce', cspNonce);
+      } else {
+        delete script.dataset.cspNonce;
+        script.removeAttribute('nonce');
+      }
+    }
+
+    const widgetEl = document.querySelector<HTMLElement>(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
+    if (widgetEl) {
+      if (className) {
+        widgetEl.className = className;
+      } else {
+        widgetEl.removeAttribute('class');
+      }
+
+      if (position) {
+        widgetEl.setAttribute('data-agentdesk-position', position);
+      } else {
+        widgetEl.removeAttribute('data-agentdesk-position');
+      }
+    }
+  }, [botId, theme, position, className, cspNonce]);
 
   if (typeof window === 'undefined') {
     console.warn(

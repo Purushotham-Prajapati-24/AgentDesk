@@ -207,6 +207,7 @@
     }
 
     connectedCallback() {
+      postLifecycleEvent("agentdesk-widget-injected");
       this.renderShell();
       void this.loadConfig();
     }
@@ -1143,6 +1144,8 @@
         right: auto;
       }
       :host([data-agentdesk-position="bottom-left"]) .ad-launcher-button {
+        bottom: 0;
+        top: auto;
         left: 0;
         right: auto;
       }
@@ -1160,6 +1163,12 @@
       }
       :host([data-agentdesk-position="top-right"]) .ad-chat-pane.active {
         transform: translateY(0) scale(1);
+      }
+      :host([data-agentdesk-position="top-right"]) .ad-launcher-button {
+        top: 0;
+        bottom: auto;
+        right: 0;
+        left: auto;
       }
 
       :host([data-agentdesk-position="top-left"]) .ad-widget {
@@ -1179,6 +1188,8 @@
         transform: translateY(0) scale(1);
       }
       :host([data-agentdesk-position="top-left"]) .ad-launcher-button {
+        top: 0;
+        bottom: auto;
         left: 0;
         right: auto;
       }
@@ -1743,7 +1754,6 @@
         mount.setAttribute("data-agentdesk-position", position);
       }
       document.body.append(mount);
-      postLifecycleEvent("agentdesk-widget-injected");
     }
   }
 
