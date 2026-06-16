@@ -90,13 +90,15 @@ jobs:
           BODY_FILE="$(mktemp)"
           trap 'rm -f "$BODY_FILE"' EXIT
           
-          jq -n \
+          cat "$DIFF_FILE" | jq -Rs \
             --arg model "minimax-m3" \
             --arg system "$SYSTEM_PROMPT" \
-            --rawfile diff "$DIFF_FILE" \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg truncated "$TRUNCATED" \
             '{
               model: $model,
-              prompt: ("PR Title: \($ENV.PR_TITLE // "")\n\nPR Description:\n\($ENV.PR_BODY // "")\n\nDiff (truncated=\($ENV.TRUNCATED // "false")):\n```diff\n" + $diff + "\n```"),
+              prompt: ("PR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff (truncated=" + $truncated + "):\n```diff\n" + . + "\n```"),
               system: $system,
               stream: false
             }' > "$BODY_FILE"
