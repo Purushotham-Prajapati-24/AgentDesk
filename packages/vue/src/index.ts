@@ -80,6 +80,15 @@ function installGlobalListener() {
 
     let originAllowed = false;
     for (const entry of bucket) {
+      // ── Origin trust model ─────────────────────────────────────────────────
+      // allowedOrigins contains window.location.origin (same-origin embeds)
+      // plus origins derived from apiOrigin / scriptSrc (cross-origin iframes).
+      // Only events from these origins are dispatched.  Payload fields such as
+      // data.message and data.text are UNTRUSTED strings from the widget iframe
+      // and have NOT been sanitized.  Consumers of the emitted 'error' and
+      // 'message-sent' events MUST treat them as plain text — never pass them
+      // to v-html or innerHTML without first sanitizing.
+      // ────────────────────────────────────────────────────────────────────────
       const allowedOrigins = new Set([window.location.origin]);
       if (entry.apiOrigin) {
         try {
@@ -113,9 +122,11 @@ function installGlobalListener() {
         dispatchEvent(data.botId, 'ready');
         break;
       case 'agentdesk-widget-error':
+        // data.message is an untrusted string — treat as plain text, not HTML.
         dispatchEvent(data.botId, 'error', { message: (data as { message?: string }).message || 'Unknown error' });
         break;
       case 'agentdesk-widget-message-sent':
+        // data.text is an untrusted string — treat as plain text, not HTML.
         dispatchEvent(data.botId, 'message-sent', { text: (data as { text?: string }).text || '' });
         break;
       case 'agentdesk-widget-injected':
@@ -414,14 +425,3 @@ export interface AgentDeskPluginOptions {
    * Set to false if you prefer to import it manually in each component.
    */
   globalComponent?: boolean;
-}
-
-export const AgentDeskPlugin: Plugin = {
-  install(app: App, options: AgentDeskPluginOptions = { globalComponent: true }) {
-    if (options.globalComponent !== false) {
-      app.component('AgentDeskWidget', AgentDeskWidget);
-    }
-  },
-};
-
-export default AgentDeskPlugin;

@@ -167,6 +167,16 @@ function installGlobalListener() {
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
 
+    // ── Origin trust model ──────────────────────────────────────────────────
+    // allowedOrigins contains window.location.origin (same-origin embeds) plus
+    // the origins derived from apiOrigin / scriptSrc (cross-origin iframe embeds).
+    // Only messages from these trusted origins are dispatched.  Note, however,
+    // that the *payload* (data.message, data.text) is an untrusted string that
+    // originated inside the widget iframe — it has not been sanitized.  Consumer
+    // callbacks (onError, onMessageSent) MUST treat these values as untrusted
+    // HTML.  Never pass them directly to dangerouslySetInnerHTML, v-html, or
+    // innerHTML without sanitization.
+    // ────────────────────────────────────────────────────────────────────────
     const allowedOrigins = new Set([window.location.origin]);
     if (bucket.apiOrigin) {
       try {
@@ -195,9 +205,11 @@ function installGlobalListener() {
         bucket.onReady?.();
         break;
       case 'agentdesk-widget-error':
+        // data.message is an untrusted string — treat as plain text, not HTML.
         bucket.onError?.({ message: (data as { message?: string }).message || 'Unknown error' });
         break;
       case 'agentdesk-widget-message-sent':
+        // data.text is an untrusted string — treat as plain text, not HTML.
         bucket.onMessageSent?.({ text: (data as { text?: string }).text || '' });
         break;
       case 'agentdesk-widget-injected':
@@ -439,17 +451,3 @@ export function AgentDeskWidget({
         widgetEl.setAttribute('data-agentdesk-position', position);
       } else {
         widgetEl.removeAttribute('data-agentdesk-position');
-      }
-    }
-  }, [botId, theme, position, className, cspNonce]);
-
-  if (typeof window === 'undefined') {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
-      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
-    return null;
-  }
-
-  return null;
-}

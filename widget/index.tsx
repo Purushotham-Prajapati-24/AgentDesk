@@ -246,17 +246,22 @@
       let success = true;
       try {
         const response = await fetchWithTimeout(configUrl, { credentials: "omit" }, DEFAULT_TIMEOUT_MS);
+        // Guard: element may have been disconnected while the request was in-flight.
+        if (!this.isConnected) return;
         if (!response.ok) {
           throw new Error("Widget configuration failed");
         }
 
         const body = (await response.json()) as { data?: WidgetConfig };
+        // Guard: check again after the second await (body parsing).
+        if (!this.isConnected) return;
         if (!body.data || body.data.botId !== botId) {
           throw new Error("Widget configuration mismatch");
         }
 
         this.config = normalizeConfig(body.data);
       } catch (err) {
+        if (!this.isConnected) return;
         success = false;
         postLifecycleEvent("agentdesk-widget-error", { message: err instanceof Error ? err.message : String(err) });
         this.config = buildFallbackConfig(botId);
