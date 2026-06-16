@@ -86,30 +86,17 @@ jobs:
           EOF
           )
 
-          USER_PROMPT=$(cat <<EOF
-          PR Title: $PR_TITLE
-
-          PR Description:
-          $PR_BODY
-
-          Diff (truncated=$TRUNCATED):
-          \`\`\`diff
-          $(cat $DIFF_FILE)
-          \`\`\`
-          EOF
-          )
-
           # Format request body using jq to securely handle diff contents and avoid shell injection
           BODY_FILE="$(mktemp)"
           trap 'rm -f "$BODY_FILE"' EXIT
           
           jq -n \
             --arg model "minimax-m3" \
-            --arg prompt "$USER_PROMPT" \
             --arg system "$SYSTEM_PROMPT" \
+            --rawfile diff "$DIFF_FILE" \
             '{
               model: $model,
-              prompt: $prompt,
+              prompt: ("PR Title: \($ENV.PR_TITLE // "")\n\nPR Description:\n\($ENV.PR_BODY // "")\n\nDiff (truncated=\($ENV.TRUNCATED // "false")):\n```diff\n" + $diff + "\n```"),
               system: $system,
               stream: false
             }' > "$BODY_FILE"
