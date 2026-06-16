@@ -302,7 +302,10 @@ export default function InboxPage() {
           createdAt: message.createdAt,
         })),
       );
-    } catch (messageError) {
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") {
+        console.error("[Inbox] Failed to list conversation messages for room:", err);
+      }
       setMessages([]);
     } finally {
       setMessageLoading(false);

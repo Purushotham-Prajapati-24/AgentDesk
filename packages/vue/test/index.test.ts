@@ -2,14 +2,16 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { AgentDeskWidget } from '../src/index';
+import { type AgentDeskWidgetGlobals } from '@agentdeskbot/core';
 
 describe('AgentDeskWidget (Vue)', () => {
   let messageListeners: Array<(event: MessageEvent) => void>;
 
   beforeEach(() => {
     // Reset shared global state so each test starts fresh
-    delete (window as Record<string, unknown>).__agentdeskGlobalListenerCount;
-    delete (window as Record<string, unknown>).__agentdeskWidgetInstances;
+    const windowRef = window as Window & AgentDeskWidgetGlobals;
+    delete windowRef.__agentdeskGlobalListenerCount;
+    delete windowRef.__agentdeskWidgetInstances;
     messageListeners = [];
     const originalAdd = window.addEventListener.bind(window);
     vi.spyOn(window, 'addEventListener').mockImplementation((type, listener) => {
@@ -162,6 +164,117 @@ describe('AgentDeskWidget (Vue)', () => {
     expect(host.exists()).toBe(true);
     expect(host.attributes('aria-hidden')).toBe('true');
     expect(host.attributes('style')).toMatch(/display\s*:\s*none/);
+    wrapper.unmount();
+  });
+
+  it('allows events from origins matching apiOrigin or scriptSrc', async () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'custom-origin-bot',
+        apiOrigin: 'https://api.custom-desk.com',
+        scriptSrc: 'https://widget.custom-desk.com/sdk.js',
+      },
+    });
+
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    // Test message from apiOrigin
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://api.custom-desk.com',
+        data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(1);
+
+    // Test message from scriptSrc origin
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://widget.custom-desk.com',
+        data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(2);
+
+    // Test message from untrusted origin
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://evil-site.com',
+        data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(2);
+
+    wrapper.unmount();
+  });
+
+
+  it('injects scripts with default same-origin endpoints', () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'saas-bot' } });
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.getAttribute('src')).toBe('/widget.js');
+    expect(script.dataset.apiOrigin).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('injects optional attributes on the script element', () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'attrs-bot',
+        theme: 'webchat-v1',
+        cspNonce: 'xyz123',
+        position: 'bottom-left',
+        className: 'my-custom-container',
+      },
+    });
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.dataset.theme).toBe('webchat-v1');
+    expect(script.dataset.cspNonce).toBe('xyz123');
+    expect(script.getAttribute('nonce')).toBe('xyz123');
+    expect(script.dataset.position).toBe('bottom-left');
+    expect(script.dataset.className).toBe('my-custom-container');
+    wrapper.unmount();
+  });
+
+  it('emits all new lifecycle events correctly', async () => {
+    const wrapper = mount(AgentDeskWidget, { props: { botId: 'callbacks-bot' } });
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-ready', botId: 'callbacks-bot' },
+      }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-error', botId: 'callbacks-bot', message: 'Fail' },
+      }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-message-sent', botId: 'callbacks-bot', text: 'hi' },
+      }),
+    );
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-injected', botId: 'callbacks-bot' },
+      }),
+    );
+
+    await nextTick();
+    expect(wrapper.emitted('ready')?.length).toBe(1);
+    expect(wrapper.emitted('error')?.[0]).toEqual([{ message: 'Fail' }]);
+    expect(wrapper.emitted('message-sent')?.[0]).toEqual([{ text: 'hi' }]);
+    expect(wrapper.emitted('injected')?.length).toBe(1);
     wrapper.unmount();
   });
 

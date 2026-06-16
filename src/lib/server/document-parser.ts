@@ -1,5 +1,3 @@
-import mammoth from "mammoth";
-import { extractText } from "unpdf";
 
 export type SupportedDocumentType = "pdf" | "docx" | "doc" | "csv" | "txt" | "md";
 
@@ -27,6 +25,8 @@ export async function parseDocument(buffer: Buffer, fileType: SupportedDocumentT
     }
 
     if (fileType === "docx") {
+      const mammothModule = await import("mammoth");
+      const mammoth = mammothModule.default ?? mammothModule;
       const result = await mammoth.extractRawText({ buffer });
       return normalizeText(result.value);
     }
@@ -47,6 +47,8 @@ export function normalizeText(text: string) {
 }
 
 async function parsePdf(buffer: Buffer) {
+  const unpdfModule = await import("unpdf");
+  const extractText = unpdfModule.extractText;
   const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
   return normalizeText(text);
 }

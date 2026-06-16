@@ -4,7 +4,11 @@ export const WIDGET_ELEMENT_NAME = 'agentdesk-widget';
 
 export type WidgetLifecycleEventType =
   | 'agentdesk-widget-open'
-  | 'agentdesk-widget-close';
+  | 'agentdesk-widget-close'
+  | 'agentdesk-widget-ready'
+  | 'agentdesk-widget-error'
+  | 'agentdesk-widget-message-sent'
+  | 'agentdesk-widget-injected';
 
 export type WidgetControlEventType = 'agentdesk-set-mode';
 
@@ -16,7 +20,9 @@ export type WidgetEventType =
   | WidgetAckEventType;
 
 export type WidgetMessageEventData =
-  | { type: WidgetLifecycleEventType; botId: string }
+  | { type: 'agentdesk-widget-open' | 'agentdesk-widget-close' | 'agentdesk-widget-ready' | 'agentdesk-widget-injected'; botId: string }
+  | { type: 'agentdesk-widget-error'; botId: string; message: string }
+  | { type: 'agentdesk-widget-message-sent'; botId: string; text: string }
   | { type: WidgetControlEventType; botId: string; mode: WidgetMode }
   | { type: WidgetAckEventType; botId: string };
 

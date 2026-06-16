@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Palette, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
+import { AlertTriangle, Bot, Braces, Check, CheckCircle2, CloudUpload, Copy, Eye, Flag, Package, Palette, RotateCcw, Save, SlidersHorizontal, X } from "lucide-react";
 import { listWebChatBots, saveWebChatBotConfig, type WebChatBotSummary } from "@/app/webchat-actions";
 import { WebChatDropdown } from "@/components/WebChatDropdown";
 import { Button } from "@/components/ui/Button";
@@ -18,7 +18,23 @@ import { DeploySettingsForm } from "./DeploySettingsForm";
 import { FeatureToggleForm } from "./FeatureToggleForm";
 
 type SectionId = "identity" | "appearance" | "deploy" | "features";
-type DeploymentTabId = "script" | "iframe" | "react" | "vue";
+type DeploymentTabId = "script" | "iframe" | "react" | "vue" | "packages";
+
+const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_INSTALL_NAMES = {
+  core: "@agentdeskbot/core",
+  react: "@agentdeskbot/react",
+  vue: "@agentdeskbot/vue",
+} as const;
+const PACKAGE_INSTALL_ALL = `npm install ${PACKAGE_INSTALL_NAMES.core}@${PACKAGE_VERSION} \\\n  ${PACKAGE_INSTALL_NAMES.react}@${PACKAGE_VERSION} \\\n  ${PACKAGE_INSTALL_NAMES.vue}@${PACKAGE_VERSION}`;
+
+type PackageInstall = {
+  name: string;
+  version: string;
+  description: string;
+  useWhen: string;
+  installCommand: string;
+};
 
 const sections: Array<{
   id: SectionId;
@@ -82,6 +98,11 @@ const deploymentTabs: Array<{
     label: "Vue",
     summary: "Component install for Vue apps.",
   },
+  {
+    id: "packages",
+    label: "npm packages",
+    summary: "Installable SDKs for React, Vue, and adapters.",
+  },
 ];
 
 type DeploymentGuide = {
@@ -94,108 +115,161 @@ type DeploymentGuide = {
     body: string;
     example?: string;
   }>;
+  packages?: PackageInstall[];
 };
 
 const deploymentGuides: Record<DeploymentTabId, DeploymentGuide> = {
   script: {
     title: "Install the floating website launcher",
-    intro: "Use this when the chat should appear as a floating bubble on your website.",
+    intro: "Use this when the chat should appear as a floating bubble on any website — no framework needed.",
     placement: "Put the script once, just before the closing </body> tag.",
     highlight: "Keep data-bot-id unchanged. It controls which bot and saved appearance load.",
     steps: [
       {
         title: "Open the global page shell",
-        body: "Use the shared HTML layout, theme footer, or site-wide custom-code area.",
+        body: "Use the shared HTML layout, theme footer, or site-wide custom-code area — wherever a tag will appear on every page.",
       },
       {
         title: "Paste the snippet once",
-        body: "Place it after the page content so it loads after the visible page.",
-        example: "<body>\n  <main>...</main>\n  <!-- AgentDesk WebChat goes here -->\n  <script ...></script>\n</body>",
+        body: "Place it after the page content so it loads after the visible page. The async attribute prevents it from blocking render.",
+        example: "<body>\n  <main>...</main>\n  <!-- AgentDesk WebChat goes here -->\n  <script src=\"https://agentdeskbot.vercel.app/widget.js\"\n          data-bot-id=\"YOUR_BOT_ID\"\n          data-theme=\"YOUR_THEME\"\n          async>\n  </script>\n</body>",
+      },
+      {
+        title: "For self-hosted or custom domains, add data-api-origin",
+        body: "If your AgentDesk backend is on a different domain from the page, set data-api-origin so the widget fetches config and sends messages to the right server.",
+        example: '<script src="https://agentdeskbot.vercel.app/widget.js"\n        data-bot-id="YOUR_BOT_ID"\n        data-api-origin="https://your-backend.com"\n        async>\n</script>',
       },
       {
         title: "Check the live page",
-        body: "Confirm the launcher does not cover cookie banners, checkout buttons, or sticky support controls.",
+        body: "Confirm the launcher does not cover cookie banners, checkout buttons, or sticky support controls. Use data-position to move it if needed.",
       },
       {
         title: "Use separate bot IDs per environment",
-        body: "Use a staging bot ID or theme tag if your team tests changes before production.",
+        body: "Use a staging bot ID in dev/staging and the production bot ID on your live site to keep test conversations separate.",
       },
     ],
   },
   iframe: {
     title: "Embed a full chat panel inside a page",
-    intro: "Use this when the chat should be visible inside a help page or dashboard section.",
+    intro: "Use this when the chat should be visible inline inside a help page, dashboard, or sidebar — always open, no launcher button.",
     placement: "Place the iframe inside the content area where users expect support.",
-    highlight: "Give the iframe a stable height, usually around 640px on desktop.",
+    highlight: "Give the iframe a fixed, stable height. Avoid percentage heights — they collapse when the parent has no explicit height.",
     steps: [
       {
         title: "Choose the support section",
-        body: "Put it under a support heading or beside the article/task it helps with.",
+        body: "Put it under a support heading or beside the article/task it helps with. Do not place it in a modal — the input keyboard push will cause layout issues on mobile.",
       },
       {
         title: "Wrap it in a responsive container",
-        body: "Use a full-width wrapper with enough height for the header, messages, and input.",
-        example: '<section class="support-chat">\n  <iframe ...></iframe>\n</section>',
+        body: "Use a full-width wrapper with a fixed height (640px on desktop, 480px on mobile). The iframe itself should fill that container.",
+        example: '<section class="support-chat" style="width:100%;height:640px;">\n  <iframe\n    src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID"\n    title="Support chat"\n    style="width:100%;height:100%;border:0"\n    loading="lazy"\n    allow="clipboard-write">\n  </iframe>\n</section>',
+      },
+      {
+        title: "Add a theme parameter if needed",
+        body: "Append ?theme=YOUR_THEME to the embed URL to load the bot with a specific saved appearance.",
+        example: 'src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID?theme=YOUR_THEME"',
       },
       {
         title: "Check mobile height",
-        body: "Preview under 480px width and make sure the message input stays usable.",
+        body: "Preview under 480px width and make sure the message input stays usable. The iframe should not be inside a scrollable parent on mobile.",
       },
       {
         title: "Compare with preview",
-        body: "Open the preview link and confirm the iframe shows the same bot, greeting, and theme.",
+        body: "Open the preview link at the bottom of this panel and confirm the iframe shows the same bot, greeting, and theme.",
       },
     ],
   },
   react: {
     title: "Mount the widget in a React or Next.js app",
-    intro: "Use this when the launcher should follow users across app routes.",
+    intro: "Use this when the launcher should follow users across all app routes without re-mounting.",
     placement: "Render the widget once near the root layout, usually after the page children.",
-    highlight: "Do not mount it inside every page. That can create duplicate launchers.",
+    highlight: "Do not mount it inside individual pages. That causes duplicate launchers and re-injects the script on every route change.",
     steps: [
       {
-        title: "Create a small client component",
-        body: "Keep the widget in a small browser-only component instead of mixing it into page content.",
-        example: '"use client";\nimport { AgentDeskWidget } from "@agentdeskbot/widget/react";\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="YOUR_BOT_ID" theme="production" />;\n}',
+        title: "Install the package",
+        body: "Run this once from your project root. The package includes full TypeScript types, dual ESM/CJS output, and an SSR-safe Next.js App Router subpath.",
+        example: `npm install @agentdeskbot/react@${PACKAGE_VERSION}`,
       },
       {
-        title: "Place it in the app shell",
-        body: "Render it after the page content so it floats without changing the page layout.",
-        example: "<body>\n  {children}\n  <SupportWidget />\n</body>",
+        title: "Choose your import path",
+        body: "Plain React (CRA/Vite/Remix): import from the package root. Next.js App Router: import from the /nextjs subpath — it uses next/dynamic with ssr:false so the widget never runs on the server.",
+        example: '// Plain React / Vite / Remix / Next.js Pages Router\nimport { AgentDeskWidget } from "@agentdeskbot/react";\n\n// Next.js App Router (Server Components safe)\nimport { AgentDeskWidget } from "@agentdeskbot/react/nextjs";',
       },
       {
-        title: "Use the public bot ID",
-        body: "The client bundle should only contain the public bot ID and theme tag.",
+        title: "Create a small wrapper component",
+        body: "Isolate the widget in its own component so it does not force your whole layout to be a Client Component.",
+        example: '// components/SupportWidget.tsx\n"use client"; // only needed for plain React import\nimport { AgentDeskWidget } from "@agentdeskbot/react";\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="YOUR_BOT_ID" />;\n}',
       },
       {
-        title: "Test route changes",
-        body: "Navigate across two routes and confirm the launcher appears once and keeps its position.",
+        title: "Add it to your root layout",
+        body: "Render it once after the page children. Replace YOUR_BOT_ID with the Bot ID shown at the top of this panel.",
+        example: "// app/layout.tsx or pages/_app.tsx\n<body>\n  {children}\n  <SupportWidget />\n</body>",
+      },
+      {
+        title: "Test route navigation",
+        body: "Navigate across two or more routes and confirm: (1) only one launcher appears, (2) the chat history is preserved between routes, (3) the launcher position does not jump.",
       },
     ],
   },
   vue: {
-    title: "Register the widget in a Vue app",
-    intro: "Use this when the launcher should live in a shared Vue or Nuxt layout.",
+    title: "Register the widget in a Vue or Nuxt app",
+    intro: "Use this when the launcher should live in a shared Vue or Nuxt layout and persist across all routes.",
     placement: "Place the widget once near the end of App.vue or the default layout template.",
-    highlight: "Use kebab-case props in templates: bot-id and theme.",
+    highlight: "Use kebab-case for props in Vue templates: bot-id instead of botId. The widget is a zero-dependency web component — no Vue reactivity wiring needed.",
     steps: [
       {
-        title: "Import or register the component",
-        body: "Add the widget to the shared layout that wraps your pages.",
-        example: '<script setup>\nimport { AgentDeskWidget } from "@agentdeskbot/widget/vue";\n</script>',
+        title: "Install the package",
+        body: "Run this once from your project root. Works with Vue 3+, Nuxt 3+, and any Vite-based setup. No additional peer deps required.",
+        example: `npm install @agentdeskbot/vue@${PACKAGE_VERSION}`,
       },
       {
-        title: "Place it after the router view",
-        body: "Render it after the page outlet so it floats over the app without pushing content.",
-        example: "<template>\n  <RouterView />\n  <AgentDeskWidget bot-id=\"YOUR_BOT_ID\" theme=\"production\" />\n</template>",
+        title: "Choose: per-file import or global plugin",
+        body: "Option A (per-file): import directly in the component where you use it. Option B (global plugin): register once in main.ts — the component is then available everywhere with no imports.",
+        example: '// Option A — import in your layout component\n<script setup>\nimport { AgentDeskWidget } from "@agentdeskbot/vue";\n</script>\n\n// Option B — register globally in main.ts\nimport { AgentDeskPlugin } from "@agentdeskbot/vue";\napp.use(AgentDeskPlugin);\n// Then use <AgentDeskWidget> anywhere with no import',
       },
       {
-        title: "Verify production values",
-        body: "Confirm bot-id points to the saved bot and theme matches the customer-facing deployment.",
+        title: "Add it to your layout template",
+        body: "Place it after <RouterView /> so it floats over all pages without pushing content. Replace YOUR_BOT_ID with the Bot ID shown at the top.",
+        example: "<template>\n  <RouterView />\n  <AgentDeskWidget bot-id=\"YOUR_BOT_ID\" />\n</template>",
       },
       {
-        title: "Check navigation and overlays",
-        body: "Open pages with drawers, modals, or sticky footers and make sure the launcher stays reachable.",
+        title: "Listen to lifecycle events (optional)",
+        body: "The component emits open, close, ready, error, and message-sent events. Use @ready to know when the widget has loaded its config.",
+        example: '<AgentDeskWidget\n  bot-id="YOUR_BOT_ID"\n  @ready="onWidgetReady"\n  @error="onWidgetError"\n/>',
+      },
+      {
+        title: "Verify and test",
+        body: "Navigate between routes and confirm: (1) only one launcher, (2) chat history persists, (3) no layout shift. Check drawers, modals, and sticky footers.",
+      },
+    ],
+  },
+  packages: {
+    title: "npm packages reference",
+    intro: "Three scoped packages ship the AgentDesk widget SDK. Install only the one your framework needs — core is included automatically as a transitive dependency.",
+    placement: "Run the install command from the root of your host app or workspace.",
+    highlight: "All three packages share the same version number. Always pin the same version across all three to keep TypeScript types in sync.",
+    steps: [],
+    packages: [
+      {
+        name: PACKAGE_INSTALL_NAMES.react,
+        version: PACKAGE_VERSION,
+        description: "React & Next.js SDK with full TypeScript types, dual ESM/CJS output, and an SSR-safe /nextjs subpath that uses next/dynamic with ssr:false.",
+        useWhen: "Use for any React 18+ or Next.js 13+ app. Import from the package root for CRA/Vite/Remix, or from /nextjs when using the Next.js App Router.",
+        installCommand: `npm install ${PACKAGE_INSTALL_NAMES.react}@${PACKAGE_VERSION}`,
+      },
+      {
+        name: PACKAGE_INSTALL_NAMES.vue,
+        version: PACKAGE_VERSION,
+        description: "Vue 3 & Nuxt 3 SDK with a global AgentDeskPlugin and per-component import support. Zero additional peer dependencies.",
+        useWhen: "Use for any Vue 3+ or Nuxt 3+ app. Import the component directly, or call app.use(AgentDeskPlugin) once in your entry point to register it globally.",
+        installCommand: `npm install ${PACKAGE_INSTALL_NAMES.vue}@${PACKAGE_VERSION}`,
+      },
+      {
+        name: PACKAGE_INSTALL_NAMES.core,
+        version: PACKAGE_VERSION,
+        description: "Shared TypeScript types, WidgetMode, event type definitions, and the widget instance registry (ref-counted, per window).",
+        useWhen: "Usually installed automatically as a peer dep of react or vue. Install directly only if you are building a custom framework adapter or need the types standalone.",
+        installCommand: `npm install ${PACKAGE_INSTALL_NAMES.core}@${PACKAGE_VERSION}`,
       },
     ],
   },
@@ -487,7 +561,12 @@ export function WebChatWorkspace() {
                     <DeploymentGuidePanel guide={deploymentGuide} />
                     <div className="grid gap-2">
                       <p className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Snippet</p>
-                      <CodeBlock label={`${selectedDeploymentLabel} snippet`} value={snippets[deployTab]} />
+                      <CodeBlock label={deployTab === "packages" ? "Install all packages" : `${selectedDeploymentLabel} snippet`} value={snippets[deployTab]} />
+                      {deployTab === "packages" ? (
+                        <p className="mt-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-[11px] font-medium leading-5 text-white/55">
+                          For the full props API, lifecycle events, and SSR notes, see the package READMEs on npm.
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1271,21 +1350,71 @@ function DeploymentGuidePanel({ guide }: { guide: DeploymentGuide }) {
         <p className="mt-1 text-xs font-semibold leading-5 text-[#facc15]">{guide.highlight}</p>
       </div>
 
-      <ol className="divide-y divide-white/10">
-        {guide.steps.map((step, index) => (
-          <li className="p-4 transition hover:bg-white/[0.04]" key={step.title}>
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 font-mono text-xs font-semibold text-[#93c5fd]">{String(index + 1).padStart(2, "0")}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold leading-5 text-white">{step.title}</p>
-                <p className="mt-1 text-xs font-medium leading-5 text-white/60">{step.body}</p>
-                {step.example ? <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-2 font-mono text-[11px] font-semibold leading-4 text-[#bfdbfe]">{step.example}</pre> : null}
+      {guide.packages ? (
+        <ul className="divide-y divide-white/10">
+          {guide.packages.map((pkg) => (
+            <li className="p-4 transition hover:bg-white/[0.04]" key={pkg.name}>
+              <PackageInstallRow pkg={pkg} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ol className="divide-y divide-white/10">
+          {guide.steps.map((step, index) => (
+            <li className="p-4 transition hover:bg-white/[0.04]" key={step.title}>
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 font-mono text-xs font-semibold text-[#93c5fd]">{String(index + 1).padStart(2, "0")}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-5 text-white">{step.title}</p>
+                  <p className="mt-1 text-xs font-medium leading-5 text-white/60">{step.body}</p>
+                  {step.example ? <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-2 font-mono text-[11px] font-semibold leading-4 text-[#bfdbfe]">{step.example}</pre> : null}
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
+  );
+}
+
+function PackageInstallRow({ pkg }: { pkg: PackageInstall }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyInstall() {
+    await navigator.clipboard.writeText(pkg.installCommand);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-sm font-semibold text-white">{pkg.name}</span>
+        <span className="rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 font-mono text-[11px] font-semibold text-white/65">
+          v{pkg.version}
+        </span>
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-[#93c5fd]">
+          <Package aria-hidden="true" className="h-3.5 w-3.5" />
+        </span>
+      </div>
+      <p className="text-xs font-medium leading-5 text-white/70">{pkg.description}</p>
+      <p className="text-xs font-medium leading-5 text-white/55">
+        <span className="font-mono text-[11px] font-semibold uppercase text-[#93c5fd]">Use when </span>
+        {pkg.useWhen}
+      </p>
+      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2">
+        <code className="min-w-0 flex-1 truncate font-mono text-[11px] font-semibold text-[#bfdbfe]">{pkg.installCommand}</code>
+        <button
+          aria-label={`Copy npm install command for ${pkg.name}`}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white/60 transition hover:border-[#60a5fa]/40 hover:bg-white/[0.1] hover:text-white"
+          onClick={() => void copyInstall()}
+          type="button"
+        >
+          {copied ? <Check aria-hidden="true" className="h-3.5 w-3.5 text-[#22c55e]" /> : <Copy aria-hidden="true" className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1320,20 +1449,47 @@ function CodeBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
+function escapeHtmlAttr(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function escapeJsString(value: string) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/<\/script>/gi, "<\\/script>")
+    .replace(/\$\{/g, "\\${");
+}
+
 function buildSnippets(config: WebChatConfig) {
   const botId = config.deploy.botId || "YOUR_BOT_ID";
   const theme = config.deploy.themeId || config.deploy.versionTag;
 
+  const escapedBotId = escapeHtmlAttr(botId);
+  const escapedTheme = escapeHtmlAttr(theme);
+  const escapedBotName = escapeHtmlAttr(config.identity.botName);
+
+  const jsBotId = escapeJsString(botId);
+  const jsTheme = escapeJsString(theme);
+
   return {
-    script: `<script src="https://agentdeskbot.vercel.app/widget.js" data-bot-id="${botId}" data-theme="${theme}" async></script>`,
-    iframe: `<iframe src="https://agentdeskbot.vercel.app/embed/${botId}?theme=${theme}" title="${config.identity.botName}" style="width:100%;height:640px;border:0"></iframe>`,
-    react: `import { AgentDeskWidget } from "@agentdeskbot/widget/react";\n\n<AgentDeskWidget botId="${botId}" theme="${theme}" />`,
-    vue: `<AgentDeskWidget bot-id="${botId}" theme="${theme}" />`,
+    script: `<script\n  src="https://agentdeskbot.vercel.app/widget.js"\n  data-bot-id="${escapedBotId}"\n  data-theme="${escapedTheme}"\n  async>\n</script>\n\n<!-- Cross-origin / self-hosted: also add data-api-origin -->\n<!-- data-api-origin="https://your-backend.com" -->`,
+    iframe: `<iframe\n  src="https://agentdeskbot.vercel.app/embed/${encodeURIComponent(botId)}?theme=${encodeURIComponent(theme)}"\n  title="${escapedBotName} support chat"\n  style="width:100%;height:640px;border:0"\n  loading="lazy"\n  allow="clipboard-write">\n</iframe>`,
+    react: `// 1. Install: npm install @agentdeskbot/react@${PACKAGE_VERSION}\n// 2. Add this component to your root layout\n\n"use client"; // omit when using @agentdeskbot/react/nextjs\nimport { AgentDeskWidget } from "@agentdeskbot/react";\n// Next.js App Router → import from "@agentdeskbot/react/nextjs" instead\n\nexport function SupportWidget() {\n  return <AgentDeskWidget botId="${jsBotId}" theme="${jsTheme}" />;\n}`,
+    vue: `<!-- 1. Install: npm install @agentdeskbot/vue@${PACKAGE_VERSION} -->\n<!-- 2. Add to your App.vue or default layout -->\n\n<script setup>\nimport { AgentDeskWidget } from "@agentdeskbot/vue";\n// Global alternative: app.use(AgentDeskPlugin) in main.ts\n</script>\n\n<template>\n  <RouterView />\n  <AgentDeskWidget bot-id="${escapedBotId}" theme="${escapedTheme}" />\n</template>`,
+    packages: PACKAGE_INSTALL_ALL,
   };
 }
 
 function buildEmbedPreviewUrl(botId: string) {
-  const origin = typeof window === "undefined" ? "http://agentdeskbot.vercel.app" : window.location.origin;
+  const origin = typeof window === "undefined" ? "https://agentdeskbot.vercel.app" : window.location.origin;
   return `${origin}/embed/${encodeURIComponent(botId)}`;
 }
 

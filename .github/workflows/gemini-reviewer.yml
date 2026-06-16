@@ -74,6 +74,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ -z "${PR_TITLE:-}" ]; then
+            echo "Error: PR_TITLE environment variable is empty."
+            exit 1
+          fi
+
+          if [ -z "${OLLAMA_API_KEY:-}" ]; then
+            echo "Error: OLLAMA_API_KEY secret is not set."
+            exit 1
+          fi
+
           SYSTEM_PROMPT=$(cat <<'EOF'
           You are an expert code reviewer. Analyze the pull request diff.
           Point out critical logical bugs, security gaps, performance bottlenecks, or syntax formatting issues.
@@ -90,16 +100,15 @@ jobs:
           BODY_FILE="$(mktemp)"
           trap 'rm -f "$BODY_FILE"' EXIT
           
-          jq -n \
+          jq -Rs \
             --arg model "minimax-m3" \
             --arg system "$SYSTEM_PROMPT" \
-            --rawfile diff "$DIFF_FILE" \
             '{
               model: $model,
-              prompt: ("PR Title: \($ENV.PR_TITLE // "")\n\nPR Description:\n\($ENV.PR_BODY // "")\n\nDiff (truncated=\($ENV.TRUNCATED // "false")):\n```diff\n" + $diff + "\n```"),
+              prompt: ("PR Title: \($ENV.PR_TITLE // "")\n\nPR Description:\n\($ENV.PR_BODY // "")\n\nDiff (truncated=\($ENV.TRUNCATED // "false")):\n```diff\n" + . + "\n```"),
               system: $system,
               stream: false
-            }' > "$BODY_FILE"
+            }' < "$DIFF_FILE" > "$BODY_FILE"
 
           # Call Ollama Cloud API with retries to handle transient capacity errors
           for i in {1..3}; do

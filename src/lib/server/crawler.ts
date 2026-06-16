@@ -3,7 +3,6 @@ import { lookup } from "node:dns/promises";
 import http from "node:http";
 import https from "node:https";
 import net from "node:net";
-import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 
 const MAX_FETCH_BYTES = 2 * 1024 * 1024;
@@ -50,12 +49,12 @@ export class WebsiteCrawler {
 
   async crawl(url: string) {
     const html = await this.fetchPageHtml(url);
-    const nextDataText = this.tryExtractNextData(html);
+    const nextDataText = await this.tryExtractNextData(html);
     if (nextDataText) {
       return nextDataText.slice(0, MAX_MARKDOWN_CHARS);
     }
 
-    return this.cleanAndConvertHtml(html, url).slice(0, MAX_MARKDOWN_CHARS);
+    return (await this.cleanAndConvertHtml(html, url)).slice(0, MAX_MARKDOWN_CHARS);
   }
 
   private async fetchPageHtml(url: string) {
@@ -87,7 +86,8 @@ export class WebsiteCrawler {
     });
   }
 
-  private tryExtractNextData(html: string) {
+  private async tryExtractNextData(html: string) {
+    const { JSDOM } = await import("jsdom");
     const dom = new JSDOM(html);
     const nextData = dom.window.document.querySelector<HTMLScriptElement>('script#__NEXT_DATA__[type="application/json"]');
     if (!nextData?.textContent) {
@@ -106,7 +106,8 @@ export class WebsiteCrawler {
     }
   }
 
-  private cleanAndConvertHtml(html: string, url: string) {
+  private async cleanAndConvertHtml(html: string, url: string) {
+    const { JSDOM } = await import("jsdom");
     const dom = new JSDOM(html, { url });
     const document = dom.window.document;
     const article = new Readability(document).parse();
@@ -128,6 +129,7 @@ export async function discoverSitemapUrls(url: string, limit = 30) {
     },
     timeoutMs: 10000,
   });
+  const { JSDOM } = await import("jsdom");
   const dom = new JSDOM(xml, { contentType: "text/xml", url });
   const links = Array.from(dom.window.document.querySelectorAll("loc"))
     .map((node) => normalizeHttpUrl(node.textContent ?? ""))
