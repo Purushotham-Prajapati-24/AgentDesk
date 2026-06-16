@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+
 type EmbedPageProps = {
   params: Promise<{
     botId: string;
@@ -6,20 +8,30 @@ type EmbedPageProps = {
     theme?: string;
     position?: string;
     className?: string;
-    cspNonce?: string;
   }>;
 };
 
 export default async function EmbedPage({ params, searchParams }: EmbedPageProps) {
   const { botId } = await params;
-  const { theme, position, className, cspNonce } = await searchParams;
+  const { theme, position, className } = await searchParams;
   const safeBotId = /^[a-zA-Z0-9_-]{3,80}$/.test(botId) ? botId : "";
 
   // Sanitize parameter inputs to match expected formats
   const cleanTheme = theme && /^[a-zA-Z0-9._-]+$/.test(theme) ? theme : undefined;
   const cleanPosition = position && ["bottom-right", "bottom-left", "top-right", "top-left"].includes(position) ? position : undefined;
-  const cleanClassName = className && /^[a-zA-Z0-9\s_-]+$/.test(className) ? className : undefined;
-  const cleanCspNonce = cspNonce && /^[a-zA-Z0-9+/=_-]+$/.test(cspNonce) ? cspNonce : undefined;
+  
+  // Split on whitespace and validate each class name token individually to allow multi-class safely
+  const cleanClassName = className
+    ? className
+        .split(/\s+/)
+        .filter((token) => /^[a-zA-Z0-9_-]+$/.test(token))
+        .join(" ") || undefined
+    : undefined;
+
+  // Retrieve CSP nonce securely from request headers
+  const headersList = await headers();
+  const nonceHeader = headersList.get("x-nonce") || undefined;
+  const cleanCspNonce = nonceHeader && /^[a-zA-Z0-9+/=_-]+$/.test(nonceHeader) ? nonceHeader : undefined;
 
   return (
     <main className="h-svh w-full overflow-hidden">

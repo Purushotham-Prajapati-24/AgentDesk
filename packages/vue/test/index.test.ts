@@ -187,12 +187,12 @@ describe('AgentDeskWidget (Vue)', () => {
     }
   });
 
-  it('injects scripts with default SaaS endpoints', () => {
+  it('injects scripts with default same-origin endpoints', () => {
     const wrapper = mount(AgentDeskWidget, { props: { botId: 'saas-bot' } });
     const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
     expect(script).not.toBeNull();
-    expect(script.src).toBe('https://agentdeskbot.vercel.app/widget.js');
-    expect(script.dataset.apiOrigin).toBe('https://agentdeskbot.vercel.app');
+    expect(script.getAttribute('src')).toBe('/widget.js');
+    expect(script.dataset.apiOrigin).toBeUndefined();
     wrapper.unmount();
   });
 

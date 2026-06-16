@@ -55,7 +55,7 @@ export interface AgentDeskWidgetProps {
 
   /**
    * URL to the `widget.js` script.
-   * Defaults to `'https://agentdeskbot.vercel.app/widget.js'`.
+   * Defaults to `'/widget.js'`.
    * For cross-site embeds, point this to your CDN or AgentDesk deployment.
    * @example 'https://cdn.agentdesk.ai/widget.js'
    */
@@ -64,7 +64,7 @@ export interface AgentDeskWidgetProps {
   /**
    * Base URL of your AgentDesk backend deployment.
    * Required when the widget is embedded on a domain different from the backend.
-   * Defaults to `'https://agentdeskbot.vercel.app'`.
+   * Defaults to `undefined` (same-origin).
    * @example 'https://support.yourapp.com'
    */
   apiOrigin?: string;
@@ -140,6 +140,7 @@ export interface AgentDeskWidgetProps {
 // side-effect free.
 
 type ListenerBucket = {
+  apiOrigin?: string;
   onOpen?: () => void;
   onClose?: () => void;
   onReady?: () => void;
@@ -158,11 +159,20 @@ function installGlobalListener() {
   globalListenerInstalled = true;
   globalListenerRef = (event: MessageEvent) => {
     if (!event.data || typeof event.data !== 'object') return;
-    if (event.origin !== window.location.origin) return;
     const data = event.data as Partial<WidgetMessageEventData>;
     if (typeof data.botId !== 'string') return;
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
+
+    const allowedOrigins = new Set([window.location.origin]);
+    if (bucket.apiOrigin) {
+      try {
+        allowedOrigins.add(new URL(bucket.apiOrigin).origin);
+      } catch {
+        // ignore
+      }
+    }
+    if (!allowedOrigins.has(event.origin)) return;
 
     switch (data.type) {
       case 'agentdesk-widget-open':
@@ -268,8 +278,8 @@ export function AgentDeskWidget({
   botId,
   configUrl,
   mode = 'launcher',
-  scriptSrc = 'https://agentdeskbot.vercel.app/widget.js',
-  apiOrigin = 'https://agentdeskbot.vercel.app',
+  scriptSrc = '/widget.js',
+  apiOrigin,
   theme,
   cspNonce,
   position,
@@ -331,6 +341,7 @@ export function AgentDeskWidget({
 
     // Register this component's callbacks in the shared dispatch table.
     const bucket: ListenerBucket = {
+      apiOrigin,
       onOpen: onOpenRef.current,
       onClose: onCloseRef.current,
       onReady: onReadyRef.current,

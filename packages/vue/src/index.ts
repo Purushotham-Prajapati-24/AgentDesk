@@ -32,9 +32,9 @@ export interface AgentDeskWidgetProps {
    *  **Dynamic updates are supported** — the SDK posts an
    *  `agentdesk-set-mode` message when this prop changes. */
   mode?: WidgetMode;
-  /** URL to widget.js. Defaults to 'https://agentdeskbot.vercel.app/widget.js'. */
+  /** URL to widget.js. Defaults to '/widget.js'. */
   scriptSrc?: string;
-  /** Base URL of your AgentDesk backend (for cross-origin embeds). */
+  /** Base URL of your AgentDesk backend (for cross-origin embeds). Defaults to undefined (same-origin). */
   apiOrigin?: string;
   /** Optional theme name for the widget (e.g. 'webchat-v1'). */
   theme?: string;
@@ -48,12 +48,19 @@ export interface AgentDeskWidgetProps {
 
 // ─── Shared global message listener ──────────────────────────────────────────
 
-type ListenerBucket = Set<(type: string, payload?: unknown) => void>;
+type EmitName = 'open' | 'close' | 'ready' | 'error' | 'message-sent' | 'injected';
+
+interface ListenerEntry {
+  apiOrigin?: string;
+  emit: (type: EmitName, payload?: unknown) => void;
+}
+
+type ListenerBucket = Set<ListenerEntry>;
 
 const listenerBuckets = new Map<string, ListenerBucket>();
 
-function dispatchEvent(botId: string, eventName: string, payload?: unknown) {
-  listenerBuckets.get(botId)?.forEach((emit) => emit(eventName, payload));
+function dispatchEvent(botId: string, eventName: EmitName, payload?: unknown) {
+  listenerBuckets.get(botId)?.forEach((entry) => entry.emit(eventName, payload));
 }
 
 let globalListenerInstalled = false;
@@ -64,9 +71,27 @@ function installGlobalListener() {
   globalListenerInstalled = true;
   globalListenerRef = (event: MessageEvent) => {
     if (!event.data || typeof event.data !== 'object') return;
-    if (event.origin !== window.location.origin) return;
     const data = event.data as Partial<WidgetMessageEventData>;
     if (typeof data.botId !== 'string') return;
+    const bucket = listenerBuckets.get(data.botId);
+    if (!bucket) return;
+
+    let originAllowed = false;
+    for (const entry of bucket) {
+      const allowedOrigins = new Set([window.location.origin]);
+      if (entry.apiOrigin) {
+        try {
+          allowedOrigins.add(new URL(entry.apiOrigin).origin);
+        } catch {
+          // ignore
+        }
+      }
+      if (allowedOrigins.has(event.origin)) {
+        originAllowed = true;
+        break;
+      }
+    }
+    if (!originAllowed) return;
 
     switch (data.type) {
       case 'agentdesk-widget-open':
@@ -184,11 +209,10 @@ export const AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String as PropType<string>,
-      default: 'https://agentdeskbot.vercel.app/widget.js',
+      default: '/widget.js',
     },
     apiOrigin: {
       type: String as PropType<string>,
-      default: 'https://agentdeskbot.vercel.app',
     },
     theme: {
       type: String as PropType<string>,
@@ -221,7 +245,7 @@ export const AgentDeskWidget = defineComponent({
     }
 
     let hasSlot = false;
-    let cachedEmit: ((type: string, payload?: unknown) => void) | null = null;
+    let entry: ListenerEntry | null = null;
 
     const install = () => {
       if (!props.botId) return;
@@ -234,7 +258,7 @@ export const AgentDeskWidget = defineComponent({
           injectScript({
             botId: props.botId,
             mode: props.mode ?? 'launcher',
-            scriptSrc: props.scriptSrc || 'https://agentdeskbot.vercel.app/widget.js',
+            scriptSrc: props.scriptSrc || '/widget.js',
             configUrl: props.configUrl || undefined,
             apiOrigin: props.apiOrigin || undefined,
             theme: props.theme || undefined,
@@ -248,18 +272,20 @@ export const AgentDeskWidget = defineComponent({
       }
       hasSlot = true;
 
-      cachedEmit = (type: string, payload?: unknown) => {
-        const emitType = type as 'open' | 'close' | 'ready' | 'error' | 'message-sent' | 'injected';
-        if (payload !== undefined) {
-          emit(emitType, payload);
-        } else {
-          emit(emitType);
-        }
+      entry = {
+        apiOrigin: props.apiOrigin || undefined,
+        emit: (type: EmitName, payload?: unknown) => {
+          if (payload !== undefined) {
+            emit(type as any, payload);
+          } else {
+            emit(type as any);
+          }
+        },
       };
       if (!listenerBuckets.has(props.botId)) {
         listenerBuckets.set(props.botId, new Set());
       }
-      listenerBuckets.get(props.botId)!.add(cachedEmit);
+      listenerBuckets.get(props.botId)!.add(entry);
 
       if (typeof customElements !== 'undefined') {
         void customElements.whenDefined(WIDGET_ELEMENT_NAME).catch(() => {
@@ -271,11 +297,11 @@ export const AgentDeskWidget = defineComponent({
     const release = () => {
       if (!hasSlot || !props.botId) return;
       const bucket = listenerBuckets.get(props.botId);
-      if (cachedEmit) bucket?.delete(cachedEmit);
+      if (entry) bucket?.delete(entry);
       if (bucket && bucket.size === 0) {
         listenerBuckets.delete(props.botId);
       }
-      cachedEmit = null;
+      entry = null;
       const result = releaseInstance(props.botId);
       hasSlot = false;
       if (result.isLastForBot) {
