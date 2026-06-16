@@ -1,5 +1,5 @@
 import * as vue from 'vue';
-import { App, PropType } from 'vue';
+import { Plugin, PropType } from 'vue';
 import { WidgetMode } from '@agentdeskbot/core';
 export { WidgetMode } from '@agentdeskbot/core';
 
@@ -140,8 +140,6 @@ interface AgentDeskPluginOptions {
      */
     globalComponent?: boolean;
 }
-declare const AgentDeskPlugin: {
-    install(app: App, options?: AgentDeskPluginOptions): void;
-};
+declare const AgentDeskPlugin: Plugin;
 
 export { AgentDeskPlugin, type AgentDeskPluginOptions, AgentDeskWidget, type AgentDeskWidgetProps, AgentDeskPlugin as default };

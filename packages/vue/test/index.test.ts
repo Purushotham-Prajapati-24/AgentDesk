@@ -167,27 +167,50 @@ describe('AgentDeskWidget (Vue)', () => {
     wrapper.unmount();
   });
 
-  it('logs a warning when window is undefined', () => {
-    const originalWindow = global.window;
-    // @ts-expect-error - deleting window to simulate server environment
-    delete global.window;
+  it('allows events from origins matching apiOrigin or scriptSrc', async () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'custom-origin-bot',
+        apiOrigin: 'https://api.custom-desk.com',
+        scriptSrc: 'https://widget.custom-desk.com/sdk.js',
+      },
+    });
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(messageListeners.length).toBeGreaterThan(0);
 
-    try {
-      const setupResult = (AgentDeskWidget.setup as (
-        props: { botId: string; mode?: string },
-        ctx: { emit: (...args: unknown[]) => void }
-      ) => () => unknown)({ botId: 'ssr-warn-bot', mode: 'launcher' }, { emit: () => {} });
-      expect(setupResult()).toBeNull();
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("AgentDeskWidget was initialized in a non-browser environment")
-      );
-    } finally {
-      global.window = originalWindow;
-      warnSpy.mockRestore();
-    }
+    // Test message from apiOrigin
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://api.custom-desk.com',
+        data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(1);
+
+    // Test message from scriptSrc origin
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://widget.custom-desk.com',
+        data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(2);
+
+    // Test message from untrusted origin
+    messageListeners[0](
+      new MessageEvent('message', {
+        origin: 'https://evil-site.com',
+        data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+      }),
+    );
+    await nextTick();
+    expect(wrapper.emitted('open')?.length).toBe(2);
+
+    wrapper.unmount();
   });
+
 
   it('injects scripts with default same-origin endpoints', () => {
     const wrapper = mount(AgentDeskWidget, { props: { botId: 'saas-bot' } });

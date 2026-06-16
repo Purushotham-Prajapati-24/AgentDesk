@@ -31,6 +31,12 @@ function installGlobalListener() {
         } catch {
         }
       }
+      if (entry.scriptSrc) {
+        try {
+          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+        } catch {
+        }
+      }
       if (allowedOrigins.has(event.origin)) {
         originAllowed = true;
         break;
@@ -176,6 +182,7 @@ var AgentDeskWidget = vue.defineComponent({
       hasSlot = true;
       entry = {
         apiOrigin: props.apiOrigin || void 0,
+        scriptSrc: props.scriptSrc || void 0,
         emit: (type, payload) => {
           if (payload !== void 0) {
             emit(type, payload);

@@ -24,6 +24,12 @@ function installGlobalListener() {
       } catch {
       }
     }
+    if (bucket.scriptSrc) {
+      try {
+        allowedOrigins.add(new URL(bucket.scriptSrc, window.location.origin).origin);
+      } catch {
+      }
+    }
     if (!allowedOrigins.has(event.origin)) return;
     switch (data.type) {
       case "agentdesk-widget-open":
@@ -109,6 +115,8 @@ function AgentDeskWidget({
   const onErrorRef = react.useRef(onError);
   const onMessageSentRef = react.useRef(onMessageSent);
   const onWidgetInjectedRef = react.useRef(onWidgetInjected);
+  const modeRef = react.useRef(mode);
+  const initialPropsRef = react.useRef({ theme, cspNonce, position, className, mode });
   react.useEffect(() => {
     onOpenRef.current = onOpen;
     onCloseRef.current = onClose;
@@ -116,11 +124,12 @@ function AgentDeskWidget({
     onErrorRef.current = onError;
     onMessageSentRef.current = onMessageSent;
     onWidgetInjectedRef.current = onWidgetInjected;
+    modeRef.current = mode;
   });
   react.useEffect(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
-    const acquire = core.acquireInstance(botId, mode);
+    const acquire = core.acquireInstance(botId, initialPropsRef.current.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -128,19 +137,22 @@ function AgentDeskWidget({
       if (!findExistingScript(botId)) {
         injectScript({
           botId,
-          mode,
+          mode: initialPropsRef.current.mode,
           scriptSrc,
           configUrl,
           apiOrigin,
-          theme,
-          cspNonce,
-          position,
-          className
+          theme: initialPropsRef.current.theme,
+          cspNonce: initialPropsRef.current.cspNonce,
+          position: initialPropsRef.current.position,
+          className: initialPropsRef.current.className
         });
       }
+    } else if (acquire.modeChanged) {
+      core.postSetMode(botId, modeRef.current);
     }
     const bucket = {
       apiOrigin,
+      scriptSrc,
       onOpen: onOpenRef.current,
       onClose: onCloseRef.current,
       onReady: onReadyRef.current,

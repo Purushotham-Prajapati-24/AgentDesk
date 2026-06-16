@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useEffect } from 'react';
-import { acquireInstance, WIDGET_ELEMENT_NAME, releaseInstance, postSetMode } from '@agentdeskbot/core';
+import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
 
 var listenerBuckets = /* @__PURE__ */ new Map();
 var globalListenerInstalled = false;
@@ -19,6 +19,12 @@ function installGlobalListener() {
     if (bucket.apiOrigin) {
       try {
         allowedOrigins.add(new URL(bucket.apiOrigin).origin);
+      } catch {
+      }
+    }
+    if (bucket.scriptSrc) {
+      try {
+        allowedOrigins.add(new URL(bucket.scriptSrc, window.location.origin).origin);
       } catch {
       }
     }
@@ -107,6 +113,8 @@ function AgentDeskWidget({
   const onErrorRef = useRef(onError);
   const onMessageSentRef = useRef(onMessageSent);
   const onWidgetInjectedRef = useRef(onWidgetInjected);
+  const modeRef = useRef(mode);
+  const initialPropsRef = useRef({ theme, cspNonce, position, className, mode });
   useEffect(() => {
     onOpenRef.current = onOpen;
     onCloseRef.current = onClose;
@@ -114,11 +122,12 @@ function AgentDeskWidget({
     onErrorRef.current = onError;
     onMessageSentRef.current = onMessageSent;
     onWidgetInjectedRef.current = onWidgetInjected;
+    modeRef.current = mode;
   });
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
-    const acquire = acquireInstance(botId, mode);
+    const acquire = acquireInstance(botId, initialPropsRef.current.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -126,19 +135,22 @@ function AgentDeskWidget({
       if (!findExistingScript(botId)) {
         injectScript({
           botId,
-          mode,
+          mode: initialPropsRef.current.mode,
           scriptSrc,
           configUrl,
           apiOrigin,
-          theme,
-          cspNonce,
-          position,
-          className
+          theme: initialPropsRef.current.theme,
+          cspNonce: initialPropsRef.current.cspNonce,
+          position: initialPropsRef.current.position,
+          className: initialPropsRef.current.className
         });
       }
+    } else if (acquire.modeChanged) {
+      postSetMode(botId, modeRef.current);
     }
     const bucket = {
       apiOrigin,
+      scriptSrc,
       onOpen: onOpenRef.current,
       onClose: onCloseRef.current,
       onReady: onReadyRef.current,

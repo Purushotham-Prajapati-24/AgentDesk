@@ -1463,7 +1463,9 @@ function escapeJsString(value: string) {
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
     .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r");
+    .replace(/\r/g, "\\r")
+    .replace(/<\/script>/gi, "<\\/script>")
+    .replace(/\$\{/g, "\\${");
 }
 
 function buildSnippets(config: WebChatConfig) {

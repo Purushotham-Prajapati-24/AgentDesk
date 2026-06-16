@@ -103,7 +103,6 @@ jobs:
           jq -Rs \
             --arg model "minimax-m3" \
             --arg system "$SYSTEM_PROMPT" \
-            --rawfile diff "$DIFF_FILE" \
             '{
               model: $model,
               prompt: ("PR Title: \($ENV.PR_TITLE // "")\n\nPR Description:\n\($ENV.PR_BODY // "")\n\nDiff (truncated=\($ENV.TRUNCATED // "false")):\n```diff\n" + . + "\n```"),

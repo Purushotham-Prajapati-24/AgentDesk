@@ -143,6 +143,7 @@ export interface AgentDeskWidgetProps {
 
 type ListenerBucket = {
   apiOrigin?: string;
+  scriptSrc?: string;
   onOpen?: () => void;
   onClose?: () => void;
   onReady?: () => void;
@@ -170,6 +171,13 @@ function installGlobalListener() {
     if (bucket.apiOrigin) {
       try {
         allowedOrigins.add(new URL(bucket.apiOrigin).origin);
+      } catch {
+        // ignore
+      }
+    }
+    if (bucket.scriptSrc) {
+      try {
+        allowedOrigins.add(new URL(bucket.scriptSrc, window.location.origin).origin);
       } catch {
         // ignore
       }
@@ -301,6 +309,11 @@ export function AgentDeskWidget({
   const onErrorRef = useRef<((error: { message: string }) => void) | undefined>(onError);
   const onMessageSentRef = useRef<((message: { text: string }) => void) | undefined>(onMessageSent);
   const onWidgetInjectedRef = useRef<(() => void) | undefined>(onWidgetInjected);
+  const modeRef = useRef(mode);
+
+  // Store mount-only configurations in refs so they are not reactive dependencies
+  // of the mount/unmount effect (avoiding full script unmount/remount cycles).
+  const initialPropsRef = useRef({ theme, cspNonce, position, className, mode });
 
   // Sync refs to the latest callback identity after every render so the
   // shared message listener always dispatches to the most recent functions.
@@ -311,6 +324,7 @@ export function AgentDeskWidget({
     onErrorRef.current = onError;
     onMessageSentRef.current = onMessageSent;
     onWidgetInjectedRef.current = onWidgetInjected;
+    modeRef.current = mode;
   });
 
   // Mount/unmount lifecycle: ref-count the widget so multiple components
@@ -321,7 +335,7 @@ export function AgentDeskWidget({
 
     // Acquire registry slot. Note that we pass the initial mode here,
     // but any subsequent mode changes are handled dynamically by the mode effect.
-    const acquire = acquireInstance(botId, mode);
+    const acquire = acquireInstance(botId, initialPropsRef.current.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -329,21 +343,24 @@ export function AgentDeskWidget({
       if (!findExistingScript(botId)) {
         injectScript({
           botId,
-          mode,
+          mode: initialPropsRef.current.mode,
           scriptSrc,
           configUrl,
           apiOrigin,
-          theme,
-          cspNonce,
-          position,
-          className,
+          theme: initialPropsRef.current.theme,
+          cspNonce: initialPropsRef.current.cspNonce,
+          position: initialPropsRef.current.position,
+          className: initialPropsRef.current.className,
         });
       }
+    } else if (acquire.modeChanged) {
+      postSetMode(botId, modeRef.current);
     }
 
     // Register this component's callbacks in the shared dispatch table.
     const bucket: ListenerBucket = {
       apiOrigin,
+      scriptSrc,
       onOpen: onOpenRef.current,
       onClose: onCloseRef.current,
       onReady: onReadyRef.current,
@@ -369,7 +386,7 @@ export function AgentDeskWidget({
         uninstallGlobalListener();
       }
     };
-  }, [botId, scriptSrc, configUrl, apiOrigin]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [botId, scriptSrc, configUrl, apiOrigin]);
 
   // Separate effect: dynamic mode propagation.
   const isFirstModeRender = useRef(true);

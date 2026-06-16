@@ -7,6 +7,7 @@ import {
   onMounted,
   watch,
   type App,
+  type Plugin,
   type PropType,
 } from 'vue';
 
@@ -52,6 +53,7 @@ type EmitName = 'open' | 'close' | 'ready' | 'error' | 'message-sent' | 'injecte
 
 interface ListenerEntry {
   apiOrigin?: string;
+  scriptSrc?: string;
   emit: (type: EmitName, payload?: unknown) => void;
 }
 
@@ -82,6 +84,13 @@ function installGlobalListener() {
       if (entry.apiOrigin) {
         try {
           allowedOrigins.add(new URL(entry.apiOrigin).origin);
+        } catch {
+          // ignore
+        }
+      }
+      if (entry.scriptSrc) {
+        try {
+          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
         } catch {
           // ignore
         }
@@ -274,6 +283,7 @@ export const AgentDeskWidget = defineComponent({
 
       entry = {
         apiOrigin: props.apiOrigin || undefined,
+        scriptSrc: props.scriptSrc || undefined,
         emit: (type: EmitName, payload?: unknown) => {
           if (payload !== undefined) {
             emit(type as Parameters<typeof emit>[0], payload);
@@ -406,7 +416,7 @@ export interface AgentDeskPluginOptions {
   globalComponent?: boolean;
 }
 
-export const AgentDeskPlugin = {
+export const AgentDeskPlugin: Plugin = {
   install(app: App, options: AgentDeskPluginOptions = { globalComponent: true }) {
     if (options.globalComponent !== false) {
       app.component('AgentDeskWidget', AgentDeskWidget);

@@ -102,6 +102,17 @@
             this.renderShell();
             void this.loadConfig();
         }
+        disconnectedCallback() {
+            if (this.socket) {
+                try {
+                    this.socket.disconnect();
+                }
+                catch {
+                }
+                this.socket = null;
+            }
+            this.hasInitialized = false;
+        }
         toggle() {
             this.isOpen = !this.isOpen;
             this.renderShell();

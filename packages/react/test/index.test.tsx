@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
-import { renderToString } from 'react-dom/server';
 import { AgentDeskWidget } from '../src/index';
 
 describe('AgentDeskWidget (React)', () => {
@@ -152,24 +151,54 @@ describe('AgentDeskWidget (React)', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('logs a warning and returns null when window is undefined', () => {
-    const originalWindow = global.window;
-    // @ts-expect-error - deleting window to simulate server environment
-    delete global.window;
+  it('allows events from origins matching apiOrigin or scriptSrc', () => {
+    const onOpen = vi.fn();
+    render(
+      <AgentDeskWidget
+        botId="custom-origin-bot"
+        apiOrigin="https://api.custom-desk.com"
+        scriptSrc="https://widget.custom-desk.com/sdk.js"
+        onOpen={onOpen}
+      />,
+    );
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(messageListeners.length).toBeGreaterThan(0);
 
-    try {
-      const html = renderToString(<AgentDeskWidget botId="ssr-bot" />);
-      expect(html).toBe('');
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("AgentDeskWidget was rendered on the server")
+    // Test message from apiOrigin
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          origin: 'https://api.custom-desk.com',
+          data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+        }),
       );
-    } finally {
-      global.window = originalWindow;
-      warnSpy.mockRestore();
-    }
+    });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+
+    // Test message from scriptSrc origin
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          origin: 'https://widget.custom-desk.com',
+          data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+        }),
+      );
+    });
+    expect(onOpen).toHaveBeenCalledTimes(2);
+
+    // Test message from untrusted origin
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          origin: 'https://evil-site.com',
+          data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+        }),
+      );
+    });
+    // Count should still be 2
+    expect(onOpen).toHaveBeenCalledTimes(2);
   });
+
 
   it('injects scripts with default same-origin endpoints', () => {
     render(<AgentDeskWidget botId="saas-bot" />);

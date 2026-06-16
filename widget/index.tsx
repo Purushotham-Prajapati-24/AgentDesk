@@ -185,6 +185,7 @@
     connected: boolean;
     emit: (event: string, payload: { message_id: string; content: string }) => void;
     on: (event: string, callback: (payload: { message_id: string; content: string }) => void) => void;
+    disconnect: () => void;
   };
 
   class AgentDeskWidget extends HTMLElement {
@@ -215,6 +216,18 @@
       postLifecycleEvent("agentdesk-widget-injected");
       this.renderShell();
       void this.loadConfig();
+    }
+
+    disconnectedCallback() {
+      if (this.socket) {
+        try {
+          this.socket.disconnect();
+        } catch {
+          // ignore
+        }
+        this.socket = null;
+      }
+      this.hasInitialized = false;
     }
 
     toggle() {

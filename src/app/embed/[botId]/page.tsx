@@ -8,12 +8,13 @@ type EmbedPageProps = {
     theme?: string;
     position?: string;
     className?: string;
+    cspNonce?: string;
   }>;
 };
 
 export default async function EmbedPage({ params, searchParams }: EmbedPageProps) {
   const { botId } = await params;
-  const { theme, position, className } = await searchParams;
+  const { theme, position, className, cspNonce } = await searchParams;
   const safeBotId = /^[a-zA-Z0-9_-]{3,80}$/.test(botId) ? botId : "";
 
   // Sanitize parameter inputs to match expected formats
@@ -28,10 +29,11 @@ export default async function EmbedPage({ params, searchParams }: EmbedPageProps
         .join(" ") || undefined
     : undefined;
 
-  // Retrieve CSP nonce securely from request headers
+  // Retrieve CSP nonce securely from request headers, falling back to query params
   const headersList = await headers();
   const nonceHeader = headersList.get("x-nonce") || undefined;
-  const cleanCspNonce = nonceHeader && /^[a-zA-Z0-9+/=_-]+$/.test(nonceHeader) ? nonceHeader : undefined;
+  const rawNonce = nonceHeader || cspNonce;
+  const cleanCspNonce = rawNonce && /^[a-zA-Z0-9+/=_-]+$/.test(rawNonce) ? rawNonce : undefined;
 
   return (
     <main className="h-svh w-full overflow-hidden">
