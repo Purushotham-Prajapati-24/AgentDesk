@@ -1,12 +1,20 @@
 type WidgetMode = 'launcher' | 'inline';
 declare const WIDGET_ELEMENT_NAME = "agentdesk-widget";
-type WidgetLifecycleEventType = 'agentdesk-widget-open' | 'agentdesk-widget-close';
+type WidgetLifecycleEventType = 'agentdesk-widget-open' | 'agentdesk-widget-close' | 'agentdesk-widget-ready' | 'agentdesk-widget-error' | 'agentdesk-widget-message-sent' | 'agentdesk-widget-injected';
 type WidgetControlEventType = 'agentdesk-set-mode';
 type WidgetAckEventType = 'agentdesk-set-mode-ack';
 type WidgetEventType = WidgetLifecycleEventType | WidgetControlEventType | WidgetAckEventType;
 type WidgetMessageEventData = {
-    type: WidgetLifecycleEventType;
+    type: 'agentdesk-widget-open' | 'agentdesk-widget-close' | 'agentdesk-widget-ready' | 'agentdesk-widget-injected';
     botId: string;
+} | {
+    type: 'agentdesk-widget-error';
+    botId: string;
+    message: string;
+} | {
+    type: 'agentdesk-widget-message-sent';
+    botId: string;
+    text: string;
 } | {
     type: WidgetControlEventType;
     botId: string;

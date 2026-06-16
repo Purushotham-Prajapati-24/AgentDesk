@@ -12,6 +12,7 @@ import {
   FileText,
   Inbox,
   Layers,
+  Package,
   Palette,
   Search,
   Settings,
@@ -405,6 +406,51 @@ onMounted(() => {
                 onCopy={copyToClipboard}
               />
             </DeploymentRow>
+          </div>
+        ),
+      },
+      {
+        id: "packages",
+        title: "Packages",
+        summary: "The npm packages that ship the AgentDesk widget for each framework.",
+        category: "deploy",
+        content: (
+          <div className="space-y-5">
+            <p className="max-w-3xl text-sm font-medium leading-6 text-[var(--ui-muted)]">
+              The AgentDesk widget is published as three npm packages — one per supported framework plus a shared core. Install only the one your framework needs; <code>core</code> is pulled in transitively by the React and Vue SDKs.
+            </p>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <CapabilityRow
+                icon={<Package aria-hidden="true" className="h-5 w-5" />}
+                title="@agentdeskbot/core"
+                text="Shared TypeScript types and the widget instance registry. Use when building a custom framework adapter."
+              />
+              <CapabilityRow
+                icon={<Package aria-hidden="true" className="h-5 w-5" />}
+                title="@agentdeskbot/react"
+                text="React & Next.js SDK. Includes a /nextjs subpath that is SSR-safe for the Next.js App Router."
+              />
+              <CapabilityRow
+                icon={<Package aria-hidden="true" className="h-5 w-5" />}
+                title="@agentdeskbot/vue"
+                text="Vue 3 & Nuxt 3 SDK. Ships a global AgentDeskPlugin so the component can be used without per-file imports."
+              />
+            </div>
+
+            <DocCodeBlock
+              id="packages-install"
+              label="install all packages"
+              copiedId={copiedId}
+              value={`npm install @agentdeskbot/core@0.1.0 \\
+  @agentdeskbot/react@0.1.0 \\
+  @agentdeskbot/vue@0.1.0`}
+              onCopy={copyToClipboard}
+            />
+
+            <DocCallout title="Versioning">
+              All three packages share the same version and are released together. Pin them in lockfiles to keep types in sync.
+            </DocCallout>
           </div>
         ),
       },

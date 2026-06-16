@@ -151,6 +151,131 @@ describe('AgentDeskWidget (React)', () => {
     expect(container.innerHTML).toBe('');
   });
 
+  it('allows events from origins matching apiOrigin or scriptSrc', () => {
+    const onOpen = vi.fn();
+    render(
+      <AgentDeskWidget
+        botId="custom-origin-bot"
+        apiOrigin="https://api.custom-desk.com"
+        scriptSrc="https://widget.custom-desk.com/sdk.js"
+        onOpen={onOpen}
+      />,
+    );
+
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    // Test message from apiOrigin
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          origin: 'https://api.custom-desk.com',
+          data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+        }),
+      );
+    });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+
+    // Test message from scriptSrc origin
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          origin: 'https://widget.custom-desk.com',
+          data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+        }),
+      );
+    });
+    expect(onOpen).toHaveBeenCalledTimes(2);
+
+    // Test message from untrusted origin
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          origin: 'https://evil-site.com',
+          data: { type: 'agentdesk-widget-open', botId: 'custom-origin-bot' },
+        }),
+      );
+    });
+    // Count should still be 2
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
+
+  it('injects scripts with default same-origin endpoints', () => {
+    render(<AgentDeskWidget botId="saas-bot" />);
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.getAttribute('src')).toBe('/widget.js');
+    expect(script.dataset.apiOrigin).toBeUndefined();
+  });
+
+  it('injects optional styling, positioning, and security attributes', () => {
+    render(
+      <AgentDeskWidget
+        botId="attrs-bot"
+        theme="webchat-v1"
+        cspNonce="xyz123"
+        position="bottom-left"
+        className="my-custom-container"
+      />
+    );
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.dataset.theme).toBe('webchat-v1');
+    expect(script.dataset.cspNonce).toBe('xyz123');
+    expect(script.getAttribute('nonce')).toBe('xyz123');
+    expect(script.dataset.position).toBe('bottom-left');
+    expect(script.dataset.className).toBe('my-custom-container');
+  });
+
+  it('invokes new lifecycle callbacks correctly', () => {
+    const onReady = vi.fn();
+    const onError = vi.fn();
+    const onMessageSent = vi.fn();
+    const onWidgetInjected = vi.fn();
+
+    render(
+      <AgentDeskWidget
+        botId="callbacks-bot"
+        onReady={onReady}
+        onError={onError}
+        onMessageSent={onMessageSent}
+        onWidgetInjected={onWidgetInjected}
+      />
+    );
+
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-ready', botId: 'callbacks-bot' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-error', botId: 'callbacks-bot', message: 'Config failed' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-message-sent', botId: 'callbacks-bot', text: 'hello' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-injected', botId: 'callbacks-bot' },
+        }),
+      );
+    });
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith({ message: 'Config failed' });
+    expect(onMessageSent).toHaveBeenCalledWith({ text: 'hello' });
+    expect(onWidgetInjected).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores messages with an unknown shape', () => {
     const onOpen = vi.fn();
     render(<AgentDeskWidget botId="shape-bot" onOpen={onOpen} />);
