@@ -80,15 +80,6 @@ function installGlobalListener() {
 
     let originAllowed = false;
     for (const entry of bucket) {
-      // ── Origin trust model ─────────────────────────────────────────────────
-      // allowedOrigins contains window.location.origin (same-origin embeds)
-      // plus origins derived from apiOrigin / scriptSrc (cross-origin iframes).
-      // Only events from these origins are dispatched.  Payload fields such as
-      // data.message and data.text are UNTRUSTED strings from the widget iframe
-      // and have NOT been sanitized.  Consumers of the emitted 'error' and
-      // 'message-sent' events MUST treat them as plain text — never pass them
-      // to v-html or innerHTML without first sanitizing.
-      // ────────────────────────────────────────────────────────────────────────
       const allowedOrigins = new Set([window.location.origin]);
       if (entry.apiOrigin) {
         try {
@@ -122,11 +113,9 @@ function installGlobalListener() {
         dispatchEvent(data.botId, 'ready');
         break;
       case 'agentdesk-widget-error':
-        // data.message is an untrusted string — treat as plain text, not HTML.
         dispatchEvent(data.botId, 'error', { message: (data as { message?: string }).message || 'Unknown error' });
         break;
       case 'agentdesk-widget-message-sent':
-        // data.text is an untrusted string — treat as plain text, not HTML.
         dispatchEvent(data.botId, 'message-sent', { text: (data as { text?: string }).text || '' });
         break;
       case 'agentdesk-widget-injected':
@@ -361,33 +350,20 @@ export const AgentDeskWidget = defineComponent({
 
     watch(
       [
-        () => props.theme,
         () => props.position,
         () => props.className,
-        () => props.cspNonce,
       ],
-      ([theme, position, className, cspNonce]) => {
+      ([position, className]) => {
         if (!hasSlot || !props.botId) return;
 
         // Sync script dataset
         const script = findExistingScript(props.botId);
         if (script) {
-          if (theme) script.dataset.theme = theme;
-          else delete script.dataset.theme;
-
           if (position) script.dataset.position = position;
           else delete script.dataset.position;
 
           if (className) script.dataset.className = className;
           else delete script.dataset.className;
-
-          if (cspNonce) {
-            script.dataset.cspNonce = cspNonce;
-            script.setAttribute('nonce', cspNonce);
-          } else {
-            delete script.dataset.cspNonce;
-            script.removeAttribute('nonce');
-          }
         }
 
         // Sync custom element attributes
@@ -405,7 +381,7 @@ export const AgentDeskWidget = defineComponent({
             widgetEl.removeAttribute('data-agentdesk-position');
           }
         }
-      }
+      },
     );
 
     return () =>
@@ -425,3 +401,14 @@ export interface AgentDeskPluginOptions {
    * Set to false if you prefer to import it manually in each component.
    */
   globalComponent?: boolean;
+}
+
+export const AgentDeskPlugin: Plugin = {
+  install(app: App, options: AgentDeskPluginOptions = { globalComponent: true }) {
+    if (options.globalComponent !== false) {
+      app.component('AgentDeskWidget', AgentDeskWidget);
+    }
+  },
+};
+
+export default AgentDeskPlugin;

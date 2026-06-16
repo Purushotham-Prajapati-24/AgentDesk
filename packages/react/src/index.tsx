@@ -167,16 +167,6 @@ function installGlobalListener() {
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
 
-    // ── Origin trust model ──────────────────────────────────────────────────
-    // allowedOrigins contains window.location.origin (same-origin embeds) plus
-    // the origins derived from apiOrigin / scriptSrc (cross-origin iframe embeds).
-    // Only messages from these trusted origins are dispatched.  Note, however,
-    // that the *payload* (data.message, data.text) is an untrusted string that
-    // originated inside the widget iframe — it has not been sanitized.  Consumer
-    // callbacks (onError, onMessageSent) MUST treat these values as untrusted
-    // HTML.  Never pass them directly to dangerouslySetInnerHTML, v-html, or
-    // innerHTML without sanitization.
-    // ────────────────────────────────────────────────────────────────────────
     const allowedOrigins = new Set([window.location.origin]);
     if (bucket.apiOrigin) {
       try {
@@ -205,11 +195,9 @@ function installGlobalListener() {
         bucket.onReady?.();
         break;
       case 'agentdesk-widget-error':
-        // data.message is an untrusted string — treat as plain text, not HTML.
         bucket.onError?.({ message: (data as { message?: string }).message || 'Unknown error' });
         break;
       case 'agentdesk-widget-message-sent':
-        // data.text is an untrusted string — treat as plain text, not HTML.
         bucket.onMessageSent?.({ text: (data as { text?: string }).text || '' });
         break;
       case 'agentdesk-widget-injected':
@@ -412,31 +400,21 @@ export function AgentDeskWidget({
     postSetMode(botId, mode);
   }, [mode, botId]);
 
-  // Separate effect: dynamic styling propagation (theme, position, className, cspNonce).
-  // This updates the script dataset and custom element attributes directly, avoiding
-  // disruptive unmount/re-mount cycles.
+  // Separate effect: dynamic styling propagation (position, className).
+  // This updates the script dataset and custom element attributes directly,
+  // avoiding disruptive unmount/re-mount cycles. Note that theme and cspNonce
+  // are strictly mount-only (updates to those props do not dynamically update).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!botId) return;
 
     const script = findExistingScript(botId);
     if (script) {
-      if (theme) script.dataset.theme = theme;
-      else delete script.dataset.theme;
-
       if (position) script.dataset.position = position;
       else delete script.dataset.position;
 
       if (className) script.dataset.className = className;
       else delete script.dataset.className;
-
-      if (cspNonce) {
-        script.dataset.cspNonce = cspNonce;
-        script.setAttribute('nonce', cspNonce);
-      } else {
-        delete script.dataset.cspNonce;
-        script.removeAttribute('nonce');
-      }
     }
 
     const widgetEl = document.querySelector<HTMLElement>(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
@@ -451,3 +429,17 @@ export function AgentDeskWidget({
         widgetEl.setAttribute('data-agentdesk-position', position);
       } else {
         widgetEl.removeAttribute('data-agentdesk-position');
+      }
+    }
+  }, [botId, position, className]);
+
+  if (typeof window === 'undefined') {
+    console.warn(
+      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
+      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
+    );
+    return null;
+  }
+
+  return null;
+}

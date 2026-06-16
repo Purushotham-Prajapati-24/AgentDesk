@@ -240,28 +240,17 @@ var AgentDeskWidget = vue.defineComponent({
     );
     vue.watch(
       [
-        () => props.theme,
         () => props.position,
-        () => props.className,
-        () => props.cspNonce
+        () => props.className
       ],
-      ([theme, position, className, cspNonce]) => {
+      ([position, className]) => {
         if (!hasSlot || !props.botId) return;
         const script = findExistingScript(props.botId);
         if (script) {
-          if (theme) script.dataset.theme = theme;
-          else delete script.dataset.theme;
           if (position) script.dataset.position = position;
           else delete script.dataset.position;
           if (className) script.dataset.className = className;
           else delete script.dataset.className;
-          if (cspNonce) {
-            script.dataset.cspNonce = cspNonce;
-            script.setAttribute("nonce", cspNonce);
-          } else {
-            delete script.dataset.cspNonce;
-            script.removeAttribute("nonce");
-          }
         }
         const widgetEl = document.querySelector(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${props.botId}"]`);
         if (widgetEl) {

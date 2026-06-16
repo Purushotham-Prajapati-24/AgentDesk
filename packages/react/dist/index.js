@@ -189,19 +189,10 @@ function AgentDeskWidget({
     if (!botId) return;
     const script = findExistingScript(botId);
     if (script) {
-      if (theme) script.dataset.theme = theme;
-      else delete script.dataset.theme;
       if (position) script.dataset.position = position;
       else delete script.dataset.position;
       if (className) script.dataset.className = className;
       else delete script.dataset.className;
-      if (cspNonce) {
-        script.dataset.cspNonce = cspNonce;
-        script.setAttribute("nonce", cspNonce);
-      } else {
-        delete script.dataset.cspNonce;
-        script.removeAttribute("nonce");
-      }
     }
     const widgetEl = document.querySelector(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
     if (widgetEl) {
@@ -216,7 +207,7 @@ function AgentDeskWidget({
         widgetEl.removeAttribute("data-agentdesk-position");
       }
     }
-  }, [botId, theme, position, className, cspNonce]);
+  }, [botId, position, className]);
   if (typeof window === "undefined") {
     console.warn(
       "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."

@@ -3,6 +3,9 @@
     const STORAGE_VERSION = "v1";
     const DEFAULT_TIMEOUT_MS = 12000;
     const MAX_MESSAGE_LENGTH = 1200;
+    const currentScript = (document.currentScript ||
+        document.querySelector('script[data-bot-id]') ||
+        document.querySelector('script[src*="widget.js"]'));
     const isIframeEmbed = (() => {
         try {
             return window.parent && window.parent !== window;
@@ -11,11 +14,28 @@
             return true;
         }
     })();
+    const parentOrigin = (() => {
+        var _a;
+        const fromAttr = (_a = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.parentOrigin) === null || _a === void 0 ? void 0 : _a.trim();
+        if (fromAttr)
+            return fromAttr;
+        if (typeof document !== "undefined" && document.referrer) {
+            try {
+                const refUrl = new URL(document.referrer);
+                if (refUrl.protocol === "http:" || refUrl.protocol === "https:") {
+                    return refUrl.origin;
+                }
+            }
+            catch {
+            }
+        }
+        return "*";
+    })();
     function postLifecycleEvent(type, extra = {}) {
         const payload = { type, botId, ...extra };
         try {
             if (isIframeEmbed) {
-                window.parent.postMessage(payload, "*");
+                window.parent.postMessage(payload, parentOrigin);
             }
             else {
                 window.postMessage(payload, window.location.origin);
@@ -37,9 +57,6 @@
         widgetEl === null || widgetEl === void 0 ? void 0 : widgetEl.setMode(nextMode);
         postLifecycleEvent("agentdesk-set-mode-ack");
     }
-    const currentScript = (document.currentScript ||
-        document.querySelector('script[data-bot-id]') ||
-        document.querySelector('script[src*="widget.js"]'));
     const scriptUrl = (currentScript === null || currentScript === void 0 ? void 0 : currentScript.src) ? new URL(currentScript.src, window.location.href) : null;
     let apiOriginRaw = (_a = currentScript === null || currentScript === void 0 ? void 0 : currentScript.dataset.apiOrigin) === null || _a === void 0 ? void 0 : _a.trim();
     if (apiOriginRaw) {
@@ -128,16 +145,22 @@
             let success = true;
             try {
                 const response = await fetchWithTimeout(configUrl, { credentials: "omit" }, DEFAULT_TIMEOUT_MS);
+                if (!this.isConnected)
+                    return;
                 if (!response.ok) {
                     throw new Error("Widget configuration failed");
                 }
                 const body = (await response.json());
+                if (!this.isConnected)
+                    return;
                 if (!body.data || body.data.botId !== botId) {
                     throw new Error("Widget configuration mismatch");
                 }
                 this.config = normalizeConfig(body.data);
             }
             catch (err) {
+                if (!this.isConnected)
+                    return;
                 success = false;
                 postLifecycleEvent("agentdesk-widget-error", { message: err instanceof Error ? err.message : String(err) });
                 this.config = buildFallbackConfig(botId);

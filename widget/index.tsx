@@ -49,6 +49,12 @@
   const DEFAULT_TIMEOUT_MS = 12000;
   const MAX_MESSAGE_LENGTH = 1200;
 
+  const currentScript = (
+    document.currentScript ||
+    document.querySelector('script[data-bot-id]') ||
+    document.querySelector('script[src*="widget.js"]')
+  ) as HTMLScriptElement | null;
+
   // True when the widget is executing inside an `<iframe>` (i.e. via the
   // `/embed/[botId]` route) and false when it was injected directly into
   // the host page via a `<script src=".../widget.js">` tag. Detection is
@@ -65,6 +71,23 @@
     }
   })();
 
+  // Resolve target origin for postMessage when embedded in an iframe to prevent wildcard leaks.
+  const parentOrigin = (() => {
+    const fromAttr = currentScript?.dataset.parentOrigin?.trim();
+    if (fromAttr) return fromAttr;
+    if (typeof document !== "undefined" && document.referrer) {
+      try {
+        const refUrl = new URL(document.referrer);
+        if (refUrl.protocol === "http:" || refUrl.protocol === "https:") {
+          return refUrl.origin;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return "*";
+  })();
+
   /**
    * Broadcast a widget lifecycle event to the host page.
    *
@@ -76,9 +99,8 @@
    *  2. **Iframe (`/embed/[botId]`)** — the widget runs inside an iframe
    *     on a separate origin, and the SDK on the parent listens via
    *     `window.addEventListener('message', …)`. `window.parent` is the
-   *     only way to reach the listener, and the parent may be on a
-   *     different origin, so we fall back to `"*"` and rely on `event.source`
-   *     validation on the receiving side.
+   *     only way to reach the listener, and we post to the derived `parentOrigin`
+   *     instead of a wildcard "*" to prevent data interception.
    */
   function postLifecycleEvent(
     type:
@@ -94,7 +116,7 @@
     const payload = { type, botId, ...extra };
     try {
       if (isIframeEmbed) {
-        window.parent.postMessage(payload, "*");
+        window.parent.postMessage(payload, parentOrigin);
       } else {
         window.postMessage(payload, window.location.origin);
       }
@@ -125,11 +147,6 @@
     postLifecycleEvent("agentdesk-set-mode-ack");
   }
 
-  const currentScript = (
-    document.currentScript ||
-    document.querySelector('script[data-bot-id]') ||
-    document.querySelector('script[src*="widget.js"]')
-  ) as HTMLScriptElement | null;
   const scriptUrl = currentScript?.src ? new URL(currentScript.src, window.location.href) : null;
   // `apiOrigin` is supplied by the host page via the `data-api-origin` attribute and
   // ultimately resolved server-side from the trusted bot config endpoint. The widget
