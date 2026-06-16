@@ -36,9 +36,9 @@ export interface AgentDeskWidgetProps {
   scriptSrc?: string;
   /** Base URL of your AgentDesk backend (for cross-origin embeds). Defaults to undefined (same-origin). */
   apiOrigin?: string;
-  /** Optional theme name for the widget (e.g. 'webchat-v1'). */
+  /** Optional theme name for the widget (e.g. 'webchat-v1'). Note: This prop only takes effect on initial mount. */
   theme?: string;
-  /** Optional Content Security Policy (CSP) nonce to apply to the injected script and dynamically created styles. */
+  /** Optional Content Security Policy (CSP) nonce to apply to the injected script and dynamically created styles. Note: This prop only takes effect on initial mount. */
   cspNonce?: string;
   /** Optional fixed positioning override. */
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';

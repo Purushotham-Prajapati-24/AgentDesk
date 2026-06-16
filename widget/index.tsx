@@ -200,6 +200,7 @@
     private composerInputRef: HTMLTextAreaElement | null = null;
     private sendButtonRef: HTMLButtonElement | null = null;
     private quickActionButtons: HTMLButtonElement[] = [];
+    private hasInitialized = false;
 
     constructor() {
       super();
@@ -207,6 +208,10 @@
     }
 
     connectedCallback() {
+      if (this.hasInitialized) {
+        return;
+      }
+      this.hasInitialized = true;
       postLifecycleEvent("agentdesk-widget-injected");
       this.renderShell();
       void this.loadConfig();
@@ -225,6 +230,7 @@
     }
 
     private async loadConfig() {
+      let success = true;
       try {
         const response = await fetchWithTimeout(configUrl, { credentials: "omit" }, DEFAULT_TIMEOUT_MS);
         if (!response.ok) {
@@ -238,6 +244,7 @@
 
         this.config = normalizeConfig(body.data);
       } catch (err) {
+        success = false;
         postLifecycleEvent("agentdesk-widget-error", { message: err instanceof Error ? err.message : String(err) });
         this.config = buildFallbackConfig(botId);
       }
@@ -259,7 +266,9 @@
       }
       this.renderShell();
       this.initSocket(this.config);
-      postLifecycleEvent("agentdesk-widget-ready");
+      if (success) {
+        postLifecycleEvent("agentdesk-widget-ready");
+      }
     }
 
     private initSocket(this: AgentDeskWidget, config: WidgetConfig) {

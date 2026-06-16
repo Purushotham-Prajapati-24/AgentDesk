@@ -38,10 +38,12 @@ interface AgentDeskWidgetProps {
     apiOrigin?: string;
     /**
      * Optional theme name for the widget (e.g. 'webchat-v1').
+     * Note: This prop only takes effect on initial mount.
      */
     theme?: string;
     /**
      * Optional Content Security Policy (CSP) nonce to apply to the injected script and dynamically created styles.
+     * Note: This prop only takes effect on initial mount.
      */
     cspNonce?: string;
     /**

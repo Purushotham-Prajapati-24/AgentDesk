@@ -90,9 +90,14 @@
             this.composerInputRef = null;
             this.sendButtonRef = null;
             this.quickActionButtons = [];
+            this.hasInitialized = false;
             this.shadowRootRef = this.attachShadow({ mode: "open" });
         }
         connectedCallback() {
+            if (this.hasInitialized) {
+                return;
+            }
+            this.hasInitialized = true;
             postLifecycleEvent("agentdesk-widget-injected");
             this.renderShell();
             void this.loadConfig();
@@ -109,6 +114,7 @@
             this.renderShell();
         }
         async loadConfig() {
+            let success = true;
             try {
                 const response = await fetchWithTimeout(configUrl, { credentials: "omit" }, DEFAULT_TIMEOUT_MS);
                 if (!response.ok) {
@@ -121,6 +127,7 @@
                 this.config = normalizeConfig(body.data);
             }
             catch (err) {
+                success = false;
                 postLifecycleEvent("agentdesk-widget-error", { message: err instanceof Error ? err.message : String(err) });
                 this.config = buildFallbackConfig(botId);
             }
@@ -140,7 +147,9 @@
             }
             this.renderShell();
             this.initSocket(this.config);
-            postLifecycleEvent("agentdesk-widget-ready");
+            if (success) {
+                postLifecycleEvent("agentdesk-widget-ready");
+            }
         }
         initSocket(config) {
             if (this.socket) {
