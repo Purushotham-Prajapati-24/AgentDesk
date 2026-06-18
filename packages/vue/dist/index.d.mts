@@ -25,20 +25,6 @@ interface AgentDeskWidgetProps {
     /** Optional custom HTML class name to apply to the host container. */
     className?: string;
 }
-/**
- * AgentDeskWidget — Vue 3 component that embeds the AgentDesk AI chat widget.
- *
- * @example
- * ```vue
- * <script setup>
- * import { AgentDeskWidget } from '@agentdeskbot/vue';
- * </script>
- *
- * <template>
- *   <AgentDeskWidget bot-id="your-bot-id" />
- * </template>
- * ```
- */
 declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     botId: {
         type: PropType<string>;

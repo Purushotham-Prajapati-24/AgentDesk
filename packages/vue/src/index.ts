@@ -78,26 +78,27 @@ function installGlobalListener() {
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
 
-    let originAllowed = false;
+    const allowedOrigins = new Set([window.location.origin]);
+    let originAllowed = allowedOrigins.has(event.origin);
     for (const entry of bucket) {
-      const allowedOrigins = new Set([window.location.origin]);
-      if (entry.apiOrigin) {
-        try {
-          allowedOrigins.add(new URL(entry.apiOrigin).origin);
-        } catch {
-          // ignore
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+            // ignore
+          }
         }
-      }
-      if (entry.scriptSrc) {
-        try {
-          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
-        } catch {
-          // ignore
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+            // ignore
+          }
         }
-      }
-      if (allowedOrigins.has(event.origin)) {
-        originAllowed = true;
-        break;
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
     if (!originAllowed) return;
@@ -199,6 +200,8 @@ function removeScriptAndWidget(botId: string): void {
  * </template>
  * ```
  */
+let defaultSaaSOriginWarned = false;
+
 export const AgentDeskWidget = defineComponent({
   name: 'AgentDeskWidget',
 
@@ -247,10 +250,6 @@ export const AgentDeskWidget = defineComponent({
 
   setup(props, { emit }) {
     if (typeof window === 'undefined') {
-      console.warn(
-        "[AgentDesk] AgentDeskWidget was initialized in a non-browser environment. " +
-        "Ensure it is only rendered on the client side."
-      );
       return () => null;
     }
 
@@ -263,6 +262,15 @@ export const AgentDeskWidget = defineComponent({
       if (hasSlot && activeBotId) {
         release(activeBotId);
       }
+
+      if (!defaultSaaSOriginWarned && (props.apiOrigin === 'https://agentdeskbot.vercel.app' || props.scriptSrc === 'https://agentdeskbot.vercel.app/widget.js')) {
+        defaultSaaSOriginWarned = true;
+        console.warn(
+          "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). " +
+          "For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+        );
+      }
+
       const acquire = acquireInstance(props.botId, props.mode ?? 'launcher');
       if (acquire.mustInstallListener) {
         installGlobalListener();
@@ -347,8 +355,7 @@ export const AgentDeskWidget = defineComponent({
 
     watch(
       () => props.mode,
-      (next, prev) => {
-        if (next === prev) return;
+      (next) => {
         if (!hasSlot) return;
         if (!props.botId) return;
         postSetMode(props.botId, next ?? 'launcher');
@@ -356,19 +363,11 @@ export const AgentDeskWidget = defineComponent({
     );
 
     watch(
-      () => props.botId,
-      (next, prev) => {
-        if (next === prev) return;
-        release(prev);
-        install();
-      },
-    );
-
-    watch(
-      [() => props.apiOrigin, () => props.scriptSrc],
-      ([apiOrigin, scriptSrc], [prevApiOrigin, prevScriptSrc]) => {
-        if (apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc) return;
-        release();
+      [() => props.botId, () => props.apiOrigin, () => props.scriptSrc],
+      ([botId, apiOrigin, scriptSrc], [prevBotId, prevApiOrigin, prevScriptSrc]) => {
+        if (!hasSlot) return;
+        if (botId === prevBotId && apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc) return;
+        release(prevBotId);
         install();
       },
     );

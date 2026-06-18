@@ -168,26 +168,27 @@ function installGlobalListener() {
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
 
-    let originAllowed = false;
+    const allowedOrigins = new Set([window.location.origin]);
+    let originAllowed = allowedOrigins.has(event.origin);
     for (const entry of bucket) {
-      const allowedOrigins = new Set([window.location.origin]);
-      if (entry.apiOrigin) {
-        try {
-          allowedOrigins.add(new URL(entry.apiOrigin).origin);
-        } catch {
-          // ignore
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+            // ignore
+          }
         }
-      }
-      if (entry.scriptSrc) {
-        try {
-          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
-        } catch {
-          // ignore
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+            // ignore
+          }
         }
-      }
-      if (allowedOrigins.has(event.origin)) {
-        originAllowed = true;
-        break;
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
     if (!originAllowed) return;
@@ -272,8 +273,9 @@ function removeScriptAndWidget(botId: string): void {
   findExistingScript(botId)?.remove();
   document
     .querySelectorAll<HTMLElement>(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`)
-    .forEach((el) => el.remove());
 }
+
+let defaultSaaSOriginWarned = false;
 
 // === Component ===
 
@@ -333,8 +335,8 @@ export function AgentDeskWidget({
   });
 
   // Always update the entry properties in an effect that runs after render.
-  // We omit the dependency array intentionally to keep callback references
-  // perfectly fresh across renders, preventing any stale closures.
+  // We specify all props in the dependency array so that the ref is only synced
+  // when one of the callback/configuration props changes, avoiding running on every render.
   useEffect(() => {
     entryRef.current.apiOrigin = apiOrigin;
     entryRef.current.scriptSrc = scriptSrc;
@@ -344,19 +346,40 @@ export function AgentDeskWidget({
     entryRef.current.onError = onError;
     entryRef.current.onMessageSent = onMessageSent;
     entryRef.current.onWidgetInjected = onWidgetInjected;
-  });
+  }, [
+    apiOrigin,
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected,
+  ]);
 
   // Track the botId to detect when it changes and update initialProps accordingly.
+  // Note: We intentionally only depend on `botId` here. This captures the initial mount-only
+  // properties (theme, cspNonce) and the initial script injection options (mode, position, className)
+  // once per botId. Dynamic updates to mode, position, and className are handled by separate effects
+  // to avoid disruptive script re-injection.
   const initialProps = useMemo(
     () => ({ theme, cspNonce, position, className, mode }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [botId],
   );
 
   // Mount/unmount lifecycle: ref-count the widget so multiple components
   // pointing at the same botId share a single script injection.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!botId) return;
+
+    if (!defaultSaaSOriginWarned && (apiOrigin === 'https://agentdeskbot.vercel.app' || scriptSrc === 'https://agentdeskbot.vercel.app/widget.js')) {
+      defaultSaaSOriginWarned = true;
+      console.warn(
+        "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). " +
+        "For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+      );
+    }
 
     // Acquire registry slot. Note that we pass the initial mode here,
     // but any subsequent mode changes are handled dynamically by the mode effect.
@@ -411,6 +434,7 @@ export function AgentDeskWidget({
         uninstallGlobalListener();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId, scriptSrc, configUrl, apiOrigin]);
 
   // Separate effect: dynamic mode propagation.
@@ -459,10 +483,6 @@ export function AgentDeskWidget({
   }, [botId, position, className]);
 
   if (typeof window === 'undefined') {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
-      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
     return null;
   }
 

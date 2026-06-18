@@ -15,24 +15,25 @@ function installGlobalListener() {
     if (typeof data.botId !== "string") return;
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
-    let originAllowed = false;
+    const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
+    let originAllowed = allowedOrigins.has(event.origin);
     for (const entry of bucket) {
-      const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
-      if (entry.apiOrigin) {
-        try {
-          allowedOrigins.add(new URL(entry.apiOrigin).origin);
-        } catch {
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+          }
         }
-      }
-      if (entry.scriptSrc) {
-        try {
-          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
-        } catch {
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+          }
         }
-      }
-      if (allowedOrigins.has(event.origin)) {
-        originAllowed = true;
-        break;
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
     if (!originAllowed) return;
@@ -97,8 +98,9 @@ function injectScript(options) {
 function removeScriptAndWidget(botId) {
   var _a;
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
-  document.querySelectorAll(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
+  document.querySelectorAll(`${WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
 }
+var defaultSaaSOriginWarned = false;
 function AgentDeskWidget({
   botId,
   configUrl,
@@ -139,14 +141,29 @@ function AgentDeskWidget({
     entryRef.current.onError = onError;
     entryRef.current.onMessageSent = onMessageSent;
     entryRef.current.onWidgetInjected = onWidgetInjected;
-  });
+  }, [
+    apiOrigin,
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected
+  ]);
   const initialProps = useMemo(
     () => ({ theme, cspNonce, position, className, mode }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [botId]
   );
   useEffect(() => {
-    if (typeof window === "undefined") return;
     if (!botId) return;
+    if (!defaultSaaSOriginWarned && (apiOrigin === "https://agentdeskbot.vercel.app" || scriptSrc === "https://agentdeskbot.vercel.app/widget.js")) {
+      defaultSaaSOriginWarned = true;
+      console.warn(
+        "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+      );
+    }
     const acquire = acquireInstance(botId, initialProps.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
@@ -229,9 +246,6 @@ function AgentDeskWidget({
     }
   }, [botId, position, className]);
   if (typeof window === "undefined") {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
     return null;
   }
   return null;
