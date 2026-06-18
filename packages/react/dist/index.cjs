@@ -1,9 +1,32 @@
 'use client';
-'use strict';
+"use strict";
+"use client";
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-var react = require('react');
-var core = require('@agentdeskbot/core');
-
+// src/index.tsx
+var src_exports = {};
+__export(src_exports, {
+  AgentDeskWidget: () => AgentDeskWidget
+});
+module.exports = __toCommonJS(src_exports);
+var import_react = require("react");
+var import_core = require("@agentdeskbot/core");
 var listenerBuckets = /* @__PURE__ */ new Map();
 var globalListenerInstalled = false;
 var globalListenerRef = null;
@@ -17,39 +40,48 @@ function installGlobalListener() {
     if (typeof data.botId !== "string") return;
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
-    const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
-    if (bucket.apiOrigin) {
-      try {
-        allowedOrigins.add(new URL(bucket.apiOrigin).origin);
-      } catch {
+    let originAllowed = false;
+    for (const entry of bucket) {
+      const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
+      if (entry.apiOrigin) {
+        try {
+          allowedOrigins.add(new URL(entry.apiOrigin).origin);
+        } catch {
+        }
+      }
+      if (entry.scriptSrc) {
+        try {
+          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+        } catch {
+        }
+      }
+      if (allowedOrigins.has(event.origin)) {
+        originAllowed = true;
+        break;
       }
     }
-    if (bucket.scriptSrc) {
-      try {
-        allowedOrigins.add(new URL(bucket.scriptSrc, window.location.origin).origin);
-      } catch {
+    if (!originAllowed) return;
+    for (const entry of bucket) {
+      switch (data.type) {
+        case "agentdesk-widget-open":
+          (_a = entry.onOpen) == null ? void 0 : _a.call(entry);
+          break;
+        case "agentdesk-widget-close":
+          (_b = entry.onClose) == null ? void 0 : _b.call(entry);
+          break;
+        case "agentdesk-widget-ready":
+          (_c = entry.onReady) == null ? void 0 : _c.call(entry);
+          break;
+        case "agentdesk-widget-error":
+          (_d = entry.onError) == null ? void 0 : _d.call(entry, { message: data.message || "Unknown error" });
+          break;
+        case "agentdesk-widget-message-sent":
+          (_e = entry.onMessageSent) == null ? void 0 : _e.call(entry, { text: data.text || "" });
+          break;
+        case "agentdesk-widget-injected":
+          (_f = entry.onWidgetInjected) == null ? void 0 : _f.call(entry);
+          break;
       }
-    }
-    if (!allowedOrigins.has(event.origin)) return;
-    switch (data.type) {
-      case "agentdesk-widget-open":
-        (_a = bucket.onOpen) == null ? void 0 : _a.call(bucket);
-        break;
-      case "agentdesk-widget-close":
-        (_b = bucket.onClose) == null ? void 0 : _b.call(bucket);
-        break;
-      case "agentdesk-widget-ready":
-        (_c = bucket.onReady) == null ? void 0 : _c.call(bucket);
-        break;
-      case "agentdesk-widget-error":
-        (_d = bucket.onError) == null ? void 0 : _d.call(bucket, { message: data.message || "Unknown error" });
-        break;
-      case "agentdesk-widget-message-sent":
-        (_e = bucket.onMessageSent) == null ? void 0 : _e.call(bucket, { text: data.text || "" });
-        break;
-      case "agentdesk-widget-injected":
-        (_f = bucket.onWidgetInjected) == null ? void 0 : _f.call(bucket);
-        break;
     }
   };
   window.addEventListener("message", globalListenerRef);
@@ -90,7 +122,7 @@ function injectScript(options) {
 function removeScriptAndWidget(botId) {
   var _a;
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
-  document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
+  document.querySelectorAll(`${import_core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
 }
 function AgentDeskWidget({
   botId,
@@ -109,27 +141,34 @@ function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected
 }) {
-  const onOpenRef = react.useRef(onOpen);
-  const onCloseRef = react.useRef(onClose);
-  const onReadyRef = react.useRef(onReady);
-  const onErrorRef = react.useRef(onError);
-  const onMessageSentRef = react.useRef(onMessageSent);
-  const onWidgetInjectedRef = react.useRef(onWidgetInjected);
-  const modeRef = react.useRef(mode);
-  const initialPropsRef = react.useRef({ theme, cspNonce, position, className, mode });
-  react.useEffect(() => {
-    onOpenRef.current = onOpen;
-    onCloseRef.current = onClose;
-    onReadyRef.current = onReady;
-    onErrorRef.current = onError;
-    onMessageSentRef.current = onMessageSent;
-    onWidgetInjectedRef.current = onWidgetInjected;
+  const modeRef = (0, import_react.useRef)(mode);
+  (0, import_react.useEffect)(() => {
     modeRef.current = mode;
   });
-  react.useEffect(() => {
+  const entryRef = (0, import_react.useRef)({
+    apiOrigin,
+    scriptSrc
+  });
+  (0, import_react.useEffect)(() => {
+    entryRef.current.apiOrigin = apiOrigin;
+    entryRef.current.scriptSrc = scriptSrc;
+    entryRef.current.onOpen = onOpen;
+    entryRef.current.onClose = onClose;
+    entryRef.current.onReady = onReady;
+    entryRef.current.onError = onError;
+    entryRef.current.onMessageSent = onMessageSent;
+    entryRef.current.onWidgetInjected = onWidgetInjected;
+  });
+  const [prevBotId, setPrevBotId] = (0, import_react.useState)(null);
+  const [initialProps, setInitialProps] = (0, import_react.useState)({ theme, cspNonce, position, className, mode });
+  if (prevBotId !== botId) {
+    setPrevBotId(botId);
+    setInitialProps({ theme, cspNonce, position, className, mode });
+  }
+  (0, import_react.useEffect)(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
-    const acquire = core.acquireInstance(botId, initialPropsRef.current.mode);
+    const acquire = (0, import_core.acquireInstance)(botId, initialProps.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -137,56 +176,56 @@ function AgentDeskWidget({
       if (!findExistingScript(botId)) {
         injectScript({
           botId,
-          mode: initialPropsRef.current.mode,
+          mode: initialProps.mode,
           scriptSrc,
           configUrl,
           apiOrigin,
-          theme: initialPropsRef.current.theme,
-          cspNonce: initialPropsRef.current.cspNonce,
-          position: initialPropsRef.current.position,
-          className: initialPropsRef.current.className
+          theme: initialProps.theme,
+          cspNonce: initialProps.cspNonce,
+          position: initialProps.position,
+          className: initialProps.className
         });
       }
     } else if (acquire.modeChanged) {
-      core.postSetMode(botId, modeRef.current);
+      (0, import_core.postSetMode)(botId, modeRef.current);
     }
-    const bucket = {
-      apiOrigin,
-      scriptSrc,
-      onOpen: onOpenRef.current,
-      onClose: onCloseRef.current,
-      onReady: onReadyRef.current,
-      onError: onErrorRef.current,
-      onMessageSent: onMessageSentRef.current,
-      onWidgetInjected: onWidgetInjectedRef.current
-    };
-    listenerBuckets.set(botId, bucket);
+    if (!listenerBuckets.has(botId)) {
+      listenerBuckets.set(botId, /* @__PURE__ */ new Set());
+    }
+    const currentEntry = entryRef.current;
+    listenerBuckets.get(botId).add(currentEntry);
     if (typeof customElements !== "undefined") {
-      void customElements.whenDefined(core.WIDGET_ELEMENT_NAME).catch(() => {
+      void customElements.whenDefined(import_core.WIDGET_ELEMENT_NAME).catch(() => {
       });
     }
     return () => {
-      const release = core.releaseInstance(botId);
+      const release = (0, import_core.releaseInstance)(botId);
+      const bucket = listenerBuckets.get(botId);
+      if (bucket) {
+        bucket.delete(currentEntry);
+        if (bucket.size === 0) {
+          listenerBuckets.delete(botId);
+        }
+      }
       if (release.isLastForBot) {
-        listenerBuckets.delete(botId);
         removeScriptAndWidget(botId);
       }
       if (release.mustRemoveListener) {
         uninstallGlobalListener();
       }
     };
-  }, [botId, scriptSrc, configUrl, apiOrigin]);
-  const isFirstModeRender = react.useRef(true);
-  react.useEffect(() => {
+  }, [botId, scriptSrc, configUrl, apiOrigin, initialProps]);
+  const isFirstModeRender = (0, import_react.useRef)(true);
+  (0, import_react.useEffect)(() => {
     if (typeof window === "undefined") return;
     if (isFirstModeRender.current) {
       isFirstModeRender.current = false;
       return;
     }
     if (!botId) return;
-    core.postSetMode(botId, mode);
+    (0, import_core.postSetMode)(botId, mode);
   }, [mode, botId]);
-  react.useEffect(() => {
+  (0, import_react.useEffect)(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
     const script = findExistingScript(botId);
@@ -196,7 +235,7 @@ function AgentDeskWidget({
       if (className) script.dataset.className = className;
       else delete script.dataset.className;
     }
-    const widgetEl = document.querySelector(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
+    const widgetEl = document.querySelector(`${import_core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
     if (widgetEl) {
       if (className) {
         widgetEl.className = className;
@@ -218,7 +257,8 @@ function AgentDeskWidget({
   }
   return null;
 }
-
-exports.AgentDeskWidget = AgentDeskWidget;
-//# sourceMappingURL=index.cjs.map
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  AgentDeskWidget
+});
 //# sourceMappingURL=index.cjs.map

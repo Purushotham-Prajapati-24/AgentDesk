@@ -198,15 +198,19 @@ If your AgentDesk backend runs on a **different domain** than the page embedding
 
 ## Props API
 
-| Prop | Type | Default | Required | Description |
-| --- | --- | --- | --- | --- |
-| `botId` *(or `bot-id`)* | `string` | — | ✅ | The Bot ID from your AgentDesk dashboard. |
-| `mode` | `'launcher' \| 'inline'` | `'launcher'` | — | `'launcher'` = floating bubble. `'inline'` = fills the nearest positioned ancestor. |
-| `scriptSrc` *(or `script-src`)* | `string` | `'/widget.js'` | — | URL to the compiled `widget.js` file. Override for cross-origin embeds. |
-| `apiOrigin` *(or `api-origin`)* | `string` | *(same origin)* | — | Base URL of your AgentDesk backend. Required for cross-origin embeds. |
-| `configUrl` *(or `config-url`)* | `string` | `{apiOrigin}/api/widget/config/{botId}` | — | Fully-qualified override for the widget config fetch endpoint. |
+| Prop (CamelCase) | Prop (kebab-case) | Type | Default | Required | Description |
+| --- | --- | --- | --- | --- | --- |
+| `botId` | `bot-id` | `string` | — | ✅ | The Bot ID from your AgentDesk dashboard. |
+| `mode` | `mode` | `'launcher' \| 'inline'` | `'launcher'` | — | `'launcher'` = floating bubble. `'inline'` = fills nearest positioned ancestor. |
+| `scriptSrc` | `script-src` | `string` | `'/widget.js'` | — | URL to compiled `widget.js`. Override for CDNs/cross-origin embeds. |
+| `apiOrigin` | `api-origin` | `string` | *(same origin)* | — | Base URL of your AgentDesk backend. Required for cross-origin embeds. |
+| `configUrl` | `config-url` | `string` | `{apiOrigin}/api/widget/config/{botId}` | — | Fully-qualified override for widget config fetch endpoint. |
+| `theme` | `theme` | `string` | — | — | Optional theme name for the widget (e.g. `'webchat-v1'`). *Mount-only.* |
+| `cspNonce` | `csp-nonce` | `string` | — | — | Optional CSP nonce to apply to the script tag and dynamic styles. *Mount-only.* |
+| `position` | `position` | `'bottom-right' \| 'bottom-left' \| 'top-right' \| 'top-left'` | `'bottom-right'` | — | Optional fixed position for launcher bubble and widget pane. |
+| `className` | `class-name` | `string` | — | — | Optional custom HTML class name to apply to host element container. |
 
-> Both `camelCase` and `kebab-case` are supported, so `bot-id` and `botId` are equivalent in templates. The underlying prop names are `botId`, `scriptSrc`, `apiOrigin`, and `configUrl` — use whichever style you prefer.
+> Both `camelCase` and `kebab-case` are fully supported for all props in Vue templates (e.g., `:bot-id` and `:botId` are equivalent).
 
 ### `WidgetMode` reference
 
@@ -223,7 +227,7 @@ type WidgetMode = 'launcher' | 'inline';
 
 ## Events
 
-The component emits two lifecycle events. Internally these are wired to the widget's `postMessage` events and validated against `event.origin` and `botId` before being emitted.
+The component emits six lifecycle events corresponding to widget actions and network status. Internally, these events are received from the widget's `postMessage` channel, origin-validated, and re-emitted:
 
 ```vue
 <script setup lang="ts">
@@ -234,6 +238,22 @@ function handleOpen() {
 function handleClose() {
   analytics.track('agentdesk_widget_closed');
 }
+
+function handleReady() {
+  console.log('Widget is ready');
+}
+
+function handleError(err: { message: string }) {
+  console.error('Widget load error:', err.message);
+}
+
+function handleMessageSent(msg: { text: string }) {
+  analytics.track('agentdesk_message_sent', { text: msg.text });
+}
+
+function handleInjected() {
+  console.log('Widget element injected into the DOM');
+}
 </script>
 
 <template>
@@ -241,14 +261,22 @@ function handleClose() {
     bot-id="YOUR_BOT_ID"
     @open="handleOpen"
     @close="handleClose"
+    @ready="handleReady"
+    @error="handleError"
+    @message-sent="handleMessageSent"
+    @injected="handleInjected"
   />
 </template>
 ```
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `open` | — | Emitted when the user opens the chat surface. |
-| `close` | — | Emitted when the user closes the chat surface. |
+| `@open` | — | Emitted when the user opens the chat widget. |
+| `@close` | — | Emitted when the user closes the chat widget. |
+| `@ready` | — | Emitted when configuration loads successfully and widget is ready. |
+| `@error` | `{ message: string }` | Emitted when configuration fails to load or socket connection is lost. |
+| `@message-sent` | `{ text: string }` | Emitted when the user/customer sends a message. |
+| `@injected` | — | Emitted when the custom element host is injected into the DOM. |
 
 > The SDK stores its own internal event listeners in the `setup()` closure and tears them down in `onBeforeUnmount`, so re-mounting the component (HMR, `<KeepAlive>`, route changes) is fully idempotent.
 
@@ -267,7 +295,15 @@ The SDK deduplicates scripts by `botId`, so mounting two `<AgentDeskWidget>` ins
 </template>
 ```
 
-Mounting the same `botId` twice (e.g. across HMR boundaries or after a route change) is a no-op — only the first injection runs.
+Mounting the same `botId` twice (e.g. across HMR boundaries or after a route change) is a no-op — only the first injection runs, and both components' listeners are registered to receive events.
+
+### Recommended Multi-Bot Patterns
+
+When mounting multiple bots on the same page:
+
+1. **Avoid Launcher Overlaps:** Do not mount more than one bot in `launcher` mode at the same position. If you must have multiple launchers, use the `position` prop to space them out (e.g., one on the `bottom-right` and one on the `bottom-left`).
+2. **Prefer Inline Mode:** For secondary assistants or context-specific support, prefer `mode="inline"` to render the bot within a sidebar, dashboard tab, or modal, keeping the main floating launcher clean.
+3. **Event Attribution:** Use `@message-sent` and `@open` event listeners on each widget to attribute user interactions and analytics tracking to the specific `bot-id`.
 
 ### Programmatic control
 
@@ -296,25 +332,7 @@ If you can't (or don't want to) install the Vue package, drop the script directl
 ></script>
 ```
 
-The same `data-*` attributes used by the Vue SDK are honored by the script:
-
-| Attribute | Maps to prop | Default |
-| --- | --- | --- |
-| `data-bot-id` | `botId` | — |
-| `data-mode` | `mode` | `'launcher'` |
-| `data-script-src` | `scriptSrc` | `'/widget.js'` |
-| `data-api-origin` | `apiOrigin` | — |
-| `data-config-url` | `configUrl` | auto-derived |
-
-Or use the iframe embed:
-
-```html
-<iframe
-  src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID?theme=webchat-v1"
-  title="AgentDesk Support"
-  style="width: 100%; height: 640px; border: 0;"
-></iframe>
-```
+The same `data-*` attributes used by the Vue SDK are honored by the script.
 
 ---
 
@@ -324,14 +342,14 @@ Under the hood, the Vue component:
 
 1. **Deduplicates** — On `onMounted`, it scans `document` for existing `script[data-agentdesk]` tags and bails early if one for the current `botId` is already present.
 2. **Injects** — Otherwise it appends a `<script>` element pointing to `widget.js` and tags it with `data-agentdesk` and `data-bot-id`.
-3. **Listens** — It registers a `message` event listener on `window`, validates `event.origin === window.location.origin` and the `botId` in the payload, then emits `open` / `close`.
-4. **Cleans up** — On `onBeforeUnmount`, the script tag, custom element, and event listener are all removed.
+3. **Listens** — It registers a single global `message` event listener on `window` and forwards events to active components matching the `botId` and origin checks.
+4. **Cleans up** — On `onBeforeUnmount` or `onDeactivated` (for KeepAlive), it removes its listener registry. If the last component referencing a `botId` unmounts, the script tag and custom element are removed from the DOM.
 
 ```
 Vue tree mount
    └─ <AgentDeskWidget :bot-id="…" />
         ├─ injects <script data-agentdesk data-bot-id="…" src="/widget.js" />
-        ├─ registers window.addEventListener('message', …)
+        ├─ registers component callback in global dispatch Set
         └─ renders <span data-agentdesk-vue-host aria-hidden="true" />
 ```
 
@@ -340,7 +358,7 @@ Vue tree mount
 ## Troubleshooting
 
 <details>
-<summary><strong>"document is not defined" in Nuxt</strong></summary>
+<summary><strong>"document is not defined" or window errors in Nuxt</strong></summary>
 
 You forgot the `.client` suffix on your plugin file. Rename it so Nuxt only loads it on the client:
 
@@ -349,27 +367,74 @@ You forgot the `.client` suffix on your plugin file. Rename it so Nuxt only load
 + plugins/agentdesk.client.ts
 ```
 
+Vue plugins that touch browser DOM globals (like `window` and `document`) must be client-only. Nuxt recognizes `.client.ts` as the official way to skip server-side execution.
+</details>
+
+<details>
+<summary><strong>widget.js returns 404 or fails to load</strong></summary>
+
+By default, the SDK requests `/widget.js` from the current origin. If your widget is served from a CDN or a separate backend server, specify the absolute URL using the `script-src` prop:
+
+```vue
+<AgentDeskWidget
+  bot-id="YOUR_BOT_ID"
+  script-src="https://cdn.example.com/widget.js"
+/>
+```
+</details>
+
+<details>
+<summary><strong>Content Security Policy (CSP) blocks the widget script</strong></summary>
+
+If your page enforces a strict CSP, inline scripts or dynamically injected scripts might be blocked. You can propagate a CSP cryptographic nonce directly to the injected script tag using the `csp-nonce` prop:
+
+```vue
+<AgentDeskWidget
+  bot-id="YOUR_BOT_ID"
+  csp-nonce="random_cryptographic_nonce_string"
+/>
+```
+This nonce is applied to the injected `<script>` tag and passed down to dynamically loaded styles.
+</details>
+
+<details>
+<summary><strong>Widget loads but configuration fetch fails</strong></summary>
+
+If the widget loads but displays a loading/connection error, check the browser console network tab. By default, it requests `{apiOrigin}/api/widget/config/{botId}`. You can override this endpoint entirely using the `config-url` prop:
+
+```vue
+<AgentDeskWidget
+  bot-id="YOUR_BOT_ID"
+  config-url="https://api.mysupport.com/custom/widget-config"
+/>
+```
+</details>
+
+<details>
+<summary><strong>Callbacks or events do not fire in cross-origin deployment</strong></summary>
+
+For security, the message listener validates `event.origin` against the page origin, `api-origin` prop, and `script-src` prop.
+If you are running the widget backend on `api.support.com` but embedding it on `app.com`, ensure you pass the correct `api-origin` and `script-src` props:
+
+```vue
+<AgentDeskWidget
+  bot-id="YOUR_BOT_ID"
+  api-origin="https://api.support.com"
+  script-src="https://api.support.com/widget.js"
+/>
+```
 </details>
 
 <details>
 <summary><strong>Widget loads twice in development</strong></summary>
 
-Vue's `<Suspense>` and HMR can re-mount components. The SDK is designed to handle this — it deduplicates scripts by `botId`. If you still see two widgets, make sure you aren't rendering two different `<AgentDeskWidget>` components with the same `botId`.
-
-</details>
-
-<details>
-<summary><strong>@open / @close events never fire</strong></summary>
-
-The SDK validates `event.origin` against `window.location.origin`. If you are embedding the widget from a different origin than the page (cross-origin iframe), the `postMessage` events will not match and the events won't be emitted. Use the `apiOrigin` + `scriptSrc` props to point at the correct host and confirm both the page and the widget backend share the same origin.
-
+Vue's `<Suspense>` and HMR can re-mount components. The SDK is designed to handle this — it deduplicates scripts by `botId`. If you still see two widgets, make sure you aren't rendering two different `<AgentDeskWidget>` components with the same `botId` on the page.
 </details>
 
 <details>
 <summary><strong>Vue 2 project</strong></summary>
 
 This package requires Vue 3. For Vue 2, use the [manual script-tag approach](#manual-script-tag-fallback) — the underlying `widget.js` IIFE is framework-agnostic.
-
 </details>
 
 ---

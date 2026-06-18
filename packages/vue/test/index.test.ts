@@ -293,4 +293,58 @@ describe('AgentDeskWidget (Vue)', () => {
     expect(wrapper.emitted('close')).toBeUndefined();
     wrapper.unmount();
   });
+
+  it('allows multiple Vue components with the same botId to receive lifecycle events', async () => {
+    const wrapper1 = mount(AgentDeskWidget, { props: { botId: 'shared-event-bot-vue' } });
+    const wrapper2 = mount(AgentDeskWidget, { props: { botId: 'shared-event-bot-vue' } });
+
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    messageListeners[0](
+      new MessageEvent('message', {
+        ...SAME_ORIGIN_EVENT,
+        data: { type: 'agentdesk-widget-open', botId: 'shared-event-bot-vue' },
+      }),
+    );
+    await nextTick();
+
+    expect(wrapper1.emitted('open')?.length).toBe(1);
+    expect(wrapper2.emitted('open')?.length).toBe(1);
+
+    wrapper1.unmount();
+    wrapper2.unmount();
+  });
+
+  it('updates script dataset and custom element attributes when position or className props change', async () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'styling-bot',
+        position: 'bottom-left',
+        className: 'first-class',
+      },
+    });
+
+    // Manually create the widget element in the mock DOM, as the widget.js script would usually do
+    const mockWidgetEl = document.createElement('agentdesk-widget');
+    mockWidgetEl.setAttribute('data-bot-id', 'styling-bot');
+    document.body.appendChild(mockWidgetEl);
+
+    // Update props
+    await wrapper.setProps({
+      position: 'top-right',
+      className: 'second-class',
+    });
+    await nextTick();
+
+    const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script).not.toBeNull();
+    expect(script.dataset.position).toBe('top-right');
+    expect(script.dataset.className).toBe('second-class');
+
+    expect(mockWidgetEl.className).toBe('second-class');
+    expect(mockWidgetEl.getAttribute('data-agentdesk-position')).toBe('top-right');
+
+    wrapper.unmount();
+    mockWidgetEl.remove();
+  });
 });

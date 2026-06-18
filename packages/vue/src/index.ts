@@ -20,7 +20,7 @@ import {
   type WidgetMessageEventData,
 } from '@agentdeskbot/core';
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+// === Public types ===
 
 export type { WidgetMode } from '@agentdeskbot/core';
 
@@ -47,7 +47,7 @@ export interface AgentDeskWidgetProps {
   className?: string;
 }
 
-// ─── Shared global message listener ──────────────────────────────────────────
+// === Shared global message listener ===
 
 type EmitName = 'open' | 'close' | 'ready' | 'error' | 'message-sent' | 'injected';
 
@@ -135,7 +135,7 @@ function uninstallGlobalListener() {
   }
 }
 
-// ─── Script injection helpers ────────────────────────────────────────────────
+// === Script injection helpers ===
 
 const SCRIPT_TAG = 'data-agentdesk';
 
@@ -183,7 +183,7 @@ function removeScriptAndWidget(botId: string): void {
     .forEach((el) => el.remove());
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// === Component ===
 
 /**
  * AgentDeskWidget — Vue 3 component that embeds the AgentDesk AI chat widget.
@@ -393,7 +393,7 @@ export const AgentDeskWidget = defineComponent({
   },
 });
 
-// ─── Vue Plugin ───────────────────────────────────────────────────────────────
+// === Vue Plugin ===
 
 export interface AgentDeskPluginOptions {
   /**

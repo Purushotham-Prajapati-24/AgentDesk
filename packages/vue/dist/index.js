@@ -1,7 +1,19 @@
-import { defineComponent, onMounted, onBeforeUnmount, onDeactivated, onActivated, watch, h } from 'vue';
-import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
-
 // src/index.ts
+import {
+  defineComponent,
+  h,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  watch
+} from "vue";
+import {
+  WIDGET_ELEMENT_NAME,
+  acquireInstance,
+  releaseInstance,
+  postSetMode
+} from "@agentdeskbot/core";
 var listenerBuckets = /* @__PURE__ */ new Map();
 function dispatchEvent(botId, eventName, payload) {
   var _a;
@@ -278,7 +290,9 @@ var AgentDeskPlugin = {
   }
 };
 var src_default = AgentDeskPlugin;
-
-export { AgentDeskPlugin, AgentDeskWidget, src_default as default };
-//# sourceMappingURL=index.js.map
+export {
+  AgentDeskPlugin,
+  AgentDeskWidget,
+  src_default as default
+};
 //# sourceMappingURL=index.js.map

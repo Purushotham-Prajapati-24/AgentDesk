@@ -181,12 +181,20 @@ If your AgentDesk backend runs on a **different domain** than the page embedding
 | Prop | Type | Default | Required | Description |
 | --- | --- | --- | --- | --- |
 | `botId` | `string` | — | ✅ | The Bot ID from your AgentDesk dashboard. |
-| `mode` | `'launcher' \| 'inline'` | `'launcher'` | — | `'launcher'` = floating bubble. `'inline'` = fills the nearest positioned ancestor. |
-| `scriptSrc` | `string` | `'/widget.js'` | — | URL to the compiled `widget.js` file. Override for cross-origin embeds. |
+| `mode` | `'launcher' \| 'inline'` | `'launcher'` | — | `'launcher'` = floating bubble (default). `'inline'` = fills the nearest positioned ancestor. |
+| `scriptSrc` | `string` | `'/widget.js'` | — | URL to the compiled `widget.js` file. Override for CDN or cross-origin embeds. |
 | `apiOrigin` | `string` | *(same origin)* | — | Base URL of your AgentDesk backend. Required for cross-origin embeds. |
 | `configUrl` | `string` | `{apiOrigin}/api/widget/config/{botId}` | — | Fully-qualified override for the widget config fetch endpoint. |
-| `onOpen` | `() => void` | — | — | Invoked when the user opens the chat surface. |
-| `onClose` | `() => void` | — | — | Invoked when the user closes the chat surface. |
+| `theme` | `string` | — | — | Optional theme name for the widget (e.g. `'webchat-v1'`). *Mount-only.* |
+| `cspNonce` | `string` | — | — | Optional CSP nonce to apply to the injected script and dynamic styles. *Mount-only.* |
+| `position` | `'bottom-right' \| 'bottom-left' \| 'top-right' \| 'top-left'` | `'bottom-right'` | — | Optional fixed position for the launcher bubble and widget pane. |
+| `className` | `string` | — | — | Optional custom HTML class name to apply to the host custom element. |
+| `onOpen` | `() => void` | — | — | Callback invoked when the user opens the chat widget. |
+| `onClose` | `() => void` | — | — | Callback invoked when the user closes the chat widget. |
+| `onReady` | `() => void` | — | — | Callback invoked when configuration loads successfully and widget is ready. |
+| `onError` | `(error: { message: string }) => void` | — | — | Callback invoked when widget fails to load config or establish connection. |
+| `onMessageSent` | `(message: { text: string }) => void` | — | — | Callback invoked when the user/customer sends a message. |
+| `onWidgetInjected` | `() => void` | — | — | Callback invoked when the widget custom element is injected into the DOM. |
 
 ### `WidgetMode` reference
 
@@ -196,29 +204,37 @@ import type { WidgetMode } from '@agentdeskbot/react'; // re-exported from @agen
 type WidgetMode = 'launcher' | 'inline';
 ```
 
-- **`'launcher'`** — A floating bubble anchored to the bottom-right corner of the viewport. Clicking it expands the chat surface.
-- **`'inline'`** — The widget fills the nearest positioned ancestor element (`position: relative | absolute | fixed`). Useful for embedding the chat directly inside a page section, side panel, or modal.
-
 ---
 
 ## Lifecycle Events
 
-The component exposes `onOpen` and `onClose` callbacks. Internally these are wired to the widget's `postMessage` events and validated against `event.origin` and `botId` before being fired.
+The component supports a rich set of lifecycle callbacks to track user interaction and widget status. Internally, these callbacks are wired to the widget's `postMessage` protocol with origin verification.
 
 ```tsx
 <AgentDeskWidget
   botId="YOUR_BOT_ID"
   onOpen={() => {
     analytics.track('agentdesk_widget_opened');
-    setChatUnreadCount(0);
   }}
   onClose={() => {
     analytics.track('agentdesk_widget_closed');
   }}
+  onReady={() => {
+    console.log('AgentDesk widget is ready to chat!');
+  }}
+  onError={({ message }) => {
+    console.error('Failed to load AgentDesk widget:', message);
+  }}
+  onMessageSent={({ text }) => {
+    analytics.track('agentdesk_message_sent', { length: text.length });
+  }}
+  onWidgetInjected={() => {
+    console.log('Widget custom element has been injected into the DOM.');
+  }}
 />
 ```
 
-> Callbacks are stored in refs, so passing **new function identities on every render is safe** — you will not cause the widget to remount.
+> **Fresh Callback Identities:** All callbacks are tracked dynamically. Changing callback function identities or state variables referenced inside your callbacks on subsequent renders is fully supported, safe, and will **never** cause the widget script to re-inject, unmount, or lose listener mappings.
 
 ---
 
@@ -235,7 +251,15 @@ The SDK deduplicates scripts by `botId`, so mounting two `<AgentDeskWidget>` ins
 </>
 ```
 
-Mounting the same `botId` twice (e.g. under StrictMode, or across HMR boundaries) is a no-op — only the first injection runs.
+Mounting the same `botId` twice (e.g. under StrictMode, or across HMR boundaries) is a no-op — only the first injection runs, and both component instances' callbacks are registered and fired.
+
+### Recommended Multi-Bot Patterns
+
+When mounting multiple bots on the same page:
+
+1. **Avoid Launcher Overlaps:** Do not mount more than one bot in `launcher` mode at the same position. If you must have multiple launchers, use the `position` prop to space them out (e.g., one on the `bottom-right` and one on the `bottom-left`).
+2. **Prefer Inline Mode:** For secondary assistants or context-specific support, prefer `mode="inline"` to render the bot within a sidebar, dashboard tab, or modal, keeping the main floating launcher clean.
+3. **Event Attribution:** Use `onMessageSent` and `onOpen` callbacks on each widget to attribute user interactions and analytics tracking to the specific `botId`.
 
 ### Programmatic control
 
@@ -264,25 +288,7 @@ If you can't (or don't want to) install the React package, drop the script direc
 ></script>
 ```
 
-The same `data-*` attributes used by the React SDK are honored by the script:
-
-| Attribute | Maps to prop | Default |
-| --- | --- | --- |
-| `data-bot-id` | `botId` | — |
-| `data-mode` | `mode` | `'launcher'` |
-| `data-script-src` | `scriptSrc` | `'/widget.js'` |
-| `data-api-origin` | `apiOrigin` | — |
-| `data-config-url` | `configUrl` | auto-derived |
-
-Or use the iframe embed:
-
-```html
-<iframe
-  src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID?theme=webchat-v1"
-  title="AgentDesk Support"
-  style="width: 100%; height: 640px; border: 0;"
-></iframe>
-```
+The same `data-*` attributes used by the React SDK are honored by the script.
 
 ---
 
@@ -292,14 +298,14 @@ Under the hood, the React component:
 
 1. **Deduplicates** — On mount, it scans `document` for existing `script[data-agentdesk]` tags and bails early if one for the current `botId` is already present.
 2. **Injects** — Otherwise it appends a `<script>` element pointing to `widget.js` and tags it with `data-agentdesk` and `data-bot-id`.
-3. **Listens** — It registers a `message` event listener on `window`, validates `event.origin === window.location.origin` and the `botId` in the payload, then fires `onOpen` / `onClose`.
-4. **Cleans up** — On unmount, the script tag, custom element, and event listener are all removed.
+3. **Listens** — It registers a single global `message` event listener on `window` and forwards events to the appropriate callback registries matching the `botId` and origin checks.
+4. **Cleans up** — On unmount, the component removes its listener registration. If the last component referencing a `botId` unmounts, the script tag and custom element are removed from the DOM.
 
 ```
 React tree mount
    └─ <AgentDeskWidget botId="…" />
         ├─ injects <script data-agentdesk data-bot-id="…" src="/widget.js" />
-        ├─ registers window.addEventListener('message', …)
+        ├─ registers component callback in global dispatch Set
         └─ renders null
 ```
 
@@ -312,32 +318,78 @@ React tree mount
 
 You are importing from `@agentdeskbot/react` in a Server Component context. Switch to the `/nextjs` subpath:
 
-```diff
-- import { AgentDeskWidget } from '@agentdeskbot/react';
-+ import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
+```tsx
+import { AgentDeskWidget } from '@agentdeskbot/react/nextjs';
 ```
 
+Using `@agentdeskbot/react/nextjs` utilizes `next/dynamic` with `ssr: false` to ensure the widget bundle is only executed client-side.
+</details>
+
+<details>
+<summary><strong>widget.js returns 404 or fails to load</strong></summary>
+
+By default, the SDK requests `/widget.js` from the current origin. If your widget is served from a CDN or a separate backend server (e.g. self-hosted), specify the absolute URL using the `scriptSrc` prop:
+
+```tsx
+<AgentDeskWidget
+  botId="YOUR_BOT_ID"
+  scriptSrc="https://cdn.example.com/widget.js"
+/>
+```
+</details>
+
+<details>
+<summary><strong>Content Security Policy (CSP) blocks the widget script</strong></summary>
+
+If your page enforces a strict CSP, inline scripts or dynamically injected scripts might be blocked. You can propagate a CSP cryptographic nonce directly to the injected script tag using the `cspNonce` prop:
+
+```tsx
+<AgentDeskWidget
+  botId="YOUR_BOT_ID"
+  cspNonce="random_cryptographic_nonce_string"
+/>
+```
+This nonce is applied to the injected `<script>` tag and passed down to dynamically loaded styles.
+</details>
+
+<details>
+<summary><strong>Widget loads but configuration fetch fails</strong></summary>
+
+If the widget loads but displays a loading/connection error, the widget configuration endpoint might be unreachable. Check the browser console network tab. By default, it requests `{apiOrigin}/api/widget/config/{botId}`. You can override this endpoint entirely using the `configUrl` prop:
+
+```tsx
+<AgentDeskWidget
+  botId="YOUR_BOT_ID"
+  configUrl="https://api.mysupport.com/custom/widget-config"
+/>
+```
+</details>
+
+<details>
+<summary><strong>Callbacks or events do not fire in cross-origin deployment</strong></summary>
+
+For security, the message listener validates `event.origin` against the page origin, `apiOrigin` prop, and `scriptSrc` prop.
+If you are running the widget backend on `api.support.com` but embedding it on `app.com`, ensure you pass the correct `apiOrigin` and `scriptSrc` props so the origins are explicitly whitelisted:
+
+```tsx
+<AgentDeskWidget
+  botId="YOUR_BOT_ID"
+  apiOrigin="https://api.support.com"
+  scriptSrc="https://api.support.com/widget.js"
+/>
+```
 </details>
 
 <details>
 <summary><strong>Widget loads twice in development</strong></summary>
 
-React 18 StrictMode intentionally double-invokes effects in development to surface side-effect bugs. The SDK is designed to handle this — it deduplicates scripts by `botId`. If you still see two widgets, make sure you aren't rendering two different `<AgentDeskWidget>` components with the same `botId`.
-
+React 18 StrictMode intentionally double-invokes effects in development to surface side-effect bugs. The SDK is designed to handle this — it deduplicates scripts by `botId`. If you still see two widgets, make sure you aren't rendering two different `<AgentDeskWidget>` components with the same `botId` on the page.
 </details>
 
 <details>
 <summary><strong>Hoisting issues in a monorepo</strong></summary>
 
 If your monorepo's package manager doesn't hoist `react` correctly (rare with npm/yarn/pnpm workspaces), add an explicit `react` peer dependency in your app's `package.json`. The SDK declares `react` and `react-dom` as peer dependencies with no `optional` flag.
-
-</details>
-
-<details>
-<summary><strong>onOpen / onClose never fire</strong></summary>
-
-The SDK validates `event.origin` against `window.location.origin`. If you are embedding the widget from a different origin than the page (cross-origin iframe), the `postMessage` events will not match and the callbacks won't fire. Use the `apiOrigin` + `scriptSrc` props to point at the correct host and confirm both the page and the widget backend share the same origin.
-
 </details>
 
 ---

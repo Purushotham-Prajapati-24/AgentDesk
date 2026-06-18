@@ -7,7 +7,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   external: ['vue'],
-  treeshake: true,
+  treeshake: false,
   splitting: false,
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' };

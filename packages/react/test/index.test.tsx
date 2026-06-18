@@ -293,4 +293,133 @@ describe('AgentDeskWidget (React)', () => {
     });
     expect(onOpen).not.toHaveBeenCalled();
   });
+
+  it('allows multiple components with the same botId to receive lifecycle callbacks', () => {
+    const onOpen1 = vi.fn();
+    const onOpen2 = vi.fn();
+
+    render(<AgentDeskWidget botId="shared-event-bot" onOpen={onOpen1} />);
+    render(<AgentDeskWidget botId="shared-event-bot" onOpen={onOpen2} />);
+
+    expect(messageListeners.length).toBeGreaterThan(0);
+
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-open', botId: 'shared-event-bot' },
+        }),
+      );
+    });
+
+    expect(onOpen1).toHaveBeenCalledTimes(1);
+    expect(onOpen2).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls the latest callback when callback props change after rerender', () => {
+    const onOpen1 = vi.fn();
+    const onOpen2 = vi.fn();
+
+    const { rerender } = render(<AgentDeskWidget botId="rerender-bot" onOpen={onOpen1} />);
+
+    rerender(<AgentDeskWidget botId="rerender-bot" onOpen={onOpen2} />);
+
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-open', botId: 'rerender-bot' },
+        }),
+      );
+    });
+
+    expect(onOpen1).not.toHaveBeenCalled();
+    expect(onOpen2).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses current props when botId changes, rather than stale first-render props', () => {
+    const { rerender } = render(
+      <AgentDeskWidget
+        botId="bot-a"
+        theme="theme-a"
+        position="bottom-left"
+      />
+    );
+
+    // Rerender with different botId and props
+    rerender(
+      <AgentDeskWidget
+        botId="bot-b"
+        theme="theme-b"
+        position="top-right"
+      />
+    );
+
+    const scriptA = document.querySelector('script[data-bot-id="bot-a"]') as HTMLScriptElement;
+    const scriptB = document.querySelector('script[data-bot-id="bot-b"]') as HTMLScriptElement;
+
+    expect(scriptA).toBeNull(); // Cleaned up
+    expect(scriptB).not.toBeNull();
+    expect(scriptB.dataset.theme).toBe('theme-b');
+    expect(scriptB.dataset.position).toBe('top-right');
+  });
+
+  it('ensures onReady, onError, onMessageSent, and onWidgetInjected still work after rerender', () => {
+    const onReady = vi.fn();
+    const onError = vi.fn();
+    const onMessageSent = vi.fn();
+    const onWidgetInjected = vi.fn();
+
+    const { rerender } = render(
+      <AgentDeskWidget
+        botId="dynamic-callbacks-bot"
+        onReady={vi.fn()}
+        onError={vi.fn()}
+        onMessageSent={vi.fn()}
+        onWidgetInjected={vi.fn()}
+      />
+    );
+
+    rerender(
+      <AgentDeskWidget
+        botId="dynamic-callbacks-bot"
+        onReady={onReady}
+        onError={onError}
+        onMessageSent={onMessageSent}
+        onWidgetInjected={onWidgetInjected}
+      />
+    );
+
+    act(() => {
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-ready', botId: 'dynamic-callbacks-bot' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-error', botId: 'dynamic-callbacks-bot', message: 'Rerendered error' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-message-sent', botId: 'dynamic-callbacks-bot', text: 'rerendered text' },
+        }),
+      );
+      messageListeners[0](
+        new MessageEvent('message', {
+          ...SAME_ORIGIN_EVENT,
+          data: { type: 'agentdesk-widget-injected', botId: 'dynamic-callbacks-bot' },
+        }),
+      );
+    });
+
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith({ message: 'Rerendered error' });
+    expect(onMessageSent).toHaveBeenCalledWith({ text: 'rerendered text' });
+    expect(onWidgetInjected).toHaveBeenCalledTimes(1);
+  });
 });

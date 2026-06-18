@@ -70,15 +70,33 @@ This package ships a **tiny runtime module** (< 3 KB) alongside type definitions
 
 ## Exports
 
-The package exposes a single, stable surface area from its root entry:
+The package exposes the following type definitions and runtime helpers from its root entry:
 
 ```ts
 export type WidgetMode = 'launcher' | 'inline';
 
-export interface WidgetMessageEventData {
-  type: 'agentdesk-widget-open' | 'agentdesk-widget-close';
-  botId: string;
-}
+export type WidgetLifecycleEventType =
+  | 'agentdesk-widget-open'
+  | 'agentdesk-widget-close'
+  | 'agentdesk-widget-ready'
+  | 'agentdesk-widget-error'
+  | 'agentdesk-widget-message-sent'
+  | 'agentdesk-widget-injected';
+
+export type WidgetControlEventType = 'agentdesk-set-mode';
+export type WidgetAckEventType = 'agentdesk-set-mode-ack';
+
+export type WidgetEventType =
+  | WidgetLifecycleEventType
+  | WidgetControlEventType
+  | WidgetAckEventType;
+
+export type WidgetMessageEventData =
+  | { type: 'agentdesk-widget-open' | 'agentdesk-widget-close' | 'agentdesk-widget-ready' | 'agentdesk-widget-injected'; botId: string }
+  | { type: 'agentdesk-widget-error'; botId: string; message: string }
+  | { type: 'agentdesk-widget-message-sent'; botId: string; text: string }
+  | { type: WidgetControlEventType; botId: string; mode: WidgetMode }
+  | { type: WidgetAckEventType; botId: string };
 ```
 
 ### `WidgetMode`
@@ -98,12 +116,16 @@ const mode: WidgetMode = 'inline';
 
 ### `WidgetMessageEventData`
 
-The shape of the payload posted by the AgentDesk widget IIFE to `window` via `postMessage` whenever the user opens or closes the chat surface.
+The shape of the payload posted by the AgentDesk widget to `window` via `postMessage` whenever lifecycle state changes.
 
-| Field | Type | Description |
+| Event Type | Additional Payload Fields | Description |
 | --- | --- | --- |
-| `type` | `'agentdesk-widget-open' \| 'agentdesk-widget-close'` | The lifecycle event being broadcast. |
-| `botId` | `string` | The bot ID this event pertains to — useful when multiple bots are mounted on the same page. |
+| `'agentdesk-widget-open'` | `botId: string` | Broadcasted when the chat surface is opened. |
+| `'agentdesk-widget-close'` | `botId: string` | Broadcasted when the chat surface is closed. |
+| `'agentdesk-widget-ready'` | `botId: string` | Broadcasted when the widget has finished loading configuration and is ready. |
+| `'agentdesk-widget-error'` | `botId: string`, `message: string` | Broadcasted when widget fails to load config or connect. |
+| `'agentdesk-widget-message-sent'` | `botId: string`, `text: string` | Broadcasted when a user sends a message. |
+| `'agentdesk-widget-injected'` | `botId: string` | Broadcasted when custom element is injected in DOM. |
 
 ```ts
 import type { WidgetMessageEventData } from '@agentdeskbot/core';
@@ -113,15 +135,57 @@ window.addEventListener('message', (event: MessageEvent) => {
   const data = event.data as WidgetMessageEventData;
   if (data?.botId !== 'YOUR_BOT_ID') return;
 
-  if (data.type === 'agentdesk-widget-open') {
-    console.log('Chat opened for bot', data.botId);
-  } else if (data.type === 'agentdesk-widget-close') {
-    console.log('Chat closed for bot', data.botId);
+  switch (data.type) {
+    case 'agentdesk-widget-open':
+      console.log('Chat opened');
+      break;
+    case 'agentdesk-widget-close':
+      console.log('Chat closed');
+      break;
+    case 'agentdesk-widget-ready':
+      console.log('Widget is ready');
+      break;
+    case 'agentdesk-widget-error':
+      console.error('Error:', data.message);
+      break;
+    case 'agentdesk-widget-message-sent':
+      console.log('Sent message:', data.text);
+      break;
+    case 'agentdesk-widget-injected':
+      console.log('Element injected');
+      break;
   }
 });
 ```
 
-> **Security note:** Always validate `event.origin` and the payload shape before acting on a postMessage event. The official React and Vue adapters do this for you.
+---
+
+## Runtime Helpers
+
+For framework adapter authors, the package exports core runtime helpers for managing script loading lifecycles, reference counting, registry states, and cross-window messages:
+
+### `acquireInstance(botId: string, mode: WidgetMode): AcquireResult`
+Acquires a registry slot for a bot instance. Tracks reference counts across multiple components pointing to the same `botId` so the loader script is injected only once.
+Returns:
+- `isFirstForBot: boolean`: True if this is the first instance for this bot (tells caller to inject script).
+- `mustInstallListener: boolean`: True if the global window message event listener needs to be installed.
+- `modeChanged: boolean`: True if the requested mode differs from the existing instance's mode.
+- `entry: AgentDeskWidgetRegistryEntry`: The entry state containing `count` and `mode`.
+
+### `releaseInstance(botId: string): ReleaseResult`
+Releases a registry slot.
+Returns:
+- `isLastForBot: boolean`: True if this was the last instance for the bot (tells caller to clean up script and element).
+- `mustRemoveListener: boolean`: True if the global window message event listener can be uninstalled.
+
+### `getEntry(botId: string): AgentDeskWidgetRegistryEntry | undefined`
+Retrieves the registry state (reference count, current mode) for a given `botId`.
+
+### `getActiveBotIds(): string[]`
+Returns an array of all currently active `botId` values registered on the page.
+
+### `postSetMode(botId: string, mode: WidgetMode): void`
+Dispatches a control message to the widget IIFE (same-origin window and parent window if iframe) to dynamically update the display mode without requiring script reload.
 
 ---
 
@@ -140,15 +204,26 @@ export interface MyAdapterProps {
   mode?: WidgetMode;
   onOpen?: () => void;
   onClose?: () => void;
+  onReady?: () => void;
+  onError?: (err: { message: string }) => void;
+  onMessageSent?: (msg: { text: string }) => void;
+  onWidgetInjected?: () => void;
 }
 ```
 
-### 2. Listening to widget lifecycle events
+### 2. Listening to all widget lifecycle events safely
 
 ```ts
 import type { WidgetMessageEventData } from '@agentdeskbot/core';
 
-function attachLifecycleListener(botId: string) {
+function attachLifecycleListener(botId: string, callbacks: {
+  onOpen?: () => void;
+  onClose?: () => void;
+  onReady?: () => void;
+  onError?: (error: { message: string }) => void;
+  onMessageSent?: (message: { text: string }) => void;
+  onWidgetInjected?: () => void;
+}) {
   const handler = (event: MessageEvent) => {
     if (event.origin !== window.location.origin) return;
     const data = event.data as Partial<WidgetMessageEventData>;
@@ -156,10 +231,22 @@ function attachLifecycleListener(botId: string) {
 
     switch (data.type) {
       case 'agentdesk-widget-open':
-        // chat opened
+        callbacks.onOpen?.();
         break;
       case 'agentdesk-widget-close':
-        // chat closed
+        callbacks.onClose?.();
+        break;
+      case 'agentdesk-widget-ready':
+        callbacks.onReady?.();
+        break;
+      case 'agentdesk-widget-error':
+        callbacks.onError?.({ message: (data as { message?: string }).message || 'Unknown error' });
+        break;
+      case 'agentdesk-widget-message-sent':
+        callbacks.onMessageSent?.({ text: (data as { text?: string }).text || '' });
+        break;
+      case 'agentdesk-widget-injected':
+        callbacks.onWidgetInjected?.();
         break;
     }
   };
@@ -169,7 +256,7 @@ function attachLifecycleListener(botId: string) {
 }
 ```
 
-### 3. Reusing the type in your own chat surface
+### 3. Reusing types in your own components
 
 ```ts
 import type { WidgetMode } from '@agentdeskbot/core';
