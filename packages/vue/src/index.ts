@@ -260,9 +260,6 @@ export const AgentDeskWidget = defineComponent({
 
     const install = () => {
       if (!props.botId) return;
-      if (hasSlot && activeBotId) {
-        release(activeBotId);
-      }
 
       if (!defaultSaaSOriginWarned && (props.apiOrigin === DEFAULT_SAAS_ORIGIN || props.scriptSrc === `${DEFAULT_SAAS_ORIGIN}/widget.js`)) {
         defaultSaaSOriginWarned = true;
@@ -364,10 +361,10 @@ export const AgentDeskWidget = defineComponent({
     );
 
     watch(
-      [() => props.botId, () => props.apiOrigin, () => props.scriptSrc],
-      ([botId, apiOrigin, scriptSrc], [prevBotId, prevApiOrigin, prevScriptSrc]) => {
-        if (!hasSlot) return;
-        if (botId === prevBotId && apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc) return;
+      [() => props.botId, () => props.apiOrigin, () => props.scriptSrc, () => props.configUrl],
+      ([botId, apiOrigin, scriptSrc, configUrl], [prevBotId, prevApiOrigin, prevScriptSrc, prevConfigUrl]) => {
+        if (!hasSlot && !(botId && !prevBotId)) return;
+        if (botId === prevBotId && apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc && configUrl === prevConfigUrl) return;
         release(prevBotId);
         install();
       },
