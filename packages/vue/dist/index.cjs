@@ -1,32 +1,11 @@
-"use strict";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+'use strict';
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+var vue = require('vue');
+var core = require('@agentdeskbot/core');
 
 // src/index.ts
-var src_exports = {};
-__export(src_exports, {
-  AgentDeskPlugin: () => AgentDeskPlugin,
-  AgentDeskWidget: () => AgentDeskWidget,
-  default: () => src_default
-});
-module.exports = __toCommonJS(src_exports);
-var import_vue = require("vue");
-var import_core = require("@agentdeskbot/core");
 var listenerBuckets = /* @__PURE__ */ new Map();
 function dispatchEvent(botId, eventName, payload) {
   var _a;
@@ -123,9 +102,9 @@ function injectScript(options) {
 function removeScriptAndWidget(botId) {
   var _a;
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
-  document.querySelectorAll(`${import_core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
+  document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
 }
-var AgentDeskWidget = (0, import_vue.defineComponent)({
+var AgentDeskWidget = vue.defineComponent({
   name: "AgentDeskWidget",
   props: {
     botId: {
@@ -180,7 +159,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
     const install = () => {
       var _a, _b, _c;
       if (!props.botId) return;
-      const acquire = (0, import_core.acquireInstance)(props.botId, (_a = props.mode) != null ? _a : "launcher");
+      const acquire = core.acquireInstance(props.botId, (_a = props.mode) != null ? _a : "launcher");
       if (acquire.mustInstallListener) {
         installGlobalListener();
       }
@@ -189,7 +168,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
           injectScript({
             botId: props.botId,
             mode: (_b = props.mode) != null ? _b : "launcher",
-            scriptSrc: props.scriptSrc || "https://agentdeskbot.vercel.app/widget.js",
+            scriptSrc: props.scriptSrc,
             configUrl: props.configUrl || void 0,
             apiOrigin: props.apiOrigin || void 0,
             theme: props.theme || void 0,
@@ -199,7 +178,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
           });
         }
       } else if (acquire.modeChanged) {
-        (0, import_core.postSetMode)(props.botId, (_c = props.mode) != null ? _c : "launcher");
+        core.postSetMode(props.botId, (_c = props.mode) != null ? _c : "launcher");
       }
       hasSlot = true;
       entry = {
@@ -218,7 +197,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
       }
       listenerBuckets.get(props.botId).add(entry);
       if (typeof customElements !== "undefined") {
-        void customElements.whenDefined(import_core.WIDGET_ELEMENT_NAME).catch(() => {
+        void customElements.whenDefined(core.WIDGET_ELEMENT_NAME).catch(() => {
         });
       }
     };
@@ -230,7 +209,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
         listenerBuckets.delete(props.botId);
       }
       entry = null;
-      const result = (0, import_core.releaseInstance)(props.botId);
+      const result = core.releaseInstance(props.botId);
       hasSlot = false;
       if (result.isLastForBot) {
         removeScriptAndWidget(props.botId);
@@ -239,28 +218,37 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
         uninstallGlobalListener();
       }
     };
-    (0, import_vue.onMounted)(() => {
+    vue.onMounted(() => {
       install();
     });
-    (0, import_vue.onBeforeUnmount)(() => {
+    vue.onBeforeUnmount(() => {
       release();
     });
-    (0, import_vue.onDeactivated)(() => {
+    vue.onDeactivated(() => {
       release();
     });
-    (0, import_vue.onActivated)(() => {
+    vue.onActivated(() => {
       install();
     });
-    (0, import_vue.watch)(
+    vue.watch(
       () => props.mode,
       (next, prev) => {
         if (next === prev) return;
         if (!hasSlot) return;
         if (!props.botId) return;
-        (0, import_core.postSetMode)(props.botId, next != null ? next : "launcher");
+        core.postSetMode(props.botId, next != null ? next : "launcher");
       }
     );
-    (0, import_vue.watch)(
+    vue.watch(
+      [() => props.apiOrigin, () => props.scriptSrc],
+      ([apiOrigin, scriptSrc]) => {
+        if (entry) {
+          entry.apiOrigin = apiOrigin || void 0;
+          entry.scriptSrc = scriptSrc || void 0;
+        }
+      }
+    );
+    vue.watch(
       [
         () => props.position,
         () => props.className
@@ -274,7 +262,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
           if (className) script.dataset.className = className;
           else delete script.dataset.className;
         }
-        const widgetEl = document.querySelector(`${import_core.WIDGET_ELEMENT_NAME}[data-bot-id="${props.botId}"]`);
+        const widgetEl = document.querySelector(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${props.botId}"]`);
         if (widgetEl) {
           if (className) {
             widgetEl.className = className;
@@ -289,7 +277,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
         }
       }
     );
-    return () => (0, import_vue.h)("span", {
+    return () => vue.h("span", {
       "data-agentdesk-vue-host": props.botId,
       style: "display:none",
       "aria-hidden": "true"
@@ -304,9 +292,9 @@ var AgentDeskPlugin = {
   }
 };
 var src_default = AgentDeskPlugin;
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  AgentDeskPlugin,
-  AgentDeskWidget
-});
+
+exports.AgentDeskPlugin = AgentDeskPlugin;
+exports.AgentDeskWidget = AgentDeskWidget;
+exports.default = src_default;
+//# sourceMappingURL=index.cjs.map
 //# sourceMappingURL=index.cjs.map

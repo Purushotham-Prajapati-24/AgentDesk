@@ -1,19 +1,7 @@
+import { defineComponent, onMounted, onBeforeUnmount, onDeactivated, onActivated, watch, h } from 'vue';
+import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
+
 // src/index.ts
-import {
-  defineComponent,
-  h,
-  onActivated,
-  onBeforeUnmount,
-  onDeactivated,
-  onMounted,
-  watch
-} from "vue";
-import {
-  WIDGET_ELEMENT_NAME,
-  acquireInstance,
-  releaseInstance,
-  postSetMode
-} from "@agentdeskbot/core";
 var listenerBuckets = /* @__PURE__ */ new Map();
 function dispatchEvent(botId, eventName, payload) {
   var _a;
@@ -176,7 +164,7 @@ var AgentDeskWidget = defineComponent({
           injectScript({
             botId: props.botId,
             mode: (_b = props.mode) != null ? _b : "launcher",
-            scriptSrc: props.scriptSrc || "https://agentdeskbot.vercel.app/widget.js",
+            scriptSrc: props.scriptSrc,
             configUrl: props.configUrl || void 0,
             apiOrigin: props.apiOrigin || void 0,
             theme: props.theme || void 0,
@@ -248,6 +236,15 @@ var AgentDeskWidget = defineComponent({
       }
     );
     watch(
+      [() => props.apiOrigin, () => props.scriptSrc],
+      ([apiOrigin, scriptSrc]) => {
+        if (entry) {
+          entry.apiOrigin = apiOrigin || void 0;
+          entry.scriptSrc = scriptSrc || void 0;
+        }
+      }
+    );
+    watch(
       [
         () => props.position,
         () => props.className
@@ -291,9 +288,7 @@ var AgentDeskPlugin = {
   }
 };
 var src_default = AgentDeskPlugin;
-export {
-  AgentDeskPlugin,
-  AgentDeskWidget,
-  src_default as default
-};
+
+export { AgentDeskPlugin, AgentDeskWidget, src_default as default };
+//# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

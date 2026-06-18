@@ -1,32 +1,9 @@
 'use client';
-"use strict";
-"use client";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+'use strict';
 
-// src/index.tsx
-var src_exports = {};
-__export(src_exports, {
-  AgentDeskWidget: () => AgentDeskWidget
-});
-module.exports = __toCommonJS(src_exports);
-var import_react = require("react");
-var import_core = require("@agentdeskbot/core");
+var react = require('react');
+var core = require('@agentdeskbot/core');
+
 var listenerBuckets = /* @__PURE__ */ new Map();
 var globalListenerInstalled = false;
 var globalListenerRef = null;
@@ -122,7 +99,7 @@ function injectScript(options) {
 function removeScriptAndWidget(botId) {
   var _a;
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
-  document.querySelectorAll(`${import_core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
+  document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
 }
 function AgentDeskWidget({
   botId,
@@ -141,15 +118,21 @@ function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected
 }) {
-  const modeRef = (0, import_react.useRef)(mode);
-  (0, import_react.useEffect)(() => {
+  if (typeof window === "undefined") {
+    console.warn(
+      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
+    );
+    return null;
+  }
+  const modeRef = react.useRef(mode);
+  react.useEffect(() => {
     modeRef.current = mode;
   });
-  const entryRef = (0, import_react.useRef)({
+  const entryRef = react.useRef({
     apiOrigin,
     scriptSrc
   });
-  (0, import_react.useEffect)(() => {
+  react.useEffect(() => {
     entryRef.current.apiOrigin = apiOrigin;
     entryRef.current.scriptSrc = scriptSrc;
     entryRef.current.onOpen = onOpen;
@@ -159,16 +142,14 @@ function AgentDeskWidget({
     entryRef.current.onMessageSent = onMessageSent;
     entryRef.current.onWidgetInjected = onWidgetInjected;
   });
-  const [prevBotId, setPrevBotId] = (0, import_react.useState)(null);
-  const [initialProps, setInitialProps] = (0, import_react.useState)({ theme, cspNonce, position, className, mode });
-  if (prevBotId !== botId) {
-    setPrevBotId(botId);
-    setInitialProps({ theme, cspNonce, position, className, mode });
-  }
-  (0, import_react.useEffect)(() => {
+  const initialProps = react.useMemo(
+    () => ({ theme, cspNonce, position, className, mode }),
+    [botId]
+  );
+  react.useEffect(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
-    const acquire = (0, import_core.acquireInstance)(botId, initialProps.mode);
+    const acquire = core.acquireInstance(botId, initialProps.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -187,7 +168,7 @@ function AgentDeskWidget({
         });
       }
     } else if (acquire.modeChanged) {
-      (0, import_core.postSetMode)(botId, modeRef.current);
+      core.postSetMode(botId, modeRef.current);
     }
     if (!listenerBuckets.has(botId)) {
       listenerBuckets.set(botId, /* @__PURE__ */ new Set());
@@ -195,11 +176,11 @@ function AgentDeskWidget({
     const currentEntry = entryRef.current;
     listenerBuckets.get(botId).add(currentEntry);
     if (typeof customElements !== "undefined") {
-      void customElements.whenDefined(import_core.WIDGET_ELEMENT_NAME).catch(() => {
+      void customElements.whenDefined(core.WIDGET_ELEMENT_NAME).catch(() => {
       });
     }
     return () => {
-      const release = (0, import_core.releaseInstance)(botId);
+      const release = core.releaseInstance(botId);
       const bucket = listenerBuckets.get(botId);
       if (bucket) {
         bucket.delete(currentEntry);
@@ -215,17 +196,17 @@ function AgentDeskWidget({
       }
     };
   }, [botId, scriptSrc, configUrl, apiOrigin, initialProps]);
-  const isFirstModeRender = (0, import_react.useRef)(true);
-  (0, import_react.useEffect)(() => {
+  const isFirstModeRender = react.useRef(true);
+  react.useEffect(() => {
     if (typeof window === "undefined") return;
     if (isFirstModeRender.current) {
       isFirstModeRender.current = false;
       return;
     }
     if (!botId) return;
-    (0, import_core.postSetMode)(botId, mode);
+    core.postSetMode(botId, mode);
   }, [mode, botId]);
-  (0, import_react.useEffect)(() => {
+  react.useEffect(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
     const script = findExistingScript(botId);
@@ -235,7 +216,7 @@ function AgentDeskWidget({
       if (className) script.dataset.className = className;
       else delete script.dataset.className;
     }
-    const widgetEl = document.querySelector(`${import_core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
+    const widgetEl = document.querySelector(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
     if (widgetEl) {
       if (className) {
         widgetEl.className = className;
@@ -249,16 +230,9 @@ function AgentDeskWidget({
       }
     }
   }, [botId, position, className]);
-  if (typeof window === "undefined") {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
-    return null;
-  }
   return null;
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  AgentDeskWidget
-});
+
+exports.AgentDeskWidget = AgentDeskWidget;
+//# sourceMappingURL=index.cjs.map
 //# sourceMappingURL=index.cjs.map

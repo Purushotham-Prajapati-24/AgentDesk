@@ -15,7 +15,7 @@
 // `@agentdeskbot/react/nextjs` instead — that subpath uses `next/dynamic`
 // with `ssr: false`.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import {
   WIDGET_ELEMENT_NAME,
   acquireInstance,
@@ -55,16 +55,15 @@ export interface AgentDeskWidgetProps {
 
   /**
    * URL to the `widget.js` script.
-   * Defaults to `'/widget.js'`.
-   * For cross-site embeds, point this to your CDN or AgentDesk deployment.
+   * Defaults to `'https://agentdeskbot.vercel.app/widget.js'`.
+   * For self-hosted or custom deployments, point this to your CDN or AgentDesk deployment.
    * @example 'https://cdn.agentdesk.ai/widget.js'
    */
   scriptSrc?: string;
 
   /**
    * Base URL of your AgentDesk backend deployment.
-   * Required when the widget is embedded on a domain different from the backend.
-   * Defaults to `undefined` (same-origin).
+   * Defaults to `'https://agentdeskbot.vercel.app'`.
    * @example 'https://support.yourapp.com'
    */
   apiOrigin?: string;
@@ -312,6 +311,14 @@ export function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected,
 }: AgentDeskWidgetProps): null {
+  if (typeof window === 'undefined') {
+    console.warn(
+      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
+      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
+    );
+    return null;
+  }
+
   const modeRef = useRef(mode);
 
   // Sync ref to the latest mode on every render.
@@ -338,13 +345,10 @@ export function AgentDeskWidget({
   });
 
   // Track the botId to detect when it changes and update initialProps accordingly.
-  const [prevBotId, setPrevBotId] = useState<string | null>(null);
-  const [initialProps, setInitialProps] = useState({ theme, cspNonce, position, className, mode });
-
-  if (prevBotId !== botId) {
-    setPrevBotId(botId);
-    setInitialProps({ theme, cspNonce, position, className, mode });
-  }
+  const initialProps = useMemo(
+    () => ({ theme, cspNonce, position, className, mode }),
+    [botId],
+  );
 
   // Mount/unmount lifecycle: ref-count the widget so multiple components
   // pointing at the same botId share a single script injection.
@@ -451,14 +455,6 @@ export function AgentDeskWidget({
       }
     }
   }, [botId, position, className]);
-
-  if (typeof window === 'undefined') {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
-      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
-    return null;
-  }
 
   return null;
 }

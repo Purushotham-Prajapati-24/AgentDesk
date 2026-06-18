@@ -10,8 +10,8 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   external: ['react', 'react-dom', 'next'],
-  treeshake: false,
-  splitting: false,
+  treeshake: true,
+  splitting: true,
   // Silence esbuild warnings about ignored "use client" directives
   esbuildOptions(options) {
     options.logOverride = {

@@ -1,14 +1,7 @@
 'use client';
-"use client";
+import { useRef, useEffect, useMemo } from 'react';
+import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
 
-// src/index.tsx
-import { useEffect, useRef, useState } from "react";
-import {
-  WIDGET_ELEMENT_NAME,
-  acquireInstance,
-  releaseInstance,
-  postSetMode
-} from "@agentdeskbot/core";
 var listenerBuckets = /* @__PURE__ */ new Map();
 var globalListenerInstalled = false;
 var globalListenerRef = null;
@@ -123,6 +116,12 @@ function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected
 }) {
+  if (typeof window === "undefined") {
+    console.warn(
+      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
+    );
+    return null;
+  }
   const modeRef = useRef(mode);
   useEffect(() => {
     modeRef.current = mode;
@@ -141,12 +140,10 @@ function AgentDeskWidget({
     entryRef.current.onMessageSent = onMessageSent;
     entryRef.current.onWidgetInjected = onWidgetInjected;
   });
-  const [prevBotId, setPrevBotId] = useState(null);
-  const [initialProps, setInitialProps] = useState({ theme, cspNonce, position, className, mode });
-  if (prevBotId !== botId) {
-    setPrevBotId(botId);
-    setInitialProps({ theme, cspNonce, position, className, mode });
-  }
+  const initialProps = useMemo(
+    () => ({ theme, cspNonce, position, className, mode }),
+    [botId]
+  );
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!botId) return;
@@ -231,15 +228,9 @@ function AgentDeskWidget({
       }
     }
   }, [botId, position, className]);
-  if (typeof window === "undefined") {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
-    return null;
-  }
   return null;
 }
-export {
-  AgentDeskWidget
-};
+
+export { AgentDeskWidget };
+//# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
