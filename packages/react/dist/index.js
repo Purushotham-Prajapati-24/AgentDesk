@@ -193,7 +193,7 @@ function AgentDeskWidget({
         uninstallGlobalListener();
       }
     };
-  }, [botId, scriptSrc, configUrl, apiOrigin, initialProps]);
+  }, [botId, scriptSrc, configUrl, apiOrigin]);
   const isFirstModeRender = useRef(true);
   useEffect(() => {
     if (typeof window === "undefined") return;

@@ -15,7 +15,7 @@
 // `@agentdeskbot/react/nextjs` instead — that subpath uses `next/dynamic`
 // with `ssr: false`.
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import {
   WIDGET_ELEMENT_NAME,
   acquireInstance,
@@ -409,7 +409,7 @@ export function AgentDeskWidget({
         uninstallGlobalListener();
       }
     };
-  }, [botId, scriptSrc, configUrl, apiOrigin, initialProps]);
+  }, [botId, scriptSrc, configUrl, apiOrigin]);
 
   // Separate effect: dynamic mode propagation.
   const isFirstModeRender = useRef(true);

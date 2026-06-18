@@ -259,6 +259,9 @@ export const AgentDeskWidget = defineComponent({
 
     const install = () => {
       if (!props.botId) return;
+      if (hasSlot) {
+        release();
+      }
       const acquire = acquireInstance(props.botId, props.mode ?? 'launcher');
       if (acquire.mustInstallListener) {
         installGlobalListener();
@@ -305,18 +308,18 @@ export const AgentDeskWidget = defineComponent({
       }
     };
 
-    const release = () => {
-      if (!hasSlot || !props.botId) return;
-      const bucket = listenerBuckets.get(props.botId);
+    const release = (targetBotId = props.botId) => {
+      if (!hasSlot || !targetBotId) return;
+      const bucket = listenerBuckets.get(targetBotId);
       if (entry) bucket?.delete(entry);
       if (bucket && bucket.size === 0) {
-        listenerBuckets.delete(props.botId);
+        listenerBuckets.delete(targetBotId);
       }
       entry = null;
-      const result = releaseInstance(props.botId);
+      const result = releaseInstance(targetBotId);
       hasSlot = false;
       if (result.isLastForBot) {
-        removeScriptAndWidget(props.botId);
+        removeScriptAndWidget(targetBotId);
       }
       if (result.mustRemoveListener) {
         uninstallGlobalListener();
@@ -346,6 +349,15 @@ export const AgentDeskWidget = defineComponent({
         if (!hasSlot) return;
         if (!props.botId) return;
         postSetMode(props.botId, next ?? 'launcher');
+      },
+    );
+
+    watch(
+      () => props.botId,
+      (next, prev) => {
+        if (next === prev) return;
+        release(prev);
+        install();
       },
     );
 
