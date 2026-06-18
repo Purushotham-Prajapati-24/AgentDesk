@@ -347,4 +347,67 @@ describe('AgentDeskWidget (Vue)', () => {
     wrapper.unmount();
     mockWidgetEl.remove();
   });
+
+  it('re-injects the script when apiOrigin or scriptSrc props change dynamically', async () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'reinject-bot',
+        apiOrigin: 'https://api.initial.com',
+        scriptSrc: 'https://initial.com/widget.js',
+      },
+    });
+
+    const script1 = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script1).not.toBeNull();
+    expect(script1.getAttribute('src')).toBe('https://initial.com/widget.js');
+    expect(script1.dataset.apiOrigin).toBe('https://api.initial.com');
+
+    // Update props
+    await wrapper.setProps({
+      apiOrigin: 'https://api.updated.com',
+      scriptSrc: 'https://updated.com/widget.js',
+    });
+    await nextTick();
+
+    const script2 = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
+    expect(script2).not.toBeNull();
+    expect(script2.getAttribute('src')).toBe('https://updated.com/widget.js');
+    expect(script2.dataset.apiOrigin).toBe('https://api.updated.com');
+
+    wrapper.unmount();
+  });
+
+  it('releases previous botId and registers new botId when botId changes dynamically', async () => {
+    const wrapper = mount(AgentDeskWidget, {
+      props: {
+        botId: 'bot-one',
+      },
+    });
+
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-one"]').length).toBe(1);
+
+    await wrapper.setProps({
+      botId: 'bot-two',
+    });
+    await nextTick();
+
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-one"]').length).toBe(0);
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-two"]').length).toBe(1);
+
+    wrapper.unmount();
+  });
+
+  it('correctly isolates and cleans up listeners when different botIds are unmounted', () => {
+    const a = mount(AgentDeskWidget, { props: { botId: 'bot-one' } });
+    const b = mount(AgentDeskWidget, { props: { botId: 'bot-two' } });
+
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(2);
+
+    a.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-one"]').length).toBe(0);
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-two"]').length).toBe(1);
+
+    b.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(0);
+  });
 });

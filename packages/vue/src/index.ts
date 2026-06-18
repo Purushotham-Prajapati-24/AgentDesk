@@ -256,11 +256,12 @@ export const AgentDeskWidget = defineComponent({
 
     let hasSlot = false;
     let entry: ListenerEntry | null = null;
+    let activeBotId: string | null = null;
 
     const install = () => {
       if (!props.botId) return;
-      if (hasSlot) {
-        release();
+      if (hasSlot && activeBotId) {
+        release(activeBotId);
       }
       const acquire = acquireInstance(props.botId, props.mode ?? 'launcher');
       if (acquire.mustInstallListener) {
@@ -284,6 +285,7 @@ export const AgentDeskWidget = defineComponent({
         postSetMode(props.botId, props.mode ?? 'launcher');
       }
       hasSlot = true;
+      activeBotId = props.botId;
 
       entry = {
         apiOrigin: props.apiOrigin || undefined,
@@ -308,7 +310,7 @@ export const AgentDeskWidget = defineComponent({
       }
     };
 
-    const release = (targetBotId = props.botId) => {
+    const release = (targetBotId = activeBotId || props.botId) => {
       if (!hasSlot || !targetBotId) return;
       const bucket = listenerBuckets.get(targetBotId);
       if (entry) bucket?.delete(entry);
@@ -318,6 +320,7 @@ export const AgentDeskWidget = defineComponent({
       entry = null;
       const result = releaseInstance(targetBotId);
       hasSlot = false;
+      activeBotId = null;
       if (result.isLastForBot) {
         removeScriptAndWidget(targetBotId);
       }
@@ -363,11 +366,10 @@ export const AgentDeskWidget = defineComponent({
 
     watch(
       [() => props.apiOrigin, () => props.scriptSrc],
-      ([apiOrigin, scriptSrc]) => {
-        if (entry) {
-          entry.apiOrigin = apiOrigin || undefined;
-          entry.scriptSrc = scriptSrc || undefined;
-        }
+      ([apiOrigin, scriptSrc], [prevApiOrigin, prevScriptSrc]) => {
+        if (apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc) return;
+        release();
+        install();
       },
     );
 

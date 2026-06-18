@@ -116,19 +116,19 @@ function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected
 }) {
-  if (typeof window === "undefined") {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
-    return null;
-  }
   const modeRef = useRef(mode);
   useEffect(() => {
     modeRef.current = mode;
   });
   const entryRef = useRef({
     apiOrigin,
-    scriptSrc
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected
   });
   useEffect(() => {
     entryRef.current.apiOrigin = apiOrigin;
@@ -228,6 +228,12 @@ function AgentDeskWidget({
       }
     }
   }, [botId, position, className]);
+  if (typeof window === "undefined") {
+    console.warn(
+      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
+    );
+    return null;
+  }
   return null;
 }
 

@@ -156,11 +156,12 @@ var AgentDeskWidget = vue.defineComponent({
     }
     let hasSlot = false;
     let entry = null;
+    let activeBotId = null;
     const install = () => {
       var _a, _b, _c;
       if (!props.botId) return;
-      if (hasSlot) {
-        release();
+      if (hasSlot && activeBotId) {
+        release(activeBotId);
       }
       const acquire = core.acquireInstance(props.botId, (_a = props.mode) != null ? _a : "launcher");
       if (acquire.mustInstallListener) {
@@ -184,6 +185,7 @@ var AgentDeskWidget = vue.defineComponent({
         core.postSetMode(props.botId, (_c = props.mode) != null ? _c : "launcher");
       }
       hasSlot = true;
+      activeBotId = props.botId;
       entry = {
         apiOrigin: props.apiOrigin || void 0,
         scriptSrc: props.scriptSrc || void 0,
@@ -204,7 +206,7 @@ var AgentDeskWidget = vue.defineComponent({
         });
       }
     };
-    const release = (targetBotId = props.botId) => {
+    const release = (targetBotId = activeBotId || props.botId) => {
       if (!hasSlot || !targetBotId) return;
       const bucket = listenerBuckets.get(targetBotId);
       if (entry) bucket == null ? void 0 : bucket.delete(entry);
@@ -214,6 +216,7 @@ var AgentDeskWidget = vue.defineComponent({
       entry = null;
       const result = core.releaseInstance(targetBotId);
       hasSlot = false;
+      activeBotId = null;
       if (result.isLastForBot) {
         removeScriptAndWidget(targetBotId);
       }
@@ -252,11 +255,10 @@ var AgentDeskWidget = vue.defineComponent({
     );
     vue.watch(
       [() => props.apiOrigin, () => props.scriptSrc],
-      ([apiOrigin, scriptSrc]) => {
-        if (entry) {
-          entry.apiOrigin = apiOrigin || void 0;
-          entry.scriptSrc = scriptSrc || void 0;
-        }
+      ([apiOrigin, scriptSrc], [prevApiOrigin, prevScriptSrc]) => {
+        if (apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc) return;
+        release();
+        install();
       }
     );
     vue.watch(

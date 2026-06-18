@@ -311,14 +311,6 @@ export function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected,
 }: AgentDeskWidgetProps): null {
-  if (typeof window === 'undefined') {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
-      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
-    return null;
-  }
-
   const modeRef = useRef(mode);
 
   // Sync ref to the latest mode on every render.
@@ -327,12 +319,22 @@ export function AgentDeskWidget({
   });
 
   // Keep a mutable entry reference that persists across renders.
+  // We initialize it with all properties on first render to prevent any
+  // snapshotting race conditions before the first post-render sync effect runs.
   const entryRef = useRef<ListenerEntry>({
     apiOrigin,
     scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected,
   });
 
   // Always update the entry properties in an effect that runs after render.
+  // We omit the dependency array intentionally to keep callback references
+  // perfectly fresh across renders, preventing any stale closures.
   useEffect(() => {
     entryRef.current.apiOrigin = apiOrigin;
     entryRef.current.scriptSrc = scriptSrc;
@@ -455,6 +457,14 @@ export function AgentDeskWidget({
       }
     }
   }, [botId, position, className]);
+
+  if (typeof window === 'undefined') {
+    console.warn(
+      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
+      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
+    );
+    return null;
+  }
 
   return null;
 }

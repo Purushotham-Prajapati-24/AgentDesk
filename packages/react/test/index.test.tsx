@@ -422,4 +422,18 @@ describe('AgentDeskWidget (React)', () => {
     expect(onMessageSent).toHaveBeenCalledWith({ text: 'rerendered text' });
     expect(onWidgetInjected).toHaveBeenCalledTimes(1);
   });
+
+  it('correctly isolates and cleans up listeners when different botIds are unmounted', () => {
+    const first = render(<AgentDeskWidget botId="bot-one" />);
+    const second = render(<AgentDeskWidget botId="bot-two" />);
+
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(2);
+
+    first.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-one"]').length).toBe(0);
+    expect(document.querySelectorAll('script[data-agentdesk][data-bot-id="bot-two"]').length).toBe(1);
+
+    second.unmount();
+    expect(document.querySelectorAll('script[data-agentdesk]').length).toBe(0);
+  });
 });
