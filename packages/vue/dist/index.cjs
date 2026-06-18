@@ -22,24 +22,25 @@ function installGlobalListener() {
     if (typeof data.botId !== "string") return;
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
-    let originAllowed = false;
+    const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
+    let originAllowed = allowedOrigins.has(event.origin);
     for (const entry of bucket) {
-      const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
-      if (entry.apiOrigin) {
-        try {
-          allowedOrigins.add(new URL(entry.apiOrigin).origin);
-        } catch {
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+          }
         }
-      }
-      if (entry.scriptSrc) {
-        try {
-          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
-        } catch {
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+          }
         }
-      }
-      if (allowedOrigins.has(event.origin)) {
-        originAllowed = true;
-        break;
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
     if (!originAllowed) return;
@@ -104,6 +105,7 @@ function removeScriptAndWidget(botId) {
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
   document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
 }
+var defaultSaaSOriginWarned = false;
 var AgentDeskWidget = vue.defineComponent({
   name: "AgentDeskWidget",
   props: {
@@ -122,10 +124,11 @@ var AgentDeskWidget = vue.defineComponent({
     },
     scriptSrc: {
       type: String,
-      default: "/widget.js"
+      default: `${core.DEFAULT_SAAS_ORIGIN}/widget.js`
     },
     apiOrigin: {
-      type: String
+      type: String,
+      default: core.DEFAULT_SAAS_ORIGIN
     },
     theme: {
       type: String,
@@ -148,16 +151,20 @@ var AgentDeskWidget = vue.defineComponent({
   emits: ["open", "close", "ready", "error", "message-sent", "injected"],
   setup(props, { emit }) {
     if (typeof window === "undefined") {
-      console.warn(
-        "[AgentDesk] AgentDeskWidget was initialized in a non-browser environment. Ensure it is only rendered on the client side."
-      );
       return () => null;
     }
     let hasSlot = false;
     let entry = null;
+    let activeBotId = null;
     const install = () => {
       var _a, _b, _c;
       if (!props.botId) return;
+      if (!defaultSaaSOriginWarned && (props.apiOrigin === core.DEFAULT_SAAS_ORIGIN || props.scriptSrc === `${core.DEFAULT_SAAS_ORIGIN}/widget.js`)) {
+        defaultSaaSOriginWarned = true;
+        console.warn(
+          `[AgentDesk] Using default hosted endpoints (${core.DEFAULT_SAAS_ORIGIN}). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly.`
+        );
+      }
       const acquire = core.acquireInstance(props.botId, (_a = props.mode) != null ? _a : "launcher");
       if (acquire.mustInstallListener) {
         installGlobalListener();
@@ -167,7 +174,7 @@ var AgentDeskWidget = vue.defineComponent({
           injectScript({
             botId: props.botId,
             mode: (_b = props.mode) != null ? _b : "launcher",
-            scriptSrc: props.scriptSrc || "/widget.js",
+            scriptSrc: props.scriptSrc,
             configUrl: props.configUrl || void 0,
             apiOrigin: props.apiOrigin || void 0,
             theme: props.theme || void 0,
@@ -180,6 +187,7 @@ var AgentDeskWidget = vue.defineComponent({
         core.postSetMode(props.botId, (_c = props.mode) != null ? _c : "launcher");
       }
       hasSlot = true;
+      activeBotId = props.botId;
       entry = {
         apiOrigin: props.apiOrigin || void 0,
         scriptSrc: props.scriptSrc || void 0,
@@ -200,18 +208,19 @@ var AgentDeskWidget = vue.defineComponent({
         });
       }
     };
-    const release = () => {
-      if (!hasSlot || !props.botId) return;
-      const bucket = listenerBuckets.get(props.botId);
+    const release = (targetBotId = activeBotId || props.botId) => {
+      if (!hasSlot || !targetBotId) return;
+      const bucket = listenerBuckets.get(targetBotId);
       if (entry) bucket == null ? void 0 : bucket.delete(entry);
       if (bucket && bucket.size === 0) {
-        listenerBuckets.delete(props.botId);
+        listenerBuckets.delete(targetBotId);
       }
       entry = null;
-      const result = core.releaseInstance(props.botId);
+      const result = core.releaseInstance(targetBotId);
       hasSlot = false;
+      activeBotId = null;
       if (result.isLastForBot) {
-        removeScriptAndWidget(props.botId);
+        removeScriptAndWidget(targetBotId);
       }
       if (result.mustRemoveListener) {
         uninstallGlobalListener();
@@ -231,11 +240,19 @@ var AgentDeskWidget = vue.defineComponent({
     });
     vue.watch(
       () => props.mode,
-      (next, prev) => {
-        if (next === prev) return;
+      (next) => {
         if (!hasSlot) return;
         if (!props.botId) return;
         core.postSetMode(props.botId, next != null ? next : "launcher");
+      }
+    );
+    vue.watch(
+      [() => props.botId, () => props.apiOrigin, () => props.scriptSrc, () => props.configUrl],
+      ([botId, apiOrigin, scriptSrc, configUrl], [prevBotId, prevApiOrigin, prevScriptSrc, prevConfigUrl]) => {
+        if (!hasSlot && !(botId && !prevBotId)) return;
+        if (botId === prevBotId && apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc && configUrl === prevConfigUrl) return;
+        release(prevBotId);
+        install();
       }
     );
     vue.watch(

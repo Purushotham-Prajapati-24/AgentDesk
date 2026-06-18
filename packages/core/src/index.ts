@@ -2,6 +2,8 @@ export type WidgetMode = 'launcher' | 'inline';
 
 export const WIDGET_ELEMENT_NAME = 'agentdesk-widget';
 
+export const DEFAULT_SAAS_ORIGIN = 'https://agentdeskbot.vercel.app';
+
 export type WidgetLifecycleEventType =
   | 'agentdesk-widget-open'
   | 'agentdesk-widget-close'

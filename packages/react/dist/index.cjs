@@ -18,38 +18,48 @@ function installGlobalListener() {
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
     const allowedOrigins = /* @__PURE__ */ new Set([window.location.origin]);
-    if (bucket.apiOrigin) {
-      try {
-        allowedOrigins.add(new URL(bucket.apiOrigin).origin);
-      } catch {
+    let originAllowed = allowedOrigins.has(event.origin);
+    for (const entry of bucket) {
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+          }
+        }
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+          }
+        }
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
-    if (bucket.scriptSrc) {
-      try {
-        allowedOrigins.add(new URL(bucket.scriptSrc, window.location.origin).origin);
-      } catch {
+    if (!originAllowed) return;
+    for (const entry of bucket) {
+      switch (data.type) {
+        case "agentdesk-widget-open":
+          (_a = entry.onOpen) == null ? void 0 : _a.call(entry);
+          break;
+        case "agentdesk-widget-close":
+          (_b = entry.onClose) == null ? void 0 : _b.call(entry);
+          break;
+        case "agentdesk-widget-ready":
+          (_c = entry.onReady) == null ? void 0 : _c.call(entry);
+          break;
+        case "agentdesk-widget-error":
+          (_d = entry.onError) == null ? void 0 : _d.call(entry, { message: data.message || "Unknown error" });
+          break;
+        case "agentdesk-widget-message-sent":
+          (_e = entry.onMessageSent) == null ? void 0 : _e.call(entry, { text: data.text || "" });
+          break;
+        case "agentdesk-widget-injected":
+          (_f = entry.onWidgetInjected) == null ? void 0 : _f.call(entry);
+          break;
       }
-    }
-    if (!allowedOrigins.has(event.origin)) return;
-    switch (data.type) {
-      case "agentdesk-widget-open":
-        (_a = bucket.onOpen) == null ? void 0 : _a.call(bucket);
-        break;
-      case "agentdesk-widget-close":
-        (_b = bucket.onClose) == null ? void 0 : _b.call(bucket);
-        break;
-      case "agentdesk-widget-ready":
-        (_c = bucket.onReady) == null ? void 0 : _c.call(bucket);
-        break;
-      case "agentdesk-widget-error":
-        (_d = bucket.onError) == null ? void 0 : _d.call(bucket, { message: data.message || "Unknown error" });
-        break;
-      case "agentdesk-widget-message-sent":
-        (_e = bucket.onMessageSent) == null ? void 0 : _e.call(bucket, { text: data.text || "" });
-        break;
-      case "agentdesk-widget-injected":
-        (_f = bucket.onWidgetInjected) == null ? void 0 : _f.call(bucket);
-        break;
     }
   };
   window.addEventListener("message", globalListenerRef);
@@ -92,12 +102,13 @@ function removeScriptAndWidget(botId) {
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
   document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
 }
+var defaultSaaSOriginWarned = false;
 function AgentDeskWidget({
   botId,
   configUrl,
   mode = "launcher",
-  scriptSrc = "/widget.js",
-  apiOrigin,
+  scriptSrc = `${core.DEFAULT_SAAS_ORIGIN}/widget.js`,
+  apiOrigin = core.DEFAULT_SAAS_ORIGIN,
   theme,
   cspNonce,
   position,
@@ -109,27 +120,53 @@ function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected
 }) {
-  const onOpenRef = react.useRef(onOpen);
-  const onCloseRef = react.useRef(onClose);
-  const onReadyRef = react.useRef(onReady);
-  const onErrorRef = react.useRef(onError);
-  const onMessageSentRef = react.useRef(onMessageSent);
-  const onWidgetInjectedRef = react.useRef(onWidgetInjected);
   const modeRef = react.useRef(mode);
-  const initialPropsRef = react.useRef({ theme, cspNonce, position, className, mode });
   react.useEffect(() => {
-    onOpenRef.current = onOpen;
-    onCloseRef.current = onClose;
-    onReadyRef.current = onReady;
-    onErrorRef.current = onError;
-    onMessageSentRef.current = onMessageSent;
-    onWidgetInjectedRef.current = onWidgetInjected;
     modeRef.current = mode;
   });
+  const entryRef = react.useRef({
+    apiOrigin,
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected
+  });
   react.useEffect(() => {
-    if (typeof window === "undefined") return;
+    entryRef.current.apiOrigin = apiOrigin;
+    entryRef.current.scriptSrc = scriptSrc;
+    entryRef.current.onOpen = onOpen;
+    entryRef.current.onClose = onClose;
+    entryRef.current.onReady = onReady;
+    entryRef.current.onError = onError;
+    entryRef.current.onMessageSent = onMessageSent;
+    entryRef.current.onWidgetInjected = onWidgetInjected;
+  }, [
+    apiOrigin,
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected
+  ]);
+  const initialProps = react.useMemo(
+    () => ({ theme, cspNonce, position, className, mode }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [botId]
+  );
+  react.useEffect(() => {
     if (!botId) return;
-    const acquire = core.acquireInstance(botId, initialPropsRef.current.mode);
+    if (!defaultSaaSOriginWarned && (apiOrigin === core.DEFAULT_SAAS_ORIGIN || scriptSrc === `${core.DEFAULT_SAAS_ORIGIN}/widget.js`)) {
+      defaultSaaSOriginWarned = true;
+      console.warn(
+        `[AgentDesk] Using default hosted endpoints (${core.DEFAULT_SAAS_ORIGIN}). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly.`
+      );
+    }
+    const acquire = core.acquireInstance(botId, initialProps.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -137,38 +174,38 @@ function AgentDeskWidget({
       if (!findExistingScript(botId)) {
         injectScript({
           botId,
-          mode: initialPropsRef.current.mode,
+          mode: initialProps.mode,
           scriptSrc,
           configUrl,
           apiOrigin,
-          theme: initialPropsRef.current.theme,
-          cspNonce: initialPropsRef.current.cspNonce,
-          position: initialPropsRef.current.position,
-          className: initialPropsRef.current.className
+          theme: initialProps.theme,
+          cspNonce: initialProps.cspNonce,
+          position: initialProps.position,
+          className: initialProps.className
         });
       }
     } else if (acquire.modeChanged) {
       core.postSetMode(botId, modeRef.current);
     }
-    const bucket = {
-      apiOrigin,
-      scriptSrc,
-      onOpen: onOpenRef.current,
-      onClose: onCloseRef.current,
-      onReady: onReadyRef.current,
-      onError: onErrorRef.current,
-      onMessageSent: onMessageSentRef.current,
-      onWidgetInjected: onWidgetInjectedRef.current
-    };
-    listenerBuckets.set(botId, bucket);
+    if (!listenerBuckets.has(botId)) {
+      listenerBuckets.set(botId, /* @__PURE__ */ new Set());
+    }
+    const currentEntry = entryRef.current;
+    listenerBuckets.get(botId).add(currentEntry);
     if (typeof customElements !== "undefined") {
       void customElements.whenDefined(core.WIDGET_ELEMENT_NAME).catch(() => {
       });
     }
     return () => {
       const release = core.releaseInstance(botId);
+      const bucket = listenerBuckets.get(botId);
+      if (bucket) {
+        bucket.delete(currentEntry);
+        if (bucket.size === 0) {
+          listenerBuckets.delete(botId);
+        }
+      }
       if (release.isLastForBot) {
-        listenerBuckets.delete(botId);
         removeScriptAndWidget(botId);
       }
       if (release.mustRemoveListener) {
@@ -211,9 +248,6 @@ function AgentDeskWidget({
     }
   }, [botId, position, className]);
   if (typeof window === "undefined") {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
     return null;
   }
   return null;

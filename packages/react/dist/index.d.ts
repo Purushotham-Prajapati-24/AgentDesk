@@ -24,15 +24,14 @@ interface AgentDeskWidgetProps {
     mode?: WidgetMode;
     /**
      * URL to the `widget.js` script.
-     * Defaults to `'/widget.js'`.
-     * For cross-site embeds, point this to your CDN or AgentDesk deployment.
+     * Defaults to `'https://agentdeskbot.vercel.app/widget.js'`.
+     * For self-hosted or custom deployments, point this to your CDN or AgentDesk deployment.
      * @example 'https://cdn.agentdesk.ai/widget.js'
      */
     scriptSrc?: string;
     /**
      * Base URL of your AgentDesk backend deployment.
-     * Required when the widget is embedded on a domain different from the backend.
-     * Defaults to `undefined` (same-origin).
+     * Defaults to `'https://agentdeskbot.vercel.app'`.
      * @example 'https://support.yourapp.com'
      */
     apiOrigin?: string;

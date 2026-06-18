@@ -16,11 +16,12 @@ import {
   acquireInstance,
   releaseInstance,
   postSetMode,
+  DEFAULT_SAAS_ORIGIN,
   type WidgetMode,
   type WidgetMessageEventData,
 } from '@agentdeskbot/core';
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+// === Public types ===
 
 export type { WidgetMode } from '@agentdeskbot/core';
 
@@ -33,9 +34,9 @@ export interface AgentDeskWidgetProps {
    *  **Dynamic updates are supported** — the SDK posts an
    *  `agentdesk-set-mode` message when this prop changes. */
   mode?: WidgetMode;
-  /** URL to widget.js. Defaults to '/widget.js'. */
+  /** URL to widget.js. Defaults to 'https://agentdeskbot.vercel.app/widget.js'. */
   scriptSrc?: string;
-  /** Base URL of your AgentDesk backend (for cross-origin embeds). Defaults to undefined (same-origin). */
+  /** Base URL of your AgentDesk backend. Defaults to 'https://agentdeskbot.vercel.app'. */
   apiOrigin?: string;
   /** Optional theme name for the widget (e.g. 'webchat-v1'). Note: This prop only takes effect on initial mount. */
   theme?: string;
@@ -47,7 +48,7 @@ export interface AgentDeskWidgetProps {
   className?: string;
 }
 
-// ─── Shared global message listener ──────────────────────────────────────────
+// === Shared global message listener ===
 
 type EmitName = 'open' | 'close' | 'ready' | 'error' | 'message-sent' | 'injected';
 
@@ -78,26 +79,27 @@ function installGlobalListener() {
     const bucket = listenerBuckets.get(data.botId);
     if (!bucket) return;
 
-    let originAllowed = false;
+    const allowedOrigins = new Set([window.location.origin]);
+    let originAllowed = allowedOrigins.has(event.origin);
     for (const entry of bucket) {
-      const allowedOrigins = new Set([window.location.origin]);
-      if (entry.apiOrigin) {
-        try {
-          allowedOrigins.add(new URL(entry.apiOrigin).origin);
-        } catch {
-          // ignore
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+            // ignore
+          }
         }
-      }
-      if (entry.scriptSrc) {
-        try {
-          allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
-        } catch {
-          // ignore
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+            // ignore
+          }
         }
-      }
-      if (allowedOrigins.has(event.origin)) {
-        originAllowed = true;
-        break;
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
     if (!originAllowed) return;
@@ -135,7 +137,7 @@ function uninstallGlobalListener() {
   }
 }
 
-// ─── Script injection helpers ────────────────────────────────────────────────
+// === Script injection helpers ===
 
 const SCRIPT_TAG = 'data-agentdesk';
 
@@ -183,7 +185,7 @@ function removeScriptAndWidget(botId: string): void {
     .forEach((el) => el.remove());
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// === Component ===
 
 /**
  * AgentDeskWidget — Vue 3 component that embeds the AgentDesk AI chat widget.
@@ -199,6 +201,8 @@ function removeScriptAndWidget(botId: string): void {
  * </template>
  * ```
  */
+let defaultSaaSOriginWarned = false;
+
 export const AgentDeskWidget = defineComponent({
   name: 'AgentDeskWidget',
 
@@ -218,10 +222,11 @@ export const AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String as PropType<string>,
-      default: '/widget.js',
+      default: `${DEFAULT_SAAS_ORIGIN}/widget.js`,
     },
     apiOrigin: {
       type: String as PropType<string>,
+      default: DEFAULT_SAAS_ORIGIN,
     },
     theme: {
       type: String as PropType<string>,
@@ -246,18 +251,24 @@ export const AgentDeskWidget = defineComponent({
 
   setup(props, { emit }) {
     if (typeof window === 'undefined') {
-      console.warn(
-        "[AgentDesk] AgentDeskWidget was initialized in a non-browser environment. " +
-        "Ensure it is only rendered on the client side."
-      );
       return () => null;
     }
 
     let hasSlot = false;
     let entry: ListenerEntry | null = null;
+    let activeBotId: string | null = null;
 
     const install = () => {
       if (!props.botId) return;
+
+      if (!defaultSaaSOriginWarned && (props.apiOrigin === DEFAULT_SAAS_ORIGIN || props.scriptSrc === `${DEFAULT_SAAS_ORIGIN}/widget.js`)) {
+        defaultSaaSOriginWarned = true;
+        console.warn(
+          `[AgentDesk] Using default hosted endpoints (${DEFAULT_SAAS_ORIGIN}). ` +
+          "For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+        );
+      }
+
       const acquire = acquireInstance(props.botId, props.mode ?? 'launcher');
       if (acquire.mustInstallListener) {
         installGlobalListener();
@@ -267,7 +278,7 @@ export const AgentDeskWidget = defineComponent({
           injectScript({
             botId: props.botId,
             mode: props.mode ?? 'launcher',
-            scriptSrc: props.scriptSrc || '/widget.js',
+            scriptSrc: props.scriptSrc,
             configUrl: props.configUrl || undefined,
             apiOrigin: props.apiOrigin || undefined,
             theme: props.theme || undefined,
@@ -280,6 +291,7 @@ export const AgentDeskWidget = defineComponent({
         postSetMode(props.botId, props.mode ?? 'launcher');
       }
       hasSlot = true;
+      activeBotId = props.botId;
 
       entry = {
         apiOrigin: props.apiOrigin || undefined,
@@ -304,18 +316,19 @@ export const AgentDeskWidget = defineComponent({
       }
     };
 
-    const release = () => {
-      if (!hasSlot || !props.botId) return;
-      const bucket = listenerBuckets.get(props.botId);
+    const release = (targetBotId = activeBotId || props.botId) => {
+      if (!hasSlot || !targetBotId) return;
+      const bucket = listenerBuckets.get(targetBotId);
       if (entry) bucket?.delete(entry);
       if (bucket && bucket.size === 0) {
-        listenerBuckets.delete(props.botId);
+        listenerBuckets.delete(targetBotId);
       }
       entry = null;
-      const result = releaseInstance(props.botId);
+      const result = releaseInstance(targetBotId);
       hasSlot = false;
+      activeBotId = null;
       if (result.isLastForBot) {
-        removeScriptAndWidget(props.botId);
+        removeScriptAndWidget(targetBotId);
       }
       if (result.mustRemoveListener) {
         uninstallGlobalListener();
@@ -340,11 +353,20 @@ export const AgentDeskWidget = defineComponent({
 
     watch(
       () => props.mode,
-      (next, prev) => {
-        if (next === prev) return;
+      (next) => {
         if (!hasSlot) return;
         if (!props.botId) return;
         postSetMode(props.botId, next ?? 'launcher');
+      },
+    );
+
+    watch(
+      [() => props.botId, () => props.apiOrigin, () => props.scriptSrc, () => props.configUrl],
+      ([botId, apiOrigin, scriptSrc, configUrl], [prevBotId, prevApiOrigin, prevScriptSrc, prevConfigUrl]) => {
+        if (!hasSlot && !(botId && !prevBotId)) return;
+        if (botId === prevBotId && apiOrigin === prevApiOrigin && scriptSrc === prevScriptSrc && configUrl === prevConfigUrl) return;
+        release(prevBotId);
+        install();
       },
     );
 
@@ -393,7 +415,7 @@ export const AgentDeskWidget = defineComponent({
   },
 });
 
-// ─── Vue Plugin ───────────────────────────────────────────────────────────────
+// === Vue Plugin ===
 
 export interface AgentDeskPluginOptions {
   /**

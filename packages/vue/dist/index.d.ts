@@ -12,9 +12,9 @@ interface AgentDeskWidgetProps {
      *  **Dynamic updates are supported** — the SDK posts an
      *  `agentdesk-set-mode` message when this prop changes. */
     mode?: WidgetMode;
-    /** URL to widget.js. Defaults to '/widget.js'. */
+    /** URL to widget.js. Defaults to 'https://agentdeskbot.vercel.app/widget.js'. */
     scriptSrc?: string;
-    /** Base URL of your AgentDesk backend (for cross-origin embeds). Defaults to undefined (same-origin). */
+    /** Base URL of your AgentDesk backend. Defaults to 'https://agentdeskbot.vercel.app'. */
     apiOrigin?: string;
     /** Optional theme name for the widget (e.g. 'webchat-v1'). Note: This prop only takes effect on initial mount. */
     theme?: string;
@@ -25,20 +25,6 @@ interface AgentDeskWidgetProps {
     /** Optional custom HTML class name to apply to the host container. */
     className?: string;
 }
-/**
- * AgentDeskWidget — Vue 3 component that embeds the AgentDesk AI chat widget.
- *
- * @example
- * ```vue
- * <script setup>
- * import { AgentDeskWidget } from '@agentdeskbot/vue';
- * </script>
- *
- * <template>
- *   <AgentDeskWidget bot-id="your-bot-id" />
- * </template>
- * ```
- */
 declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     botId: {
         type: PropType<string>;
@@ -59,6 +45,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
     apiOrigin: {
         type: PropType<string>;
+        default: string;
     };
     theme: {
         type: PropType<string>;
@@ -99,6 +86,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
     apiOrigin: {
         type: PropType<string>;
+        default: string;
     };
     theme: {
         type: PropType<string>;
@@ -127,6 +115,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
 }>, {
     mode: WidgetMode;
     configUrl: string;
+    apiOrigin: string;
     theme: string;
     cspNonce: string;
     position: "bottom-right" | "bottom-left" | "top-right" | "top-left";

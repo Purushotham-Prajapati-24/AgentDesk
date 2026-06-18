@@ -15,17 +15,18 @@
 // `@agentdeskbot/react/nextjs` instead — that subpath uses `next/dynamic`
 // with `ssr: false`.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import {
   WIDGET_ELEMENT_NAME,
   acquireInstance,
   releaseInstance,
   postSetMode,
+  DEFAULT_SAAS_ORIGIN,
   type WidgetMode,
   type WidgetMessageEventData,
 } from '@agentdeskbot/core';
 
-// ─── Public types ─────────────────────────────────────────────────────────────
+// === Public types ===
 
 export type { WidgetMode } from '@agentdeskbot/core';
 
@@ -55,16 +56,15 @@ export interface AgentDeskWidgetProps {
 
   /**
    * URL to the `widget.js` script.
-   * Defaults to `'/widget.js'`.
-   * For cross-site embeds, point this to your CDN or AgentDesk deployment.
+   * Defaults to `'https://agentdeskbot.vercel.app/widget.js'`.
+   * For self-hosted or custom deployments, point this to your CDN or AgentDesk deployment.
    * @example 'https://cdn.agentdesk.ai/widget.js'
    */
   scriptSrc?: string;
 
   /**
    * Base URL of your AgentDesk backend deployment.
-   * Required when the widget is embedded on a domain different from the backend.
-   * Defaults to `undefined` (same-origin).
+   * Defaults to `'https://agentdeskbot.vercel.app'`.
    * @example 'https://support.yourapp.com'
    */
   apiOrigin?: string;
@@ -124,7 +124,7 @@ export interface AgentDeskWidgetProps {
   onWidgetInjected?: () => void;
 }
 
-// ─── Shared global message listener ──────────────────────────────────────────
+// === Shared global message listener ===
 //
 // We register a single `window.message` listener for the lifetime of the
 // page (across all botIds) instead of one-per-component. The listener
@@ -141,7 +141,7 @@ export interface AgentDeskWidgetProps {
 // component (see `useAgentDeskListeners` below) keeps the dispatch logic
 // side-effect free.
 
-type ListenerBucket = {
+interface ListenerEntry {
   apiOrigin?: string;
   scriptSrc?: string;
   onOpen?: () => void;
@@ -150,7 +150,9 @@ type ListenerBucket = {
   onError?: (error: { message: string }) => void;
   onMessageSent?: (message: { text: string }) => void;
   onWidgetInjected?: () => void;
-};
+}
+
+type ListenerBucket = Set<ListenerEntry>;
 
 const listenerBuckets = new Map<string, ListenerBucket>();
 
@@ -168,41 +170,51 @@ function installGlobalListener() {
     if (!bucket) return;
 
     const allowedOrigins = new Set([window.location.origin]);
-    if (bucket.apiOrigin) {
-      try {
-        allowedOrigins.add(new URL(bucket.apiOrigin).origin);
-      } catch {
-        // ignore
+    let originAllowed = allowedOrigins.has(event.origin);
+    for (const entry of bucket) {
+      if (!originAllowed) {
+        if (entry.apiOrigin) {
+          try {
+            allowedOrigins.add(new URL(entry.apiOrigin).origin);
+          } catch {
+            // ignore
+          }
+        }
+        if (entry.scriptSrc) {
+          try {
+            allowedOrigins.add(new URL(entry.scriptSrc, window.location.origin).origin);
+          } catch {
+            // ignore
+          }
+        }
+        if (allowedOrigins.has(event.origin)) {
+          originAllowed = true;
+        }
       }
     }
-    if (bucket.scriptSrc) {
-      try {
-        allowedOrigins.add(new URL(bucket.scriptSrc, window.location.origin).origin);
-      } catch {
-        // ignore
-      }
-    }
-    if (!allowedOrigins.has(event.origin)) return;
+    if (!originAllowed) return;
 
-    switch (data.type) {
-      case 'agentdesk-widget-open':
-        bucket.onOpen?.();
-        break;
-      case 'agentdesk-widget-close':
-        bucket.onClose?.();
-        break;
-      case 'agentdesk-widget-ready':
-        bucket.onReady?.();
-        break;
-      case 'agentdesk-widget-error':
-        bucket.onError?.({ message: (data as { message?: string }).message || 'Unknown error' });
-        break;
-      case 'agentdesk-widget-message-sent':
-        bucket.onMessageSent?.({ text: (data as { text?: string }).text || '' });
-        break;
-      case 'agentdesk-widget-injected':
-        bucket.onWidgetInjected?.();
-        break;
+    for (const entry of bucket) {
+      switch (data.type) {
+        case 'agentdesk-widget-open':
+          entry.onOpen?.();
+          break;
+        case 'agentdesk-widget-close':
+          entry.onClose?.();
+          break;
+        case 'agentdesk-widget-ready':
+          entry.onReady?.();
+          break;
+        case 'agentdesk-widget-error':
+          entry.onError?.({ message: (data as { message?: string }).message || 'Unknown error' });
+          break;
+        case 'agentdesk-widget-message-sent':
+          entry.onMessageSent?.({ text: (data as { text?: string }).text || '' });
+          break;
+        case 'agentdesk-widget-injected':
+          entry.onWidgetInjected?.();
+          break;
+      }
     }
   };
   window.addEventListener('message', globalListenerRef);
@@ -217,7 +229,7 @@ function uninstallGlobalListener() {
   }
 }
 
-// ─── Script injection helpers ────────────────────────────────────────────────
+// === Script injection helpers ===
 
 const SCRIPT_TAG = 'data-agentdesk';
 
@@ -265,7 +277,9 @@ function removeScriptAndWidget(botId: string): void {
     .forEach((el) => el.remove());
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+let defaultSaaSOriginWarned = false;
+
+// === Component ===
 
 /**
  * AgentDeskWidget — embeds the AgentDesk AI chat widget into any React app.
@@ -288,8 +302,8 @@ export function AgentDeskWidget({
   botId,
   configUrl,
   mode = 'launcher',
-  scriptSrc = '/widget.js',
-  apiOrigin,
+  scriptSrc = `${DEFAULT_SAAS_ORIGIN}/widget.js`,
+  apiOrigin = DEFAULT_SAAS_ORIGIN,
   theme,
   cspNonce,
   position,
@@ -301,41 +315,77 @@ export function AgentDeskWidget({
   onMessageSent,
   onWidgetInjected,
 }: AgentDeskWidgetProps): null {
-  // Keep callbacks in refs so the effect closure never goes stale across
-  // re-renders. The shared dispatch function reads the latest refs.
-  const onOpenRef = useRef<(() => void) | undefined>(onOpen);
-  const onCloseRef = useRef<(() => void) | undefined>(onClose);
-  const onReadyRef = useRef<(() => void) | undefined>(onReady);
-  const onErrorRef = useRef<((error: { message: string }) => void) | undefined>(onError);
-  const onMessageSentRef = useRef<((message: { text: string }) => void) | undefined>(onMessageSent);
-  const onWidgetInjectedRef = useRef<(() => void) | undefined>(onWidgetInjected);
   const modeRef = useRef(mode);
 
-  // Store mount-only configurations in refs so they are not reactive dependencies
-  // of the mount/unmount effect (avoiding full script unmount/remount cycles).
-  const initialPropsRef = useRef({ theme, cspNonce, position, className, mode });
-
-  // Sync refs to the latest callback identity after every render so the
-  // shared message listener always dispatches to the most recent functions.
+  // Sync ref to the latest mode on every render.
   useEffect(() => {
-    onOpenRef.current = onOpen;
-    onCloseRef.current = onClose;
-    onReadyRef.current = onReady;
-    onErrorRef.current = onError;
-    onMessageSentRef.current = onMessageSent;
-    onWidgetInjectedRef.current = onWidgetInjected;
     modeRef.current = mode;
   });
+
+  // Keep a mutable entry reference that persists across renders.
+  // We initialize it with all properties on first render to prevent any
+  // snapshotting race conditions before the first post-render sync effect runs.
+  const entryRef = useRef<ListenerEntry>({
+    apiOrigin,
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected,
+  });
+
+  // Always update the entry properties in an effect that runs after render.
+  // We specify all props in the dependency array so that the ref is only synced
+  // when one of the callback/configuration props changes, avoiding running on every render.
+  useEffect(() => {
+    entryRef.current.apiOrigin = apiOrigin;
+    entryRef.current.scriptSrc = scriptSrc;
+    entryRef.current.onOpen = onOpen;
+    entryRef.current.onClose = onClose;
+    entryRef.current.onReady = onReady;
+    entryRef.current.onError = onError;
+    entryRef.current.onMessageSent = onMessageSent;
+    entryRef.current.onWidgetInjected = onWidgetInjected;
+  }, [
+    apiOrigin,
+    scriptSrc,
+    onOpen,
+    onClose,
+    onReady,
+    onError,
+    onMessageSent,
+    onWidgetInjected,
+  ]);
+
+  // Track the botId to detect when it changes and update initialProps accordingly.
+  // Note: We intentionally only depend on `botId` here. This captures the initial mount-only
+  // properties (theme, cspNonce) and the initial script injection options (mode, position, className)
+  // once per botId. Dynamic updates to mode, position, and className are handled by separate effects
+  // to avoid disruptive script re-injection.
+  const initialProps = useMemo(
+    () => ({ theme, cspNonce, position, className, mode }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [botId],
+  );
 
   // Mount/unmount lifecycle: ref-count the widget so multiple components
   // pointing at the same botId share a single script injection.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (!botId) return;
+
+    if (!defaultSaaSOriginWarned && (apiOrigin === DEFAULT_SAAS_ORIGIN || scriptSrc === `${DEFAULT_SAAS_ORIGIN}/widget.js`)) {
+      defaultSaaSOriginWarned = true;
+      console.warn(
+        `[AgentDesk] Using default hosted endpoints (${DEFAULT_SAAS_ORIGIN}). ` +
+        "For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+      );
+    }
 
     // Acquire registry slot. Note that we pass the initial mode here,
     // but any subsequent mode changes are handled dynamically by the mode effect.
-    const acquire = acquireInstance(botId, initialPropsRef.current.mode);
+    const acquire = acquireInstance(botId, initialProps.mode);
     if (acquire.mustInstallListener) {
       installGlobalListener();
     }
@@ -343,32 +393,26 @@ export function AgentDeskWidget({
       if (!findExistingScript(botId)) {
         injectScript({
           botId,
-          mode: initialPropsRef.current.mode,
+          mode: initialProps.mode,
           scriptSrc,
           configUrl,
           apiOrigin,
-          theme: initialPropsRef.current.theme,
-          cspNonce: initialPropsRef.current.cspNonce,
-          position: initialPropsRef.current.position,
-          className: initialPropsRef.current.className,
+          theme: initialProps.theme,
+          cspNonce: initialProps.cspNonce,
+          position: initialProps.position,
+          className: initialProps.className,
         });
       }
     } else if (acquire.modeChanged) {
       postSetMode(botId, modeRef.current);
     }
 
-    // Register this component's callbacks in the shared dispatch table.
-    const bucket: ListenerBucket = {
-      apiOrigin,
-      scriptSrc,
-      onOpen: onOpenRef.current,
-      onClose: onCloseRef.current,
-      onReady: onReadyRef.current,
-      onError: onErrorRef.current,
-      onMessageSent: onMessageSentRef.current,
-      onWidgetInjected: onWidgetInjectedRef.current,
-    };
-    listenerBuckets.set(botId, bucket);
+    // Register this component's entry in the shared dispatch Set.
+    if (!listenerBuckets.has(botId)) {
+      listenerBuckets.set(botId, new Set());
+    }
+    const currentEntry = entryRef.current;
+    listenerBuckets.get(botId)!.add(currentEntry);
 
     if (typeof customElements !== 'undefined') {
       void customElements.whenDefined(WIDGET_ELEMENT_NAME).catch(() => {
@@ -378,14 +422,24 @@ export function AgentDeskWidget({
 
     return () => {
       const release = releaseInstance(botId);
+      const bucket = listenerBuckets.get(botId);
+      if (bucket) {
+        bucket.delete(currentEntry);
+        if (bucket.size === 0) {
+          listenerBuckets.delete(botId);
+        }
+      }
       if (release.isLastForBot) {
-        listenerBuckets.delete(botId);
         removeScriptAndWidget(botId);
       }
       if (release.mustRemoveListener) {
         uninstallGlobalListener();
       }
     };
+    // The dependency array is intentionally limited to the props that dictate the identity
+    // of the widget script and the bot it connects to. Any other props (mode, callbacks)
+    // are synced via refs/effects dynamically and do not require remounting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botId, scriptSrc, configUrl, apiOrigin]);
 
   // Separate effect: dynamic mode propagation.
@@ -434,10 +488,6 @@ export function AgentDeskWidget({
   }, [botId, position, className]);
 
   if (typeof window === 'undefined') {
-    console.warn(
-      "[AgentDesk] AgentDeskWidget was rendered on the server. " +
-      "If you are using Next.js App Router, please import from '@agentdeskbot/react/nextjs' instead to ensure proper SSR/App Router integration."
-    );
     return null;
   }
 
