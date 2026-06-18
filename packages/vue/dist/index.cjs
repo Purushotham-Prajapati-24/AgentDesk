@@ -124,11 +124,11 @@ var AgentDeskWidget = vue.defineComponent({
     },
     scriptSrc: {
       type: String,
-      default: "https://agentdeskbot.vercel.app/widget.js"
+      default: `${core.DEFAULT_SAAS_ORIGIN}/widget.js`
     },
     apiOrigin: {
       type: String,
-      default: "https://agentdeskbot.vercel.app"
+      default: core.DEFAULT_SAAS_ORIGIN
     },
     theme: {
       type: String,
@@ -162,10 +162,10 @@ var AgentDeskWidget = vue.defineComponent({
       if (hasSlot && activeBotId) {
         release(activeBotId);
       }
-      if (!defaultSaaSOriginWarned && (props.apiOrigin === "https://agentdeskbot.vercel.app" || props.scriptSrc === "https://agentdeskbot.vercel.app/widget.js")) {
+      if (!defaultSaaSOriginWarned && (props.apiOrigin === core.DEFAULT_SAAS_ORIGIN || props.scriptSrc === `${core.DEFAULT_SAAS_ORIGIN}/widget.js`)) {
         defaultSaaSOriginWarned = true;
         console.warn(
-          "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+          `[AgentDesk] Using default hosted endpoints (${core.DEFAULT_SAAS_ORIGIN}). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly.`
         );
       }
       const acquire = core.acquireInstance(props.botId, (_a = props.mode) != null ? _a : "launcher");

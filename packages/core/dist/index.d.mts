@@ -1,5 +1,6 @@
 type WidgetMode = 'launcher' | 'inline';
 declare const WIDGET_ELEMENT_NAME = "agentdesk-widget";
+declare const DEFAULT_SAAS_ORIGIN = "https://agentdeskbot.vercel.app";
 type WidgetLifecycleEventType = 'agentdesk-widget-open' | 'agentdesk-widget-close' | 'agentdesk-widget-ready' | 'agentdesk-widget-error' | 'agentdesk-widget-message-sent' | 'agentdesk-widget-injected';
 type WidgetControlEventType = 'agentdesk-set-mode';
 type WidgetAckEventType = 'agentdesk-set-mode-ack';
@@ -53,4 +54,4 @@ declare function getEntry(botId: string): AgentDeskWidgetRegistryEntry | undefin
 declare function getActiveBotIds(): string[];
 declare function postSetMode(botId: string, mode: WidgetMode): void;
 
-export { type AcquireResult, type AgentDeskWidgetGlobals, type AgentDeskWidgetRegistryEntry, type ReleaseResult, WIDGET_ELEMENT_NAME, type WidgetAckEventType, type WidgetControlEventType, type WidgetEventType, type WidgetLifecycleEventType, type WidgetMessageEventData, type WidgetMode, acquireInstance, getActiveBotIds, getEntry, postSetMode, releaseInstance };
+export { type AcquireResult, type AgentDeskWidgetGlobals, type AgentDeskWidgetRegistryEntry, DEFAULT_SAAS_ORIGIN, type ReleaseResult, WIDGET_ELEMENT_NAME, type WidgetAckEventType, type WidgetControlEventType, type WidgetEventType, type WidgetLifecycleEventType, type WidgetMessageEventData, type WidgetMode, acquireInstance, getActiveBotIds, getEntry, postSetMode, releaseInstance };

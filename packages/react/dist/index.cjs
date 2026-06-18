@@ -100,15 +100,15 @@ function injectScript(options) {
 function removeScriptAndWidget(botId) {
   var _a;
   (_a = findExistingScript(botId)) == null ? void 0 : _a.remove();
-  document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`);
+  document.querySelectorAll(`${core.WIDGET_ELEMENT_NAME}[data-bot-id="${botId}"]`).forEach((el) => el.remove());
 }
 var defaultSaaSOriginWarned = false;
 function AgentDeskWidget({
   botId,
   configUrl,
   mode = "launcher",
-  scriptSrc = "https://agentdeskbot.vercel.app/widget.js",
-  apiOrigin = "https://agentdeskbot.vercel.app",
+  scriptSrc = `${core.DEFAULT_SAAS_ORIGIN}/widget.js`,
+  apiOrigin = core.DEFAULT_SAAS_ORIGIN,
   theme,
   cspNonce,
   position,
@@ -160,10 +160,10 @@ function AgentDeskWidget({
   );
   react.useEffect(() => {
     if (!botId) return;
-    if (!defaultSaaSOriginWarned && (apiOrigin === "https://agentdeskbot.vercel.app" || scriptSrc === "https://agentdeskbot.vercel.app/widget.js")) {
+    if (!defaultSaaSOriginWarned && (apiOrigin === core.DEFAULT_SAAS_ORIGIN || scriptSrc === `${core.DEFAULT_SAAS_ORIGIN}/widget.js`)) {
       defaultSaaSOriginWarned = true;
       console.warn(
-        "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+        `[AgentDesk] Using default hosted endpoints (${core.DEFAULT_SAAS_ORIGIN}). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly.`
       );
     }
     const acquire = core.acquireInstance(botId, initialProps.mode);

@@ -16,6 +16,7 @@ import {
   acquireInstance,
   releaseInstance,
   postSetMode,
+  DEFAULT_SAAS_ORIGIN,
   type WidgetMode,
   type WidgetMessageEventData,
 } from '@agentdeskbot/core';
@@ -221,11 +222,11 @@ export const AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String as PropType<string>,
-      default: 'https://agentdeskbot.vercel.app/widget.js',
+      default: `${DEFAULT_SAAS_ORIGIN}/widget.js`,
     },
     apiOrigin: {
       type: String as PropType<string>,
-      default: 'https://agentdeskbot.vercel.app',
+      default: DEFAULT_SAAS_ORIGIN,
     },
     theme: {
       type: String as PropType<string>,
@@ -263,10 +264,10 @@ export const AgentDeskWidget = defineComponent({
         release(activeBotId);
       }
 
-      if (!defaultSaaSOriginWarned && (props.apiOrigin === 'https://agentdeskbot.vercel.app' || props.scriptSrc === 'https://agentdeskbot.vercel.app/widget.js')) {
+      if (!defaultSaaSOriginWarned && (props.apiOrigin === DEFAULT_SAAS_ORIGIN || props.scriptSrc === `${DEFAULT_SAAS_ORIGIN}/widget.js`)) {
         defaultSaaSOriginWarned = true;
         console.warn(
-          "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). " +
+          `[AgentDesk] Using default hosted endpoints (${DEFAULT_SAAS_ORIGIN}). ` +
           "For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
         );
       }

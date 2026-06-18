@@ -1,5 +1,5 @@
 import { defineComponent, onMounted, onBeforeUnmount, onDeactivated, onActivated, watch, h } from 'vue';
-import { acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
+import { DEFAULT_SAAS_ORIGIN, acquireInstance, postSetMode, WIDGET_ELEMENT_NAME, releaseInstance } from '@agentdeskbot/core';
 
 // src/index.ts
 var listenerBuckets = /* @__PURE__ */ new Map();
@@ -120,11 +120,11 @@ var AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String,
-      default: "https://agentdeskbot.vercel.app/widget.js"
+      default: `${DEFAULT_SAAS_ORIGIN}/widget.js`
     },
     apiOrigin: {
       type: String,
-      default: "https://agentdeskbot.vercel.app"
+      default: DEFAULT_SAAS_ORIGIN
     },
     theme: {
       type: String,
@@ -158,10 +158,10 @@ var AgentDeskWidget = defineComponent({
       if (hasSlot && activeBotId) {
         release(activeBotId);
       }
-      if (!defaultSaaSOriginWarned && (props.apiOrigin === "https://agentdeskbot.vercel.app" || props.scriptSrc === "https://agentdeskbot.vercel.app/widget.js")) {
+      if (!defaultSaaSOriginWarned && (props.apiOrigin === DEFAULT_SAAS_ORIGIN || props.scriptSrc === `${DEFAULT_SAAS_ORIGIN}/widget.js`)) {
         defaultSaaSOriginWarned = true;
         console.warn(
-          "[AgentDesk] Using default hosted endpoints (https://agentdeskbot.vercel.app). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly."
+          `[AgentDesk] Using default hosted endpoints (${DEFAULT_SAAS_ORIGIN}). For custom backend configurations, please specify the apiOrigin and scriptSrc props explicitly.`
         );
       }
       const acquire = acquireInstance(props.botId, (_a = props.mode) != null ? _a : "launcher");
