@@ -204,8 +204,8 @@ describe('AgentDeskWidget (React)', () => {
     render(<AgentDeskWidget botId="saas-bot" />);
     const script = document.querySelector('script[data-agentdesk]') as HTMLScriptElement;
     expect(script).not.toBeNull();
-    expect(script.getAttribute('src')).toBe('/widget.js');
-    expect(script.dataset.apiOrigin).toBeUndefined();
+    expect(script.getAttribute('src')).toBe('https://agentdeskbot.vercel.app/widget.js');
+    expect(script.dataset.apiOrigin).toBe('https://agentdeskbot.vercel.app');
   });
 
   it('injects optional styling, positioning, and security attributes', () => {

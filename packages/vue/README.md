@@ -202,8 +202,8 @@ If your AgentDesk backend runs on a **different domain** than the page embedding
 | --- | --- | --- | --- | --- | --- |
 | `botId` | `bot-id` | `string` | — | ✅ | The Bot ID from your AgentDesk dashboard. |
 | `mode` | `mode` | `'launcher' \| 'inline'` | `'launcher'` | — | `'launcher'` = floating bubble. `'inline'` = fills nearest positioned ancestor. |
-| `scriptSrc` | `script-src` | `string` | `'/widget.js'` | — | URL to compiled `widget.js`. Override for CDNs/cross-origin embeds. |
-| `apiOrigin` | `api-origin` | `string` | *(same origin)* | — | Base URL of your AgentDesk backend. Required for cross-origin embeds. |
+| `scriptSrc` | `script-src` | `string` | `'https://agentdeskbot.vercel.app/widget.js'` | — | URL to compiled `widget.js`. Override for custom or self-hosted deployments. |
+| `apiOrigin` | `api-origin` | `string` | `'https://agentdeskbot.vercel.app'` | — | Base URL of your AgentDesk backend. Required for custom or self-hosted deployments. |
 | `configUrl` | `config-url` | `string` | `{apiOrigin}/api/widget/config/{botId}` | — | Fully-qualified override for widget config fetch endpoint. |
 | `theme` | `theme` | `string` | — | — | Optional theme name for the widget (e.g. `'webchat-v1'`). *Mount-only.* |
 | `cspNonce` | `csp-nonce` | `string` | — | — | Optional CSP nonce to apply to the script tag and dynamic styles. *Mount-only.* |
@@ -348,7 +348,7 @@ Under the hood, the Vue component:
 ```
 Vue tree mount
    └─ <AgentDeskWidget :bot-id="…" />
-        ├─ injects <script data-agentdesk data-bot-id="…" src="/widget.js" />
+        ├─ injects <script data-agentdesk data-bot-id="…" src="https://agentdeskbot.vercel.app/widget.js" />
         ├─ registers component callback in global dispatch Set
         └─ renders <span data-agentdesk-vue-host aria-hidden="true" />
 ```
@@ -373,12 +373,12 @@ Vue plugins that touch browser DOM globals (like `window` and `document`) must b
 <details>
 <summary><strong>widget.js returns 404 or fails to load</strong></summary>
 
-By default, the SDK requests `/widget.js` from the current origin. If your widget is served from a CDN or a separate backend server, specify the absolute URL using the `script-src` prop:
+By default, the SDK requests `https://agentdeskbot.vercel.app/widget.js`. If you are using a self-hosted or white-labeled deployment, specify your custom absolute URL using the `script-src` prop:
 
 ```vue
 <AgentDeskWidget
   bot-id="YOUR_BOT_ID"
-  script-src="https://cdn.example.com/widget.js"
+  script-src="https://support.yourapp.com/widget.js"
 />
 ```
 </details>

@@ -218,10 +218,11 @@ export const AgentDeskWidget = defineComponent({
     },
     scriptSrc: {
       type: String as PropType<string>,
-      default: '/widget.js',
+      default: 'https://agentdeskbot.vercel.app/widget.js',
     },
     apiOrigin: {
       type: String as PropType<string>,
+      default: 'https://agentdeskbot.vercel.app',
     },
     theme: {
       type: String as PropType<string>,
@@ -267,7 +268,7 @@ export const AgentDeskWidget = defineComponent({
           injectScript({
             botId: props.botId,
             mode: props.mode ?? 'launcher',
-            scriptSrc: props.scriptSrc || '/widget.js',
+            scriptSrc: props.scriptSrc || 'https://agentdeskbot.vercel.app/widget.js',
             configUrl: props.configUrl || undefined,
             apiOrigin: props.apiOrigin || undefined,
             theme: props.theme || undefined,

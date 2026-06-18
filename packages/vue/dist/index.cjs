@@ -143,10 +143,11 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
     },
     scriptSrc: {
       type: String,
-      default: "/widget.js"
+      default: "https://agentdeskbot.vercel.app/widget.js"
     },
     apiOrigin: {
-      type: String
+      type: String,
+      default: "https://agentdeskbot.vercel.app"
     },
     theme: {
       type: String,
@@ -188,7 +189,7 @@ var AgentDeskWidget = (0, import_vue.defineComponent)({
           injectScript({
             botId: props.botId,
             mode: (_b = props.mode) != null ? _b : "launcher",
-            scriptSrc: props.scriptSrc || "/widget.js",
+            scriptSrc: props.scriptSrc || "https://agentdeskbot.vercel.app/widget.js",
             configUrl: props.configUrl || void 0,
             apiOrigin: props.apiOrigin || void 0,
             theme: props.theme || void 0,

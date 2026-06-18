@@ -59,6 +59,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
     apiOrigin: {
         type: PropType<string>;
+        default: string;
     };
     theme: {
         type: PropType<string>;
@@ -99,6 +100,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
     };
     apiOrigin: {
         type: PropType<string>;
+        default: string;
     };
     theme: {
         type: PropType<string>;
@@ -127,6 +129,7 @@ declare const AgentDeskWidget: vue.DefineComponent<vue.ExtractPropTypes<{
 }>, {
     mode: WidgetMode;
     configUrl: string;
+    apiOrigin: string;
     theme: string;
     cspNonce: string;
     position: "bottom-right" | "bottom-left" | "top-right" | "top-left";
