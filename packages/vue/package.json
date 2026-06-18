@@ -1,6 +1,6 @@
 {
   "name": "@agentdeskbot/vue",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "AgentDesk AI chat widget — Vue 3 SDK",
   "keywords": [
     "agentdesk",

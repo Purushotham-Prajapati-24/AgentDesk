@@ -1,6 +1,6 @@
 {
   "name": "@agentdeskbot/react",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "AgentDesk AI chat widget — React & Next.js SDK",
   "keywords": [
     "agentdesk",
