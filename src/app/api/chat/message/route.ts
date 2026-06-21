@@ -557,7 +557,7 @@ async function broadcastBotMessage(tenantId: string, sessionId: string, content:
         tenant_id: tenantId,
         session_id: sessionId,
         content,
-        message_id: messageId || undefined,
+        message_id: messageId || ID.unique(),
         token: createHandoffToken({
           tenant_id: tenantId,
           session_id: sessionId,

@@ -1309,7 +1309,7 @@ function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMe
       return current;
     }
     const lastMessage = current[current.length - 1];
-    if (lastMessage && lastMessage.sender === message.sender && lastMessage.content === message.content) {
+    if (message.sender === "bot" && lastMessage && lastMessage.sender === "bot" && lastMessage.content === message.content) {
       return current;
     }
     return [...current, message];

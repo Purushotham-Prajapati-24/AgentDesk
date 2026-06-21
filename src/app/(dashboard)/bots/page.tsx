@@ -49,16 +49,6 @@ function BotsContent() {
 
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
-  const [prevIsNew, setPrevIsNew] = useState(isNew);
-  if (isNew !== prevIsNew) {
-    setPrevIsNew(isNew);
-    if (isNew) {
-      setSelectedId(null);
-      setForm(EMPTY_FORM);
-      setStatus("");
-    }
-  }
-
   useEffect(() => {
     if (!tenant?.$id) {
       return;
@@ -73,14 +63,6 @@ function BotsContent() {
       setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
-        if (isNew) {
-          setSelectedId(null);
-          setForm(EMPTY_FORM);
-        } else {
-          const firstBot = response.bots[0] ?? null;
-          setSelectedId(firstBot?.$id ?? null);
-          setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
-        }
       } else {
         setStatus(response.error);
       }
@@ -89,7 +71,30 @@ function BotsContent() {
     return () => {
       isActive = false;
     };
-  }, [tenant?.$id, isNew]);
+  }, [tenant?.$id]);
+
+  useEffect(() => {
+    if (isNew) {
+      Promise.resolve().then(() => {
+        setSelectedId(null);
+        setForm(EMPTY_FORM);
+        setStatus("");
+      });
+    } else if (bots.length > 0) {
+      Promise.resolve().then(() => {
+        setSelectedId((currId) => {
+          if (currId === null) {
+            const firstBot = bots[0];
+            Promise.resolve().then(() => {
+              setForm(botToForm(firstBot));
+            });
+            return firstBot.$id;
+          }
+          return currId;
+        });
+      });
+    }
+  }, [isNew, bots]);
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -184,7 +189,7 @@ function BotsContent() {
 
   return (
     <div className="cockpit-lane min-h-screen">
-      <BotsHeader />
+      <BotsHeader botCount={bots.length} />
 
       <div className="mx-auto flex flex-col lg:flex-row justify-between gap-6 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="grid content-start gap-4 md:grid-cols-2 flex-1">
@@ -213,11 +218,19 @@ function BotsContent() {
               ) : (
                 bots.map((bot, index) => (
                   <div
+                    role="button"
+                    tabIndex={0}
                     className={`group/card relative min-h-[160px] cursor-pointer overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
                       bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
                     } ${botCardClass(index)}`}
                     key={bot.$id}
                     onClick={() => selectBot(bot)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        selectBot(bot);
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
@@ -499,7 +512,7 @@ function SkeletonField({ className, labelWidth }: { className: string; labelWidt
   );
 }
 
-function BotsHeader() {
+function BotsHeader({ botCount }: { botCount: number }) {
   const steps = [
     "Write the agent's support instructions.",
     "Set the fallback response customers will see.",
@@ -512,8 +525,10 @@ function BotsHeader() {
         <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
           <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
             <div className="min-w-0">
-              <p className="inline-flex rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
-                Support agent setup
+              <p className="inline-flex items-center gap-2 rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
+                <span>Support agent setup</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#312e81]/50 dark:bg-[#ccfbf1]/50" />
+                <span>{botCount} configured</span>
               </p>
               <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
                 Create customer support agents for this workspace.
