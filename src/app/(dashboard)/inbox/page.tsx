@@ -55,6 +55,7 @@ type MobileInboxPanel = "queue" | "transcript" | "context";
 
 type SocketEventMessage = {
   message_id: string;
+  session_id?: string;
   sender: Sender;
   content: string;
   created_at: string;
@@ -133,13 +134,23 @@ export default function InboxPage() {
    * When a new message arrives via the socket (customer / bot / agent),
    * bump the matching conversation card's lastMessage, lastSender, messageCount,
    * and updatedAt so the history panel stays in sync with the live transcript.
-   * Uses sessionId from the current room context to ensure we update the correct conversation.
+   * Uses message.session_id to match the correct conversation row — if the event
+   * has no session_id, we skip the bump entirely rather than falling back to
+   * the currently-open room, which could mutate the wrong conversation row.
    */
-  function bumpHistoryMessage(sessionId: string, message: SocketEventMessage) {
+  function bumpHistoryMessage(message: SocketEventMessage) {
+    // Require an explicit session_id from the server event.
+    // Never fall back to the room's sessionId: that would silently mutate
+    // the currently-open card for any legacy event missing the field.
+    const targetSessionId = message.session_id;
+    if (!targetSessionId) {
+      console.warn("[inbox] bumpHistoryMessage: event missing session_id — skipping bump", message);
+      return;
+    }
     const now = message.created_at || new Date().toISOString();
     setHistory((prev) =>
       prev.map((conversation) =>
-        conversation.sessionToken === sessionId
+        conversation.id === targetSessionId
           ? {
               ...conversation,
               lastMessage: message.content,
@@ -1304,11 +1315,10 @@ function mapSocketMessage(message: SocketEventMessage): ChatMessage {
 function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage): boolean {
   let wasAdded = false;
   setMessages((current) => {
-    if (current.some((item) => item.id === message.id)) {
-      return current;
-    }
-    const lastMessage = current[current.length - 1];
-    if (lastMessage && lastMessage.sender === message.sender && lastMessage.content === message.content) {
+    // Dedup by server-supplied message ID — the most reliable guard.
+    // message.id is now always populated (falls back to ID.unique() on the server
+    // if Appwrite persistence fails), so this covers both normal and error paths.
+    if (message.id && current.some((item) => item.id === message.id)) {
       return current;
     }
     wasAdded = true;
