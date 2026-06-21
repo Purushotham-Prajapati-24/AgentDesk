@@ -142,6 +142,10 @@ export function knowledgePointId(fileId: string, chunkIndex: number) {
 }
 
 export async function deleteKnowledgePointsForBot(tenantId: string, botId: string) {
+  if (!hasStrictTenantBotIds(tenantId, botId)) {
+    throw new Error("tenantId and botId are required to delete knowledge points.");
+  }
+
   const config = qdrantConfig();
   if (!config) {
     return { skipped: true, deleted: false };

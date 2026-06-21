@@ -1,13 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+
+import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import { ArrowRight, Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
 import { createBot, deleteBot, listBots, updateBot } from "@/app/bot-actions";
 import { useTenant } from "@/context/TenantContext";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { EmptyState, Panel, StatusPill } from "@/components/ui/Signal";
+import { EmptyState, Panel } from "@/components/ui/Signal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type Bot = {
   $id: string;
@@ -30,8 +32,12 @@ const EMPTY_FORM: BotForm = {
   fallback_message: "I do not have enough verified context to answer that yet.",
 };
 
-export default function BotsPage() {
+function BotsContent() {
   const { tenant, loading: tenantLoading } = useTenant();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const isNew = searchParams.get("new") === "true";
+
   const [bots, setBots] = useState<Bot[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<BotForm>(EMPTY_FORM);
@@ -45,23 +51,87 @@ export default function BotsPage() {
 
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
+  const [isDrafting, setIsDrafting] = useState(isNew);
+
+  const isFormDirty = useMemo(() => {
+    if (selectedBot) {
+      return (
+        form.name !== selectedBot.name ||
+        form.system_prompt !== selectedBot.system_prompt ||
+        form.fallback_message !== selectedBot.fallback_message
+      );
+    }
+    return (
+      form.name !== EMPTY_FORM.name ||
+      form.system_prompt !== EMPTY_FORM.system_prompt ||
+      form.fallback_message !== EMPTY_FORM.fallback_message
+    );
+  }, [form, selectedBot]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__agentdesk_form_dirty = isFormDirty;
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__agentdesk_form_dirty = false;
+      }
+    };
+  }, [isFormDirty]);
+
+  useEffect(() => {
+    if (!isFormDirty) return;
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      // Firefox and Safari also require returnValue to be set for the native
+      // "Leave site?" dialog to appear.
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isFormDirty]);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    // This effect intentionally reads `isNew` at tenant-mount time only.
+    // Adding `isNew` to the dep array would cause the ?new=true draft to be
+    // discarded immediately after router.replace removes the query param.
+    setIsDrafting(isNew);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.$id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (isNew) {
+      setSelectedId(null);
+      setForm(EMPTY_FORM);
+      setStatus("");
+      setIsDrafting(true);
+      router.replace("/bots");
+    }
+  }, [isNew, router]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!tenant?.$id) {
+      setBots([]);
+      setIsAgentsLoading(false);
       return;
     }
 
     let isActive = true;
+    setIsAgentsLoading(true);
     listBots(tenant.$id).then((response) => {
       if (!isActive) {
         return;
       }
-
       setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
-        const firstBot = response.bots[0] ?? null;
-        setSelectedId(firstBot?.$id ?? null);
-        setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
       } else {
         setStatus(response.error);
       }
@@ -71,13 +141,40 @@ export default function BotsPage() {
       isActive = false;
     };
   }, [tenant?.$id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (isAgentsLoading) {
+      return;
+    }
+
+    if (!selectedId && !isDrafting) {
+      if (bots.length > 0) {
+        const firstBot = bots[0];
+        setSelectedId(firstBot.$id);
+        setForm(botToForm(firstBot));
+      } else {
+        setSelectedId(null);
+        setForm(EMPTY_FORM);
+      }
+    }
+  }, [isAgentsLoading, bots, selectedId, isDrafting]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
   function selectBot(bot: Bot) {
+    if (bot.$id === selectedId) {
+      return;
+    }
+    if (isFormDirty && !confirm("Discard unsaved changes?")) {
+      return;
+    }
     setSelectedId(bot.$id);
     setForm(botToForm(bot));
     setStatus("");
+    setIsDrafting(false);
   }
 
   async function handleCopy() {
@@ -112,15 +209,22 @@ export default function BotsPage() {
     setBots((current) => [nextBot, ...current.filter((bot) => bot.$id !== nextBot.$id)]);
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
-    setStatus("Agent configuration saved.");
+    // Clear draft mode so auto-select logic doesn't stay in a phantom drafting state.
+    if (!selectedBot) {
+      setIsDrafting(false);
+    }
+    setStatus(selectedBot ? "Agent configuration saved." : "Agent created.");
   }
 
-  function requestDeleteBot() {
-    if (!selectedBot) {
+  function requestDeleteBotFor(bot: Bot) {
+    // Only prompt about unsaved changes when deleting the bot that is currently
+    // open in the editor (selected) or when the user has a new-agent draft in
+    // progress. Never interrupt deletion of an unrelated card.
+    const isEditingThisBot = bot.$id === selectedId || isDrafting;
+    if (isEditingThisBot && isFormDirty && !confirm("You have unsaved changes that will be discarded. Continue?")) {
       return;
     }
-
-    setDeleteTarget(selectedBot);
+    setDeleteTarget(bot);
     setDeleteConfirmed(false);
     setStatus("");
   }
@@ -150,9 +254,14 @@ export default function BotsPage() {
 
     const remainingBots = bots.filter((bot) => bot.$id !== deleteTarget.$id);
     setBots(remainingBots);
-    const firstBot = remainingBots[0] ?? null;
-    setSelectedId(firstBot?.$id ?? null);
-    setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+    
+    // Only reset or change selection if the deleted bot was the active one
+    if (selectedId === deleteTarget.$id) {
+      const firstBot = remainingBots[0] ?? null;
+      setSelectedId(firstBot?.$id ?? null);
+      setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+    }
+    
     setDeleteTarget(null);
     setDeleteConfirmed(false);
     setStatus("Agent deleted.");
@@ -166,8 +275,8 @@ export default function BotsPage() {
     <div className="cockpit-lane min-h-screen">
       <BotsHeader botCount={bots.length} />
 
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
-        <section className="grid content-start gap-3 md:grid-cols-2">
+      <div className="mx-auto flex flex-col lg:flex-row justify-between gap-6 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <section className="grid content-start gap-4 md:grid-cols-2 flex-1">
           {isAgentListLoading ? (
             <AgentGridSkeleton />
           ) : (
@@ -175,9 +284,16 @@ export default function BotsPage() {
               <button
                 className="min-h-[160px] rounded-2xl border border-[#262626] bg-[#141414] p-4 text-left transition hover:-translate-y-1 hover:border-white/50"
                 onClick={() => {
+                  if (selectedId === null && isDrafting) {
+                    return;
+                  }
+                  if (isFormDirty && !confirm("Discard unsaved changes?")) {
+                    return;
+                  }
                   setSelectedId(null);
                   setForm(EMPTY_FORM);
                   setStatus("");
+                  setIsDrafting(true);
                 }}
                 type="button"
               >
@@ -192,21 +308,37 @@ export default function BotsPage() {
                 </Panel>
               ) : (
                 bots.map((bot, index) => (
-                  <button
-                    className={`min-h-[160px] overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
-                      bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
-                    } ${botCardClass(index)}`}
+                  <div
                     key={bot.$id}
-                    onClick={() => selectBot(bot)}
-                    type="button"
+                    className="group/card relative min-h-[160px] transition hover:-translate-y-1"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
-                      <BotIcon aria-hidden="true" className="h-6 w-6" />
-                    </div>
-                    <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
-                    <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
-                  </button>
+                    <button
+                      type="button"
+                      className={`w-full h-full min-h-[160px] rounded-2xl p-4 text-left text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0099ff] ${
+                        bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
+                      } ${botCardClass(index)}`}
+                      onClick={() => selectBot(bot)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
+                        <BotIcon aria-hidden="true" className="mr-10 h-6 w-6" />
+                      </div>
+                      <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
+                      <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                    </button>
+
+                    <button
+                      className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white z-10"
+                      onClick={() => {
+                        requestDeleteBotFor(bot);
+                      }}
+                      type="button"
+                      title="Delete agent"
+                      aria-label={`Delete agent ${bot.name}`}
+                    >
+                      <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))
               )}
             </>
@@ -216,32 +348,40 @@ export default function BotsPage() {
         {isAgentListLoading ? (
           <AgentFormSkeleton />
         ) : (
-        <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+          <Panel className="h-fit w-full lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
           <form onSubmit={saveBot}>
             <section className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
               <div className="min-w-0 flex-1">
-                <p className="studio-kicker text-[#0099ff]">Tenant: {tenant?.$id ?? "Unavailable"}</p>
-                <h2 className="mt-1 text-3xl font-semibold leading-tight tracking-[-0.04em] text-[var(--ui-text)]">{selectedBot ? "Edit agent" : "Create agent"}</h2>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <StatusPill tone={selectedBot ? "hot" : "warn"}>
-                  <span className="block max-w-24 truncate sm:max-w-36">{selectedBot ? selectedBot.$id : "new draft"}</span>
-                </StatusPill>
-                {selectedBot && (
-                  <Button
-                    className="h-9 w-9 p-0"
-                    onClick={handleCopy}
-                    size="icon"
-                    type="button"
-                    variant="outline"
-                  >
-                    {isCopied ? (
-                      <Check aria-hidden="true" className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy aria-hidden="true" className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
+                <h2 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-[var(--ui-text)]">{selectedBot ? "Edit agent" : "Create agent"}</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-mono">
+                  {selectedBot ? (
+                    <>
+                      <span className="rounded-full bg-[#0099ff]/10 border border-[#0099ff]/30 px-2.5 py-0.5 font-semibold text-[#0099ff] dark:bg-[#0099ff]/20">
+                        Agent ID
+                      </span>
+                      <span className="font-semibold text-[var(--ui-text)] select-all">{selectedBot.$id}</span>
+                      <button
+                        onClick={handleCopy}
+                        type="button"
+                        className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[#0099ff] hover:border-[#0099ff]/50 transition duration-200"
+                        title="Copy Agent ID"
+                      >
+                        {isCopied ? (
+                          <Check aria-hidden="true" className="h-3.5 w-3.5 text-green-500" />
+                        ) : (
+                          <Copy aria-hidden="true" className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="rounded-full bg-[#f59e0b]/10 border border-[#f59e0b]/30 px-2.5 py-0.5 font-semibold text-[#f59e0b] dark:bg-[#f59e0b]/20">
+                        New agent draft
+                      </span>
+                      <span className="text-[var(--ui-muted)]">ID will be generated upon saving</span>
+                    </>
+                  )}
+                </div>
               </div>
             </section>
 
@@ -285,16 +425,6 @@ export default function BotsPage() {
             <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
               <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
                 Save agent
-              </Button>
-              <Button
-                className="w-full sm:w-auto"
-                disabled={!selectedBot}
-                leftIcon={<Trash2 aria-hidden="true" className="h-4 w-4" />}
-                onClick={requestDeleteBot}
-                type="button"
-                variant="danger"
-              >
-                Delete
               </Button>
             </div>
           </form>
@@ -352,12 +482,20 @@ export default function BotsPage() {
   );
 }
 
+export default function BotsPage() {
+  return (
+    <Suspense fallback={<BotsPageSkeleton />}>
+      <BotsContent />
+    </Suspense>
+  );
+}
+
 function BotsPageSkeleton() {
   return (
     <div className="cockpit-lane min-h-screen">
       <BotsHeaderSkeleton />
-      <div className="mx-auto grid max-w-6xl gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,0.95fr)_440px] lg:px-8">
-        <section className="grid content-start gap-3 md:grid-cols-2">
+      <div className="mx-auto flex flex-col lg:flex-row justify-between gap-6 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <section className="grid content-start gap-4 md:grid-cols-2 flex-1">
           <AgentGridSkeleton />
         </section>
         <AgentFormSkeleton />
@@ -380,10 +518,9 @@ function BotsHeaderSkeleton() {
               </div>
             </div>
 
-            <div className="grid content-start gap-3 rounded-3xl border border-white/35 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
-              <div className="flex items-center justify-between gap-3">
-                <Skeleton className="h-4 w-36 bg-white/50 dark:bg-white/20" />
-                <Skeleton className="h-7 w-12 rounded-full bg-white/45 dark:bg-white/15" />
+            <div className="grid content-start gap-3">
+              <div>
+                <Skeleton className="h-4 w-24 bg-white/50 dark:bg-white/20" />
               </div>
               <div className="grid gap-2">
                 {Array.from({ length: 3 }).map((_, index) => (
@@ -427,15 +564,14 @@ function AgentCardSkeleton() {
 
 function AgentFormSkeleton() {
   return (
-    <Panel className="h-fit overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
-      <div className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+    <Panel className="h-fit w-full lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+      <div className="mb-5 border-b border-[var(--ui-border)] pb-4">
         <div className="min-w-0 flex-1">
-          <Skeleton className="h-4 w-40 bg-[var(--ui-bg)]" />
-          <Skeleton className="mt-2 h-9 w-40 bg-[var(--ui-bg)]" />
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Skeleton className="h-7 w-24 rounded-full bg-[var(--ui-bg)] sm:w-36" />
-          <Skeleton className="h-9 w-9 rounded-md bg-[var(--ui-bg)]" />
+          <Skeleton className="h-8 w-48 bg-[var(--ui-bg)]" />
+          <div className="mt-3 flex items-center gap-2">
+            <Skeleton className="h-6 w-20 rounded-full bg-[var(--ui-bg)]" />
+            <Skeleton className="h-4 w-32 bg-[var(--ui-bg)]" />
+          </div>
         </div>
       </div>
 
@@ -475,18 +611,19 @@ function BotsHeader({ botCount }: { botCount: number }) {
         <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
           <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
             <div className="min-w-0">
-              <p className="inline-flex rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
-                Support agent setup
+              <p className="inline-flex items-center gap-2 rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
+                <span>Support agent setup</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-[#312e81]/50 dark:bg-[#ccfbf1]/50" />
+                <span>{botCount} configured</span>
               </p>
               <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
                 Create customer support agents for this workspace.
               </h1>
             </div>
 
-            <div className="grid content-start gap-3 rounded-3xl border border-white/35 bg-white/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.24)] dark:bg-black/20">
-              <div className="flex items-center justify-between gap-3">
-                <span className="studio-kicker opacity-70">Agent flow</span>
-                <StatusPill tone="warn">{botCount}</StatusPill>
+            <div className="grid content-start gap-3">
+              <div>
+                <p className="studio-kicker opacity-70">Agent flow</p>
               </div>
               <div className="grid gap-2">
                 {steps.map((step) => (

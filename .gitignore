@@ -91,3 +91,9 @@ debug.log
 diff.txt
 packages/react/dist/index.cjs.map
 packages/vue/dist/index.cjs.map
+
+
+plan.md
+
+# Local Git worktrees — never commit these
+.worktrees/

@@ -55,6 +55,7 @@ type MobileInboxPanel = "queue" | "transcript" | "context";
 
 type SocketEventMessage = {
   message_id: string;
+  session_id?: string;
   sender: Sender;
   content: string;
   created_at: string;
@@ -106,6 +107,93 @@ export default function InboxPage() {
   // Tracks whether the one-time initial auto-select has already fired.
   // Prevents updateRoom() + history re-fetch from overwriting a manual selection.
   const initialAutoSelectedRef = useRef(false);
+  // Mirrors selectedConversationId so socket handlers (registered once per room)
+  // always read the currently selected conversation without capturing a stale closure.
+  const selectedConversationIdRef = useRef<string | null>(null);
+  // Shared dedup set for socket-delivered messages. Both appendMessage and
+  // bumpHistoryMessage consult this synchronously so that messageCount in the
+  // history panel never drifts from the actual transcript length.
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  // Tracks the active session ID to guard against late-arriving listConversationMessages promises.
+  const activeSessionIdRef = useRef<string | null>(DEFAULT_ROOM.sessionId);
+  // Tracks the active room session ID for WebSocket message routing/filtering.
+  const roomSessionIdRef = useRef<string>(room.sessionId);
+
+  useEffect(() => {
+    roomSessionIdRef.current = room.sessionId;
+  }, [room]);
+
+  function trackMessageId(id: string): boolean {
+    if (!id) return false;
+    if (seenMessageIdsRef.current.has(id)) {
+      return true; // Already tracked
+    }
+    seenMessageIdsRef.current.add(id);
+    if (seenMessageIdsRef.current.size > 500) {
+      const first = seenMessageIdsRef.current.values().next().value;
+      if (first !== undefined) {
+        seenMessageIdsRef.current.delete(first);
+      }
+    }
+    return false; // New message
+  }
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId;
+  }, [selectedConversationId]);
+
+  /**
+   * When the socket reports a status change (session-state / bot-status-toggle),
+   * immediately reflect it on the matching conversation card in the history panel
+   * so the "paused by human" pill appears without a full page reload.
+   * Reads selectedConversationId from a ref to avoid stale closures in the socket effect.
+   */
+  function updateHistoryStatus(newStatus: SessionStatus, updatedAt: string) {
+    const selectedId = selectedConversationIdRef.current;
+    if (!selectedId) {
+      return;
+    }
+    setHistory((prev) =>
+      prev.map((conversation) =>
+        conversation.id === selectedId
+          ? { ...conversation, status: newStatus, updatedAt: updatedAt || conversation.updatedAt }
+          : conversation,
+      ),
+    );
+  }
+
+  /**
+   * When a new message arrives via the socket (customer / bot / agent),
+   * bump the matching conversation card's lastMessage, lastSender, messageCount,
+   * and updatedAt so the history panel stays in sync with the live transcript.
+   * Uses message.session_id to match the correct conversation row — if the event
+   * has no session_id, we skip the bump entirely rather than falling back to
+   * the currently-open room, which could mutate the wrong conversation row.
+   */
+  function bumpHistoryMessage(message: SocketEventMessage) {
+    const targetSessionId = message.session_id;
+    if (!targetSessionId) {
+      console.warn(
+        "[inbox] bumpHistoryMessage: event missing session_id, skipping history bump. message_id=",
+        message.message_id
+      );
+      return;
+    }
+    const now = message.created_at || new Date().toISOString();
+    setHistory((prev) =>
+      prev.map((conversation) =>
+        conversation.id === targetSessionId
+          ? {
+              ...conversation,
+              lastMessage: message.content,
+              lastSender: message.sender,
+              messageCount: conversation.messageCount + 1,
+              updatedAt: now,
+            }
+          : conversation,
+      ),
+    );
+  }
 
   useEffect(() => {
     if (!WEB_SOCKET_URL) {
@@ -193,16 +281,40 @@ export default function InboxPage() {
         setSocketStatus("disconnected");
         setError(`Unable to connect to the live handoff server at ${wsUrl}. ${connectionError.message}`);
       });
-      socket.on("session-state", (state: SessionState) => setSessionStatus(state.status));
-      socket.on("bot-status-toggle", (state: SessionState) => setSessionStatus(state.status));
+      socket.on("session-state", (state: SessionState) => {
+        setSessionStatus(state.status);
+        updateHistoryStatus(state.status, state.updated_at);
+      });
+      socket.on("bot-status-toggle", (state: SessionState) => {
+        setSessionStatus(state.status);
+        updateHistoryStatus(state.status, state.updated_at);
+      });
       socket.on("customer-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
+        // Consult the shared dedup set synchronously so both the transcript and
+        // the history card counter stay in lockstep. appendMessage's internal
+        // setState updater runs asynchronously, so we can't rely on it alone.
+        if (message.message_id && trackMessageId(message.message_id)) return;
+        // Gate on the document $id (activeSessionIdRef), not the session_token
+        // (roomSessionIdRef). The WebSocket server broadcasts with session_id
+        // equal to session.$id — the two values are different strings.
+        if (message.session_id === activeSessionIdRef.current) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
+        bumpHistoryMessage(message);
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
+        if (message.message_id && trackMessageId(message.message_id)) return;
+        if (message.session_id === activeSessionIdRef.current) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
+        bumpHistoryMessage(message);
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
+        if (message.message_id && trackMessageId(message.message_id)) return;
+        if (message.session_id === activeSessionIdRef.current) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
+        bumpHistoryMessage(message);
       });
       socket.on("server-error", (response: AckResponse<never>) => {
         if (!response.success) {
@@ -281,6 +393,10 @@ export default function InboxPage() {
     setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
+    activeSessionIdRef.current = draftRoom.sessionId;
+    // Clear dedup set unconditionally on room switch so stale IDs from the
+    // previous room can never suppress replayed events in the new room.
+    seenMessageIdsRef.current.clear();
 
     setMessageLoading(true);
     try {
@@ -288,6 +404,10 @@ export default function InboxPage() {
         tenantId: draftRoom.tenantId,
         sessionId: draftRoom.sessionId,
       });
+
+      if (draftRoom.sessionId !== activeSessionIdRef.current) {
+        return;
+      }
 
       if (!response.success) {
         setMessages([]);
@@ -302,13 +422,23 @@ export default function InboxPage() {
           createdAt: message.createdAt,
         })),
       );
+      // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO)
+      seenMessageIdsRef.current.clear();
+      response.data.messages.forEach((m) => {
+        if (m.id) trackMessageId(m.id);
+      });
     } catch (err) {
+      if (draftRoom.sessionId !== activeSessionIdRef.current) {
+        return;
+      }
       if (process.env.NODE_ENV !== "production") {
         console.error("[Inbox] Failed to list conversation messages for room:", err);
       }
       setMessages([]);
     } finally {
-      setMessageLoading(false);
+      if (draftRoom.sessionId === activeSessionIdRef.current) {
+        setMessageLoading(false);
+      }
     }
   }
 
@@ -356,6 +486,10 @@ export default function InboxPage() {
     setSessionStatus(conversation.status);
     setDraftRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
     setRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
+    activeSessionIdRef.current = conversation.id;
+    // Clear dedup set unconditionally on room switch so stale IDs from the
+    // previous room can never suppress replayed events in the new room.
+    seenMessageIdsRef.current.clear();
     setMessages([]);
     setMessageLoading(true);
     setMobilePanel("transcript");
@@ -368,25 +502,47 @@ export default function InboxPage() {
         sessionId: conversation.id,
       });
 
+      if (conversation.id !== activeSessionIdRef.current) {
+        return;
+      }
+
       if (!response.success) {
         setMessages([]);
         setError(response.error);
         return;
       }
 
-      setMessages(
-        response.data.messages.map((message) => ({
-          id: message.id,
-          sender: message.sender,
-          content: message.content,
-          createdAt: message.createdAt,
-        })),
+      const loadedMessages = response.data.messages.map((message) => ({
+        id: message.id,
+        sender: message.sender,
+        content: message.content,
+        createdAt: message.createdAt,
+      }));
+      setMessages(loadedMessages);
+      // Sync the conversation card's messageCount with the actual number of
+      // messages returned from the DB. The history-list API returns a
+      // denormalised count from the sessions document which may lag behind
+      // the real transcript length.
+      setHistory((prev) =>
+        prev.map((c) =>
+          c.id === conversation.id ? { ...c, messageCount: loadedMessages.length } : c,
+        ),
       );
+      // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO).
+      // clear() was already called unconditionally above.
+      response.data.messages.forEach((m) => {
+        if (m.id) trackMessageId(m.id);
+      });
     } catch (messageError) {
+      if (conversation.id !== activeSessionIdRef.current) {
+        return;
+      }
       setMessages([]);
       setError(messageError instanceof Error ? messageError.message : "Unable to load conversation messages.");
     } finally {
-      setMessageLoading(false);
+      if (conversation.id === activeSessionIdRef.current) {
+        setMessageLoading(false);
+      }
     }
   }
 
@@ -486,7 +642,7 @@ export default function InboxPage() {
           onChange={setMobilePanel}
         />
 
-        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[720px] lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
+        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[720px] lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)_280px]">
           <ConversationHistoryPanel
             className={mobilePanel === "queue" ? "flex" : "hidden lg:flex"}
             history={history}
@@ -543,7 +699,7 @@ function InboxPageSkeleton() {
       <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 sm:px-6 lg:px-8">
         <InboxHeroSkeleton />
         <InboxMetricGridSkeleton />
-        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[720px] lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_310px]">
+        <div className="grid min-w-0 gap-5 lg:h-[calc(100vh-8rem)] lg:min-h-[720px] lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)_280px]">
           <ConversationHistoryPanelSkeleton />
           <LiveTranscriptPanelSkeleton />
           <OperatorContextPanelSkeleton />
@@ -592,13 +748,13 @@ function InboxMetricGridSkeleton() {
 
 function InboxMetricSkeleton() {
   return (
-    <article className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
-      <div className="flex items-center justify-between gap-3">
-        <Skeleton className="h-3 w-28 bg-[var(--ui-panel-2)]" />
-        <Skeleton className="h-3 w-3 rounded-full bg-[var(--ui-panel-2)]" />
+    <article className="rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <Skeleton className="h-3 w-24 bg-[var(--ui-panel-2)]" />
+        <Skeleton className="h-2.5 w-2.5 rounded-full bg-[var(--ui-panel-2)]" />
       </div>
-      <Skeleton className="mt-5 h-10 w-20 bg-[var(--ui-panel-2)]" />
-      <Skeleton className="mt-4 h-4 w-36 bg-[var(--ui-panel-2)]" />
+      <Skeleton className="mt-3 h-7 w-16 bg-[var(--ui-panel-2)]" />
+      <Skeleton className="mt-2 h-3.5 w-32 bg-[var(--ui-panel-2)]" />
     </article>
   );
 }
@@ -606,20 +762,20 @@ function InboxMetricSkeleton() {
 function ConversationHistoryPanelSkeleton() {
   return (
     <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]">
-      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2.5">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <Skeleton className="h-3 w-36 bg-[var(--ui-bg)]" />
-            <Skeleton className="mt-2 h-5 w-32 bg-[var(--ui-bg)]" />
+            <Skeleton className="h-3 w-32 bg-[var(--ui-bg)]" />
+            <Skeleton className="mt-1 h-4 w-28 bg-[var(--ui-bg)]" />
           </div>
-          <Skeleton className="h-7 w-20 rounded-full bg-[var(--ui-bg)]" />
+          <Skeleton className="h-6 w-16 rounded-full bg-[var(--ui-bg)]" />
         </div>
         <div className="flex gap-2">
-          <Skeleton className="h-10 min-w-0 flex-1 rounded-full bg-[var(--ui-bg)]" />
-          <Skeleton className="h-10 w-10 rounded-full bg-[var(--ui-bg)]" />
+          <Skeleton className="h-9 min-w-0 flex-1 rounded-full bg-[var(--ui-bg)]" />
+          <Skeleton className="h-9 w-9 rounded-full bg-[var(--ui-bg)]" />
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 gap-2 overflow-hidden p-3">
+      <div className="grid min-h-0 flex-1 gap-1.5 overflow-hidden p-2.5">
         <HistoryRowsSkeleton />
       </div>
       <PanelFooterSkeleton />
@@ -653,18 +809,18 @@ function LiveTranscriptPanelSkeleton() {
 
 function OperatorContextPanelSkeleton() {
   return (
-    <aside className="grid min-h-0 content-start gap-5">
-      <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-        <Skeleton className="h-3 w-36 bg-[var(--ui-panel-2)]" />
-        <div className="mt-4 grid gap-3">
-          <Skeleton className="h-16 rounded-2xl bg-[var(--ui-bg)]" />
-          <Skeleton className="h-16 rounded-2xl bg-[var(--ui-bg)]" />
+    <aside className="grid min-h-0 content-start gap-3">
+      <section className="rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
+        <Skeleton className="h-3 w-32 bg-[var(--ui-panel-2)]" />
+        <div className="mt-3 grid gap-2">
+          <Skeleton className="h-12 rounded-2xl bg-[var(--ui-bg)]" />
+          <Skeleton className="h-12 rounded-2xl bg-[var(--ui-bg)]" />
           <Skeleton className="h-9 rounded-full bg-[var(--ui-bg)]" />
         </div>
       </section>
-      <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-        <Skeleton className="h-3 w-32 bg-[var(--ui-panel-2)]" />
-        <div className="mt-4 grid gap-3">
+      <section className="rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
+        <Skeleton className="h-3 w-28 bg-[var(--ui-panel-2)]" />
+        <div className="mt-3 grid gap-2">
           <ContextRowsSkeleton />
         </div>
       </section>
@@ -676,21 +832,21 @@ function HistoryRowsSkeleton() {
   return (
     <>
       {Array.from({ length: 5 }).map((_, index) => (
-        <article className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-4" key={index}>
-          <div className="flex items-start justify-between gap-3">
+        <article className="rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-2.5" key={index}>
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <Skeleton className="h-5 w-4/5 bg-[var(--ui-panel-2)]" />
-              <Skeleton className="mt-2 h-3 w-2/5 bg-[var(--ui-panel-2)]" />
+              <Skeleton className="h-4 w-4/5 bg-[var(--ui-panel-2)]" />
+              <Skeleton className="mt-1.5 h-3 w-2/5 bg-[var(--ui-panel-2)]" />
             </div>
-            <Skeleton className="h-7 w-20 rounded-full bg-[var(--ui-panel-2)]" />
+            <Skeleton className="h-6 w-16 rounded-full bg-[var(--ui-panel-2)]" />
           </div>
-          <div className="mt-4 grid gap-2">
-            <Skeleton className="h-4 w-full bg-[var(--ui-panel-2)]" />
-            <Skeleton className="h-4 w-3/4 bg-[var(--ui-panel-2)]" />
+          <div className="mt-2 grid gap-1.5">
+            <Skeleton className="h-3.5 w-full bg-[var(--ui-panel-2)]" />
+            <Skeleton className="h-3.5 w-3/4 bg-[var(--ui-panel-2)]" />
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <Skeleton className="h-3 w-24 bg-[var(--ui-panel-2)]" />
+          <div className="mt-2 flex items-center justify-between gap-2">
             <Skeleton className="h-3 w-20 bg-[var(--ui-panel-2)]" />
+            <Skeleton className="h-3 w-16 bg-[var(--ui-panel-2)]" />
           </div>
         </article>
       ))}
@@ -724,9 +880,9 @@ function ContextRowsSkeleton() {
   return (
     <>
       {Array.from({ length: 5 }).map((_, index) => (
-        <div className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3" key={index}>
+        <div className="rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-2.5" key={index}>
           <Skeleton className="h-3 w-20 bg-[var(--ui-panel-2)]" />
-          <Skeleton className="mt-2 h-4 w-full bg-[var(--ui-panel-2)]" />
+          <Skeleton className="mt-2 h-3.5 w-full bg-[var(--ui-panel-2)]" />
         </div>
       ))}
     </>
@@ -851,22 +1007,22 @@ function ConversationHistoryPanel({
 }) {
   return (
     <section className={cn("min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)]", className)}>
-      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-3">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+      <div className="border-b border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2.5">
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <p className="studio-kicker text-[var(--ui-blue)]">Conversation history</p>
-            <h2 className="mt-1 text-base font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Find a session</h2>
+            <p className="studio-kicker text-[10px] text-[var(--ui-blue)]">Conversation history</p>
+            <h2 className="mt-0.5 text-sm font-semibold tracking-[-0.02em] text-[var(--ui-text)]">Find a session</h2>
           </div>
-          <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">
+          <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[var(--ui-muted)]">
             {historyLoading ? "Loading" : `${history.length} rows`}
           </span>
         </div>
 
         <form className="flex gap-2" onSubmit={onSearch}>
           <div className="relative min-w-0 flex-1">
-            <Search aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ui-muted)]" />
+            <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ui-muted)]" />
             <input
-              className="min-h-10 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] pl-10 pr-4 text-sm font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
+              className="min-h-9 w-full rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] pl-9 pr-3 text-xs font-semibold text-[var(--ui-text)] placeholder:text-[var(--ui-muted)] transition focus:border-[var(--ui-blue)]"
               placeholder="Search session, bot, status"
               value={historySearchInput}
               onChange={(event) => onSearchInputChange(event.target.value)}
@@ -878,7 +1034,7 @@ function ConversationHistoryPanel({
         </form>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto p-3">
+      <div className="grid min-h-0 flex-1 gap-1.5 overflow-y-auto p-2.5">
         {historyLoading ? (
           <HistoryRowsSkeleton />
         ) : history.length === 0 ? (
@@ -887,7 +1043,7 @@ function ConversationHistoryPanel({
           history.map((conversation) => (
             <button
               className={cn(
-                "w-full rounded-2xl border p-4 text-left transition duration-200 ease-out hover:-translate-y-0.5",
+                "w-full rounded-xl border p-2.5 text-left transition duration-200 ease-out hover:-translate-y-0.5",
                 selectedConversationId === conversation.id
                   ? "border-[var(--ui-blue)] bg-[var(--ui-blue)]/10"
                   : "border-[var(--ui-border)] bg-[var(--ui-bg)] hover:border-[var(--ui-blue)]/50",
@@ -896,28 +1052,28 @@ function ConversationHistoryPanel({
               onClick={() => onSelectConversation(conversation)}
               type="button"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-[var(--ui-text)]">{conversation.sessionToken}</p>
-                  <p className="mt-1 truncate font-mono text-xs font-semibold text-[var(--ui-muted)]">{conversation.botId || "unassigned agent"}</p>
+                  <p className="truncate text-sm font-semibold text-[var(--ui-text)]">{conversation.sessionToken}</p>
+                  <p className="mt-0.5 truncate font-mono text-[11px] font-semibold text-[var(--ui-muted)]">{conversation.botId || "unassigned agent"}</p>
                 </div>
                 <SessionStatusPill status={conversation.status} />
               </div>
-              <p className="mt-4 line-clamp-2 text-sm font-medium leading-6 text-[var(--ui-muted)]">{conversation.lastMessage || "No message preview yet."}</p>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <span className="font-mono text-xs font-semibold text-[var(--ui-muted)]">{conversation.messageCount} messages</span>
-                <span className="font-mono text-xs font-semibold text-[var(--ui-muted)]">{formatDate(conversation.updatedAt)}</span>
+              <p className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-[var(--ui-muted)]">{conversation.lastMessage || "No message preview yet."}</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-[11px] font-semibold text-[var(--ui-muted)]">{conversation.messageCount} messages</span>
+                <span className="font-mono text-[11px] font-semibold text-[var(--ui-muted)]">{formatDate(conversation.updatedAt)}</span>
               </div>
             </button>
           ))
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ui-border)] bg-[var(--ui-panel-2)] p-2">
         <Button className="rounded-full" disabled={historyCursorStack.length === 0 || historyLoading} leftIcon={<ChevronLeft className="h-4 w-4" />} onClick={onPreviousPage} size="sm" type="button" variant="outline">
           Prev
         </Button>
-        <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-3 py-1 font-mono text-xs font-semibold text-[var(--ui-muted)]">
+        <span className="rounded-full border border-[var(--ui-border)] bg-[var(--ui-panel)] px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[var(--ui-muted)]">
           {historyLoading ? "Loading" : "History"}
         </span>
         <Button className="rounded-full" disabled={!historyNextCursor || historyLoading} rightIcon={<ChevronRight className="h-4 w-4" />} onClick={onNextPage} size="sm" type="button" variant="outline">
@@ -1060,18 +1216,18 @@ function OperatorContextPanel({
   const ragLabel = messages.some((message) => message.shouldCallRag) ? "Source lookup requested" : "No source flag yet";
 
   return (
-    <aside className={cn("min-h-0 content-start gap-5", className)}>
-      <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-        <p className="studio-kicker text-[var(--ui-blue)]">Manual room connect</p>
-        <form className="mt-4 grid gap-3" onSubmit={onUpdateRoom}>
+    <aside className={cn("min-h-0 content-start gap-3", className)}>
+      <section className="rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
+        <p className="studio-kicker text-[10px] text-[var(--ui-blue)]">Manual room connect</p>
+        <form className="mt-2 grid gap-2" onSubmit={onUpdateRoom}>
           <Input
-            className="rounded-full border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
+            className="min-h-9 rounded-full border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
             label="Tenant"
             value={draftRoom.tenantId}
             onChange={(event) => onDraftRoomChange((current) => ({ ...current, tenantId: event.target.value }))}
           />
           <Input
-            className="rounded-full border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
+            className="min-h-9 rounded-full border-[var(--ui-border)] bg-[var(--ui-bg)] text-xs text-[var(--ui-text)] focus:border-[var(--ui-blue)]"
             label="Session"
             value={draftRoom.sessionId}
             onChange={(event) => onDraftRoomChange((current) => ({ ...current, sessionId: event.target.value }))}
@@ -1082,9 +1238,9 @@ function OperatorContextPanel({
         </form>
       </section>
 
-      <section className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
-        <p className="studio-kicker text-[var(--ui-blue)]">Operator context</p>
-        <div className="mt-4 grid gap-3">
+      <section className="rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3">
+        <p className="studio-kicker text-[10px] text-[var(--ui-blue)]">Operator context</p>
+        <div className="mt-2 grid gap-2">
           <ContextRow label="Tenant" value={room.tenantId} />
           <ContextRow label="Session" value={room.sessionId} />
           <ContextRow label="Selected row" value={selectedConversation?.id ?? "No history row selected"} />
@@ -1104,13 +1260,13 @@ function InboxMetric({ label, value, detail, tone }: { label: string; value: str
   }[tone];
 
   return (
-    <article className="rounded-[1.5rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-mono text-xs font-semibold uppercase text-[var(--ui-muted)]">{label}</p>
-        <span className={`h-3 w-3 rounded-full ${dotClass}`} />
+    <article className="rounded-[1.25rem] border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-mono text-[11px] font-semibold uppercase text-[var(--ui-muted)]">{label}</p>
+        <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
       </div>
-      <p className="mt-5 font-mono text-4xl font-semibold tracking-[-0.04em] text-[var(--ui-text)]">{value}</p>
-      <p className="mt-3 text-sm font-medium text-[var(--ui-muted)]">{detail}</p>
+      <p className="mt-3 font-mono text-2xl font-semibold tracking-[-0.04em] text-[var(--ui-text)]">{value}</p>
+      <p className="mt-1.5 text-xs font-medium text-[var(--ui-muted)]">{detail}</p>
     </article>
   );
 }
@@ -1170,9 +1326,9 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 
 function ContextRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-3">
-      <p className="font-mono text-xs font-semibold uppercase text-[var(--ui-muted)]">{label}</p>
-      <p className="mt-1 break-all text-sm font-semibold text-[var(--ui-text)]">{value}</p>
+    <div className="rounded-xl border border-[var(--ui-border)] bg-[var(--ui-bg)] p-2.5">
+      <p className="font-mono text-[10px] font-semibold uppercase text-[var(--ui-muted)]">{label}</p>
+      <p className="mt-1 break-all text-xs font-semibold text-[var(--ui-text)]">{value}</p>
     </div>
   );
 }
@@ -1243,9 +1399,7 @@ function mapSocketMessage(message: SocketEventMessage): ChatMessage {
 
 function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage) {
   setMessages((current) => {
-    if (current.some((item) => item.id === message.id)) {
-      return current;
-    }
+    if (message.id && current.some((item) => item.id === message.id)) return current;
     return [...current, message];
   });
 }

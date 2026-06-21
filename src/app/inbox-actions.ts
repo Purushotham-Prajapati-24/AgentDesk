@@ -1,6 +1,6 @@
 "use server";
 
-import { Query, type Models } from "node-appwrite";
+import { AppwriteException, Query, type Models } from "node-appwrite";
 import { createSessionClient } from "@/lib/server/appwrite";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { mapSessionSummary } from "@/lib/server/monitor-rollups";
@@ -48,6 +48,8 @@ type MessageDocument = Models.Document & {
 };
 
 const PAGE_LIMIT = 10;
+// Load the most recent messages to show in the transcript view. Capped at 100
+// to avoid large database load and payload size.
 const MESSAGE_LIMIT = 100;
 
 export async function listConversationSessions({
@@ -87,19 +89,21 @@ export async function listConversationMessages({
   try {
     const { account, databases } = await createSessionClient();
     await assertTenantAccess(account, tenantId);
-    await assertSessionTenant(databases, tenantId, sessionId);
+    
+    // Resolve session by ID or token, verifying it belongs to the tenant
+    const session = await resolveSession(databases, tenantId, sessionId);
 
     const messages = await databases.listDocuments(databaseId(), messagesCollectionId(), [
       Query.equal("tenant_id", tenantId),
-      Query.equal("session_id", sessionId),
-      Query.orderAsc("created"),
+      Query.equal("session_id", session.$id),
+      Query.orderDesc("created"),
       Query.limit(MESSAGE_LIMIT),
     ]);
 
     return {
       success: true,
       data: {
-        messages: messages.documents.map((document) => mapMessage(document as MessageDocument)),
+        messages: messages.documents.reverse().map((document) => mapMessage(document as MessageDocument)),
       },
     };
   } catch (error: unknown) {
@@ -139,7 +143,7 @@ async function fetchSessions(
   }
 }
 
-async function assertSessionTenant(
+async function resolveSession(
   databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
   tenantId: string,
   sessionId: string,
@@ -148,10 +152,43 @@ async function assertSessionTenant(
     throw new Error("Invalid session ID.");
   }
 
-  const session = (await databases.getDocument(databaseId(), sessionsCollectionId(), sessionId)) as SessionDocument;
-  if (session.tenant_id !== tenantId) {
-    throw new Error("Conversation does not belong to this tenant.");
+  // Strategy: try databases.getDocument($id) first.
+  //   - Found AND tenant matches  → return it.
+  //   - Found BUT wrong tenant     → throw immediately (cross-tenant, do not retry).
+  //   - AppwriteException code 404 → not a document $id; fall through to token lookup.
+  //   - Any other exception        → real transport/auth error; re-throw as-is so the
+  //                                   caller can distinguish a 503 from a 404.
+  try {
+    const doc = await databases.getDocument(databaseId(), sessionsCollectionId(), sessionId) as SessionDocument;
+    // Document found — enforce tenant boundary.
+    if (String(doc.tenant_id) !== tenantId) {
+      // Valid $id but belongs to a different tenant — do not leak, do not retry.
+      throw new Error("Conversation session was not found.");
+    }
+    return doc;
+  } catch (error) {
+    if (error instanceof AppwriteException && error.code === 404) {
+      // sessionId is not a document $id — fall through to session_token lookup below.
+    } else {
+      // Re-throw: either the tenant mismatch error above, a real transport error,
+      // or a permission error. Do not swallow real failures as "not found".
+      throw error;
+    }
   }
+
+  // sessionId was not found as a document $id — treat it as a session_token.
+  const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+    Query.equal("tenant_id", tenantId),
+    Query.equal("session_token", sessionId),
+    Query.limit(1),
+  ]);
+
+  const session = result.documents[0] as SessionDocument | undefined;
+  if (!session) {
+    throw new Error("Conversation session was not found.");
+  }
+
+  return session;
 }
 
 async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessionClient>>["account"], tenantId: string) {
