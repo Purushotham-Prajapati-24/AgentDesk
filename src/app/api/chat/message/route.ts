@@ -251,12 +251,25 @@ function streamCompletion({
 
         controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
-        await onComplete(finalTokenCount);
-        await onMessageComplete(completionText, finalTokenCount);
-      } catch {
+        try {
+          await onComplete(finalTokenCount);
+        } catch (onCompleteError) {
+          console.error("[chat] onComplete callback failed:", onCompleteError);
+        }
+        try {
+          await onMessageComplete(completionText, finalTokenCount);
+        } catch (onMessageCompleteError) {
+          console.error("[chat] onMessageComplete callback failed:", onMessageCompleteError);
+        }
+      } catch (streamError) {
+        console.error("[chat] Stream execution failed:", streamError);
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());
-        await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
+        try {
+          await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
+        } catch (fallbackPersistError) {
+          console.error("[chat] Fallback onMessageComplete callback failed:", fallbackPersistError);
+        }
       } finally {
         controller.close();
       }

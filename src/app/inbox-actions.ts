@@ -48,7 +48,10 @@ type MessageDocument = Models.Document & {
 };
 
 const PAGE_LIMIT = 10;
-const MESSAGE_LIMIT = 1000;
+// Limit loaded transcript context to 200 messages to prevent cold-load latency,
+// bloated payload size, and rendering bottlenecks, while still providing
+// ample history for human operator handoff.
+const MESSAGE_LIMIT = 200;
 
 export async function listConversationSessions({
   tenantId,
@@ -141,6 +144,21 @@ async function fetchSessions(
   }
 }
 
+
+
+/**
+ * Resolves a session document by either its unique database document ID ($id)
+ * or its public session_token.
+ * 
+ * --- THREAT MODEL & SECURITY DESIGN ---
+ * 1. Tenant Isolation: The fallback session_token lookup is strictly scoped to the
+ *    authenticated tenantId using Query.equal("tenant_id", tenantId). This prevents a malicious
+ *    tenant from querying or guessing another tenant's session_token.
+ * 2. Pre-authentication: The caller must execute assertTenantAccess(account, tenantId)
+ *    first, verifying that the session client has explicit rights to the requested tenant scope.
+ * 3. Input Validation: Both document IDs and session tokens are strictly validated via
+ *    isSafeId() to prevent query syntax injection.
+ */
 async function resolveSession(
   databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
   tenantId: string,
@@ -160,7 +178,7 @@ async function resolveSession(
     // If not found or error, fall back to querying by session_token
   }
 
-  // 2. Query by session_token
+  // 2. Query by session_token (validated and isolated to current tenantId)
   const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
     Query.equal("tenant_id", tenantId),
     Query.equal("session_token", sessionId),

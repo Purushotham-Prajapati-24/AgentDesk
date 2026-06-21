@@ -59,6 +59,8 @@ type SocketEventMessage = {
   content: string;
   created_at: string;
   should_call_rag?: boolean;
+  session_id?: string;
+  tenant_id?: string;
 };
 
 type AckResponse<T> =
@@ -113,41 +115,22 @@ export default function InboxPage() {
     selectedConversationIdRef.current = selectedConversationId;
   }, [selectedConversationId]);
 
-  /**
-   * When the socket reports a status change (session-state / bot-status-toggle),
-   * immediately reflect it on the matching conversation card in the history panel
-   * so the "paused by human" pill appears without a full page reload.
-   * Reads selectedConversationId from a ref to avoid stale closures in the socket effect.
-   */
-  function updateHistoryStatus(newStatus: SessionStatus, updatedAt: string) {
-    const selectedId = selectedConversationIdRef.current;
-    if (!selectedId) {
-      return;
-    }
+  // Socket event handler helpers for inbox page history panel updates
+  function updateHistoryStatus(sessionId: string, newStatus: SessionStatus, updatedAt: string) {
     setHistory((prev) =>
       prev.map((conversation) =>
-        conversation.id === selectedId
+        conversation.sessionToken === sessionId
           ? { ...conversation, status: newStatus, updatedAt: updatedAt || conversation.updatedAt }
           : conversation,
       ),
     );
   }
 
-  /**
-   * When a new message arrives via the socket (customer / bot / agent),
-   * bump the matching conversation card's lastMessage, lastSender, messageCount,
-   * and updatedAt so the history panel stays in sync with the live transcript.
-   * Reads selectedConversationId from a ref to avoid stale closures in the socket effect.
-   */
-  function bumpHistoryMessage(message: SocketEventMessage) {
-    const selectedId = selectedConversationIdRef.current;
-    if (!selectedId) {
-      return;
-    }
+  function bumpHistoryMessage(sessionId: string, message: SocketEventMessage) {
     const now = message.created_at || new Date().toISOString();
     setHistory((prev) =>
       prev.map((conversation) =>
-        conversation.id === selectedId
+        conversation.sessionToken === sessionId
           ? {
               ...conversation,
               lastMessage: message.content,
@@ -159,7 +142,6 @@ export default function InboxPage() {
       ),
     );
   }
-
   useEffect(() => {
     if (!WEB_SOCKET_URL) {
       return;
@@ -246,25 +228,36 @@ export default function InboxPage() {
         setSocketStatus("disconnected");
         setError(`Unable to connect to the live handoff server at ${wsUrl}. ${connectionError.message}`);
       });
+
       socket.on("session-state", (state: SessionState) => {
-        setSessionStatus(state.status);
-        updateHistoryStatus(state.status, state.updated_at);
+        if (state.session_id === room.sessionId) {
+          setSessionStatus(state.status);
+        }
+        updateHistoryStatus(state.session_id, state.status, state.updated_at);
       });
       socket.on("bot-status-toggle", (state: SessionState) => {
-        setSessionStatus(state.status);
-        updateHistoryStatus(state.status, state.updated_at);
+        if (state.session_id === room.sessionId) {
+          setSessionStatus(state.status);
+        }
+        updateHistoryStatus(state.session_id, state.status, state.updated_at);
       });
       socket.on("customer-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
-        bumpHistoryMessage(message);
+        if (message.session_id === room.sessionId) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
+        bumpHistoryMessage(message.session_id ?? room.sessionId, message);
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
-        bumpHistoryMessage(message);
+        if (message.session_id === room.sessionId) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
+        bumpHistoryMessage(message.session_id ?? room.sessionId, message);
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
-        bumpHistoryMessage(message);
+        if (message.session_id === room.sessionId) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
+        bumpHistoryMessage(message.session_id ?? room.sessionId, message);
       });
       socket.on("server-error", (response: AckResponse<never>) => {
         if (!response.success) {
@@ -1309,7 +1302,13 @@ function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMe
       return current;
     }
     const lastMessage = current[current.length - 1];
-    if (message.sender === "bot" && lastMessage && lastMessage.sender === "bot" && lastMessage.content === message.content) {
+    if (
+      message.sender === "bot" &&
+      lastMessage &&
+      lastMessage.sender === "bot" &&
+      lastMessage.content === message.content &&
+      Date.now() - new Date(lastMessage.createdAt).getTime() < 500
+    ) {
       return current;
     }
     return [...current, message];

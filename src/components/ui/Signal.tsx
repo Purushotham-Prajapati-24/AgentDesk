@@ -9,6 +9,7 @@ import {
   CreditCard,
   FileText,
   Inbox,
+  Home,
   LogOut,
   Menu,
   MessagesSquare,
@@ -40,7 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const currentSection = useMemo(() => {
-    if (pathname === "/") return { href: "/", label: "Home", icon: Bot };
+    if (pathname === "/") return { href: "/", label: "Home", icon: Home };
     return navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ?? navItems[0];
   }, [pathname]);
 

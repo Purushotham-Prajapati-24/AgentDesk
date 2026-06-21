@@ -73,28 +73,23 @@ function BotsContent() {
     };
   }, [tenant?.$id]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isNew) {
-      Promise.resolve().then(() => {
-        setSelectedId(null);
-        setForm(EMPTY_FORM);
-        setStatus("");
-      });
-    } else if (bots.length > 0) {
-      Promise.resolve().then(() => {
-        setSelectedId((currId) => {
-          if (currId === null) {
-            const firstBot = bots[0];
-            Promise.resolve().then(() => {
-              setForm(botToForm(firstBot));
-            });
-            return firstBot.$id;
-          }
-          return currId;
-        });
-      });
+      setSelectedId(null);
+      setForm(EMPTY_FORM);
+      setStatus("");
+      return;
     }
+    if (bots.length === 0) return;
+    setSelectedId((curr) => {
+      const next = curr ?? bots[0].$id;
+      const target = bots.find((b) => b.$id === next) ?? bots[0];
+      setForm(botToForm(target));
+      return next;
+    });
   }, [isNew, bots]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -191,7 +186,7 @@ function BotsContent() {
     <div className="cockpit-lane min-h-screen">
       <BotsHeader botCount={bots.length} />
 
-      <div className="mx-auto flex flex-col lg:flex-row justify-between gap-6 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto flex flex-col lg:flex-row justify-between items-start gap-6 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="grid content-start gap-4 md:grid-cols-2 flex-1">
           {isAgentListLoading ? (
             <AgentGridSkeleton />
@@ -220,6 +215,7 @@ function BotsContent() {
                   <div
                     role="button"
                     tabIndex={0}
+                    aria-pressed={bot.$id === selectedId}
                     className={`group/card relative min-h-[160px] cursor-pointer overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
                       bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
                     } ${botCardClass(index)}`}
@@ -236,7 +232,7 @@ function BotsContent() {
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
                       <div className="flex items-center gap-2">
                         <button
-                          className="grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200"
+                          className="grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[var(--ui-coral)] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200"
                           onClick={(event) => {
                             event.stopPropagation();
                             requestDeleteBotFor(bot);
@@ -270,14 +266,14 @@ function BotsContent() {
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-mono">
                   {selectedBot ? (
                     <>
-                      <span className="rounded-full bg-[#0099ff]/10 border border-[#0099ff]/30 px-2.5 py-0.5 font-semibold text-[#0099ff] dark:bg-[#0099ff]/20">
+                      <span className="rounded-full bg-[var(--ui-blue)]/10 border border-[var(--ui-blue)]/30 px-2.5 py-0.5 font-semibold text-[var(--ui-blue)] dark:bg-[var(--ui-blue)]/20">
                         Agent ID
                       </span>
                       <span className="font-semibold text-[var(--ui-text)] select-all">{selectedBot.$id}</span>
                       <button
                         onClick={handleCopy}
                         type="button"
-                        className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[#0099ff] hover:border-[#0099ff]/50 transition duration-200"
+                        className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[var(--ui-blue)] hover:border-[var(--ui-blue)]/50 transition duration-200"
                         title="Copy Agent ID"
                       >
                         {isCopied ? (
@@ -289,7 +285,7 @@ function BotsContent() {
                     </>
                   ) : (
                     <>
-                      <span className="rounded-full bg-[#f59e0b]/10 border border-[#f59e0b]/30 px-2.5 py-0.5 font-semibold text-[#f59e0b] dark:bg-[#f59e0b]/20">
+                      <span className="rounded-full bg-[var(--ui-amber)]/10 border border-[var(--ui-amber)]/30 px-2.5 py-0.5 font-semibold text-[var(--ui-amber)] dark:bg-[var(--ui-amber)]/20">
                         New agent draft
                       </span>
                       <span className="text-[var(--ui-muted)]">ID will be generated upon saving</span>
