@@ -114,11 +114,27 @@ export default function InboxPage() {
   // bumpHistoryMessage consult this synchronously so that messageCount in the
   // history panel never drifts from the actual transcript length.
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
+
+  function trackMessageId(id: string): boolean {
+    if (!id) return false;
+    if (seenMessageIdsRef.current.has(id)) {
+      return true; // Already tracked
+    }
+    seenMessageIdsRef.current.add(id);
+    if (seenMessageIdsRef.current.size > 500) {
+      const first = seenMessageIdsRef.current.values().next().value;
+      if (first !== undefined) {
+        seenMessageIdsRef.current.delete(first);
+      }
+    }
+    return false; // New message
+  }
+
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
     // Reset the seen-message set whenever the operator switches to a different
     // conversation — new messages for the new session should never be suppressed.
-    seenMessageIdsRef.current = new Set();
+    seenMessageIdsRef.current.clear();
   }, [selectedConversationId]);
 
   /**
@@ -155,7 +171,9 @@ export default function InboxPage() {
     // the currently-open card for any legacy event missing the field.
     const targetSessionId = message.session_id;
     if (!targetSessionId) {
-      console.warn("[inbox] bumpHistoryMessage: event missing session_id — skipping bump", message);
+      // Log only the non-content identifier — never log message.content or
+      // the full payload, which may contain user PII.
+      console.warn("[inbox] bumpHistoryMessage: event missing session_id, message_id=", message.message_id);
       return;
     }
     const now = message.created_at || new Date().toISOString();
@@ -272,20 +290,17 @@ export default function InboxPage() {
         // Consult the shared dedup set synchronously so both the transcript and
         // the history card counter stay in lockstep. appendMessage's internal
         // setState updater runs asynchronously, so we can't rely on it alone.
-        if (message.message_id && seenMessageIdsRef.current.has(message.message_id)) return;
-        if (message.message_id) seenMessageIdsRef.current.add(message.message_id);
+        if (message.message_id && trackMessageId(message.message_id)) return;
         appendMessage(setMessages, mapSocketMessage(message));
         bumpHistoryMessage(message);
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
-        if (message.message_id && seenMessageIdsRef.current.has(message.message_id)) return;
-        if (message.message_id) seenMessageIdsRef.current.add(message.message_id);
+        if (message.message_id && trackMessageId(message.message_id)) return;
         appendMessage(setMessages, mapSocketMessage(message));
         bumpHistoryMessage(message);
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
-        if (message.message_id && seenMessageIdsRef.current.has(message.message_id)) return;
-        if (message.message_id) seenMessageIdsRef.current.add(message.message_id);
+        if (message.message_id && trackMessageId(message.message_id)) return;
         appendMessage(setMessages, mapSocketMessage(message));
         bumpHistoryMessage(message);
       });
@@ -387,6 +402,11 @@ export default function InboxPage() {
           createdAt: message.createdAt,
         })),
       );
+      // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO)
+      seenMessageIdsRef.current.clear();
+      response.data.messages.forEach((m) => {
+        if (m.id) trackMessageId(m.id);
+      });
     } catch (err) {
       if (process.env.NODE_ENV !== "production") {
         console.error("[Inbox] Failed to list conversation messages for room:", err);
@@ -467,6 +487,11 @@ export default function InboxPage() {
           createdAt: message.createdAt,
         })),
       );
+      // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO)
+      seenMessageIdsRef.current.clear();
+      response.data.messages.forEach((m) => {
+        if (m.id) trackMessageId(m.id);
+      });
     } catch (messageError) {
       setMessages([]);
       setError(messageError instanceof Error ? messageError.message : "Unable to load conversation messages.");
@@ -1328,11 +1353,12 @@ function mapSocketMessage(message: SocketEventMessage): ChatMessage {
 
 function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage) {
   setMessages((current) => {
-    // Dedup by server-supplied message ID — the most reliable guard.
-    // message.id is now always populated (falls back to ID.unique() on the server
-    // if Appwrite persistence fails), so this covers both normal and error paths.
-    if (message.id && current.some((item) => item.id === message.id)) {
-      return current;
+    // Always dedup — if message.id is missing (legacy path), fall back to
+    // matching by sender + createdAt so we never add guaranteed duplicates.
+    if (message.id) {
+      if (current.some((item) => item.id === message.id)) return current;
+    } else {
+      if (current.some((item) => item.sender === message.sender && item.createdAt === message.createdAt)) return current;
     }
     return [...current, message];
   });

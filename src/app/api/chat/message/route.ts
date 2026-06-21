@@ -251,12 +251,24 @@ function streamCompletion({
 
         controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
-        await onComplete(finalTokenCount);
-        await onMessageComplete(completionText, finalTokenCount);
+        
+        // Fire-and-forget the awaits so they do not block stream closure for the client
+        void Promise.allSettled([
+          Promise.resolve(onComplete(finalTokenCount)),
+          Promise.resolve(onMessageComplete(completionText, finalTokenCount))
+        ]).then((results) => {
+          results.forEach((res, i) => {
+            if (res.status === "rejected") {
+              console.error(`[chat/message] Hook ${i === 0 ? "onComplete" : "onMessageComplete"} failed:`, res.reason);
+            }
+          });
+        });
       } catch {
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());
-        await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
+        void Promise.resolve(onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message))).catch((err) => {
+          console.error("[chat/message] fallback onMessageComplete hook failed:", err);
+        });
       } finally {
         controller.close();
       }

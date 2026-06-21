@@ -48,11 +48,9 @@ type MessageDocument = Models.Document & {
 };
 
 const PAGE_LIMIT = 10;
-// 1 000 is the per-query maximum the Appwrite SDK allows.
-// The transcript view is append-only, so loading the full history in one
-// query is acceptable for most sessions. Long-running sessions with >1 000
-// messages will need paginated loading — tracked as a future improvement.
-const MESSAGE_LIMIT = 1000;
+// Load the most recent messages to show in the transcript view. Capped at 100
+// to avoid large database load and payload size.
+const MESSAGE_LIMIT = 100;
 
 export async function listConversationSessions({
   tenantId,
@@ -98,14 +96,14 @@ export async function listConversationMessages({
     const messages = await databases.listDocuments(databaseId(), messagesCollectionId(), [
       Query.equal("tenant_id", tenantId),
       Query.equal("session_id", session.$id),
-      Query.orderAsc("created"),
+      Query.orderDesc("created"),
       Query.limit(MESSAGE_LIMIT),
     ]);
 
     return {
       success: true,
       data: {
-        messages: messages.documents.map((document) => mapMessage(document as MessageDocument)),
+        messages: messages.documents.reverse().map((document) => mapMessage(document as MessageDocument)),
       },
     };
   } catch (error: unknown) {
@@ -154,23 +152,18 @@ async function resolveSession(
     throw new Error("Invalid session ID.");
   }
 
-  // 1. Try fetching directly by document ID (fastest)
+  // 1. Try fetching by document ID and tenant_id using listDocuments (to prevent cross-tenant probing)
   try {
-    const session = (await databases.getDocument(databaseId(), sessionsCollectionId(), sessionId)) as SessionDocument;
-    if (session.tenant_id === tenantId) {
-      return session;
+    const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+      Query.equal("$id", sessionId),
+      Query.equal("tenant_id", tenantId),
+      Query.limit(1),
+    ]);
+    if (result.documents.length > 0) {
+      return result.documents[0] as SessionDocument;
     }
-    // The document exists but belongs to a different tenant — this is a
-    // security-relevant miscall: fail loudly so it's visible in logs rather
-    // than silently falling through to the token query.
-    throw new Error(`Session '${sessionId}' does not belong to tenant '${tenantId}'.`);
-  } catch (error) {
-    // Re-throw explicit tenant-mismatch errors immediately; only suppress
-    // Appwrite 404 / network errors so we can fall through to the token query.
-    if (error instanceof Error && error.message.includes("does not belong to tenant")) {
-      throw error;
-    }
-    // Not found by document ID — fall back to querying by session_token
+  } catch {
+    // Suppress Appwrite error and fall back to session_token query
   }
 
   // 2. Query by session_token
