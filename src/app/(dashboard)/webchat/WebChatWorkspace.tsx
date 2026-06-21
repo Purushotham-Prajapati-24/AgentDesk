@@ -738,7 +738,7 @@ export function WebChatWorkspace() {
                 Live preview
               </button>
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-4 text-sm font-semibold !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] transition hover:border-[#c4b5fd]/80 hover:brightness-[1.06]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#0d9488]/60 bg-[linear-gradient(135deg,#06b6d4_0%,#0d9488_46%,#0f766e_100%)] px-4 text-sm font-semibold !text-white shadow-[0_10px_26px_rgba(13,148,136,0.24)] transition hover:border-[#2dd4bf]/80 hover:brightness-[1.06]"
                 onClick={() => {
                   setSaveSuccess(null);
                   setDeployModalOpen(true);
@@ -808,7 +808,7 @@ export function WebChatWorkspace() {
               aria-controls="webchat-deploy-modal"
               aria-expanded={deployModalOpen}
               aria-haspopup="dialog"
-              className="min-h-11 w-full rounded-full border-[#8b5cf6]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#6366f1_46%,#7c3aed_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(99,102,241,0.28)] hover:border-[#c4b5fd]/80 hover:brightness-[1.06]"
+              className="min-h-11 w-full rounded-full border-[#0d9488]/60 bg-[linear-gradient(135deg,#06b6d4_0%,#0d9488_46%,#0f766e_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(13,148,136,0.24)] hover:border-[#2dd4bf]/80 hover:brightness-[1.06]"
               leftIcon={<CloudUpload aria-hidden="true" className="h-4 w-4" />}
               onClick={() => setDeployModalOpen(true)}
               type="button"

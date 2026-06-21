@@ -86,6 +86,19 @@ test("invalid tenant or bot inputs do not call Qdrant search", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("invalid tenant or bot inputs reject in deleteKnowledgePointsForBot", async () => {
+  const calls = mockFetch([]);
+  await assert.rejects(
+    qdrant.deleteKnowledgePointsForBot("", "bot-1"),
+    /tenantId and botId are required/
+  );
+  await assert.rejects(
+    qdrant.deleteKnowledgePointsForBot("tenant-1", "  "),
+    /tenantId and botId are required/
+  );
+  assert.equal(calls.length, 0);
+});
+
 test("knowledge point IDs are deterministic per file and chunk", () => {
   const first = qdrant.knowledgePointId("file-1", 0);
   const second = qdrant.knowledgePointId("file-1", 0);

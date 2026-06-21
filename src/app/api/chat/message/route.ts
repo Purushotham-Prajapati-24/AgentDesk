@@ -76,10 +76,10 @@ export async function POST(request: Request) {
 
     const fallbackMessage = stringValue(bot.fallback_message, "I cannot answer that from the available support context.");
 
-    const durableSession = await findSession(databases, parsed.value);
-    const durableStatus = normalizeSessionStatus(durableSession?.status);
+    const session = await ensureSession(databases, parsed.value);
+    const durableStatus = normalizeSessionStatus(session?.status);
     if (durableStatus === "paused_by_human") {
-      void persistCustomerMessage(databases, parsed.value);
+      void persistCustomerMessage(databases, parsed.value, session);
       return streamDoneOnly();
     }
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 
     const shouldCallRag = await checkRagPermission(parsed.value.tenant_id, parsed.value.session_token);
     if (!shouldCallRag) {
-      void persistCustomerMessage(databases, parsed.value);
+      void persistCustomerMessage(databases, parsed.value, session);
       return streamDoneOnly();
     }
 
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
       return streamStaticMessage("This workspace is out of chat credits. Add credits in Usage before sending more bot replies.");
     }
 
-    void persistCustomerMessage(databases, parsed.value);
+    void persistCustomerMessage(databases, parsed.value, session);
 
     const contextChunks = await retrieveContextChunks(parsed.value.message, parsed.value.tenant_id, parsed.value.bot_id);
     if (contextChunks.length === 0) {
@@ -115,8 +115,10 @@ export async function POST(request: Request) {
         tenantId: parsed.value.tenant_id,
         botId: parsed.value.bot_id,
       });
-      void persistBotMessage(databases, parsed.value, fallbackMessage, 0);
-      void broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage);
+      const messageId = await persistBotMessage(databases, parsed.value, session, fallbackMessage, 0);
+      if (messageId) {
+        await broadcastBotMessage(parsed.value.tenant_id, session.$id, fallbackMessage, messageId);
+      }
       return streamStaticMessage(fallbackMessage);
     }
 
@@ -125,12 +127,14 @@ export async function POST(request: Request) {
       contextChunks,
       fallbackMessage,
       message: parsed.value.message,
-      onComplete: (tokenCount) => {
-        void debitCredits(databases, parsed.value.tenant_id, parsed.value.bot_id, parsed.value.session_token, tokenCount);
+      onComplete: async (tokenCount) => {
+        await debitCredits(databases, parsed.value.tenant_id, parsed.value.bot_id, parsed.value.session_token, tokenCount);
       },
-      onMessageComplete: (content, tokenCount) => {
-        void persistBotMessage(databases, parsed.value, content || fallbackMessage, tokenCount);
-        void broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage);
+      onMessageComplete: async (content, tokenCount) => {
+        const messageId = await persistBotMessage(databases, parsed.value, session, content || fallbackMessage, tokenCount);
+        if (messageId) {
+          await broadcastBotMessage(parsed.value.tenant_id, session.$id, content || fallbackMessage, messageId);
+        }
       },
     });
   } catch {
@@ -221,8 +225,8 @@ function streamCompletion({
   contextChunks: string[];
   fallbackMessage: string;
   message: string;
-  onComplete: (tokenCount: number) => void;
-  onMessageComplete: (content: string, tokenCount: number) => void;
+  onComplete: (tokenCount: number) => Promise<void> | void;
+  onMessageComplete: (content: string, tokenCount: number) => Promise<void> | void;
 }) {
   let completionText = "";
   let streamedTokenCount = 0;
@@ -251,12 +255,24 @@ function streamCompletion({
 
         controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
-        onComplete(finalTokenCount);
-        onMessageComplete(completionText, finalTokenCount);
+        
+        // Fire-and-forget the awaits so they do not block stream closure for the client
+        void Promise.allSettled([
+          Promise.resolve(onComplete(finalTokenCount)),
+          Promise.resolve(onMessageComplete(completionText, finalTokenCount))
+        ]).then((results) => {
+          results.forEach((res, i) => {
+            if (res.status === "rejected") {
+              console.error(`[chat/message] Hook ${i === 0 ? "onComplete" : "onMessageComplete"} failed:`, res.reason);
+            }
+          });
+        });
       } catch {
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());
-        onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
+        void Promise.resolve(onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message))).catch((err) => {
+          console.error("[chat/message] fallback onMessageComplete hook failed:", err);
+        });
       } finally {
         controller.close();
       }
@@ -287,30 +303,32 @@ async function debitCredits(
 async function persistCustomerMessage(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
-) {
-  await persistMessage(databases, request, "customer", request.message, 0);
+  session: SessionDocument,
+): Promise<string | null> {
+  return await persistMessage(databases, request, session, "customer", request.message, 0);
 }
 
 async function persistBotMessage(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
+  session: SessionDocument,
   content: string,
   tokenCount: number,
-) {
-  await persistMessage(databases, request, "bot", content, tokenCount);
+): Promise<string | null> {
+  return await persistMessage(databases, request, session, "bot", content, tokenCount);
 }
 
 async function persistMessage(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
+  session: SessionDocument,
   sender: "customer" | "bot",
   content: string,
   tokenCount: number,
-) {
+): Promise<string | null> {
   try {
-    const session = await ensureSession(databases, request);
     const createdAt = new Date().toISOString();
-    await databases.createDocument(databaseId(), messagesCollectionId(), ID.unique(), {
+    const doc = await databases.createDocument(databaseId(), messagesCollectionId(), ID.unique(), {
       tenant_id: request.tenant_id,
       session_id: session.$id,
       sender,
@@ -319,9 +337,11 @@ async function persistMessage(
       created: createdAt,
     });
     await recordBestEffort("message rollup", () => recordMessageCreated(databases, session, sender, content, createdAt));
+    return doc.$id;
   } catch (err) {
     // Log the error so silent failures are visible in dev, but never crash chat delivery.
     console.error("[persistMessage] Failed to persist message:", err);
+    return null;
   }
 }
 
@@ -539,7 +559,7 @@ async function checkRagPermission(tenantId: string, sessionId: string): Promise<
   }
 }
 
-async function broadcastBotMessage(tenantId: string, sessionId: string, content: string): Promise<boolean> {
+async function broadcastBotMessage(tenantId: string, sessionId: string, content: string, messageId?: string | null): Promise<boolean> {
   const wsUrl = getServerWebSocketUrl();
   if (!wsUrl) {
     return false;
@@ -555,6 +575,7 @@ async function broadcastBotMessage(tenantId: string, sessionId: string, content:
         tenant_id: tenantId,
         session_id: sessionId,
         content,
+        message_id: messageId || ID.unique(),
         token: createHandoffToken({
           tenant_id: tenantId,
           session_id: sessionId,

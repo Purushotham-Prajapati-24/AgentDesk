@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "dev": "next dev",
+    "dev:webpack": "next dev --webpack",
     "dev:ws": "npm --prefix websocket-server start",
     "build": "npm run build:widget && npm run build:sdk && next build",
     "build:sdk": "npm run build -w @agentdeskbot/core && npm run build -w @agentdeskbot/react -w @agentdeskbot/vue",
