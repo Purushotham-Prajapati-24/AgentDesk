@@ -110,8 +110,15 @@ export default function InboxPage() {
   // Mirrors selectedConversationId so socket handlers (registered once per room)
   // always read the currently selected conversation without capturing a stale closure.
   const selectedConversationIdRef = useRef<string | null>(null);
+  // Shared dedup set for socket-delivered messages. Both appendMessage and
+  // bumpHistoryMessage consult this synchronously so that messageCount in the
+  // history panel never drifts from the actual transcript length.
+  const seenMessageIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
+    // Reset the seen-message set whenever the operator switches to a different
+    // conversation — new messages for the new session should never be suppressed.
+    seenMessageIdsRef.current = new Set();
   }, [selectedConversationId]);
 
   /**
@@ -262,14 +269,23 @@ export default function InboxPage() {
         updateHistoryStatus(state.status, state.updated_at);
       });
       socket.on("customer-message", (message: SocketEventMessage) => {
+        // Consult the shared dedup set synchronously so both the transcript and
+        // the history card counter stay in lockstep. appendMessage's internal
+        // setState updater runs asynchronously, so we can't rely on it alone.
+        if (message.message_id && seenMessageIdsRef.current.has(message.message_id)) return;
+        if (message.message_id) seenMessageIdsRef.current.add(message.message_id);
         appendMessage(setMessages, mapSocketMessage(message));
         bumpHistoryMessage(message);
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
+        if (message.message_id && seenMessageIdsRef.current.has(message.message_id)) return;
+        if (message.message_id) seenMessageIdsRef.current.add(message.message_id);
         appendMessage(setMessages, mapSocketMessage(message));
         bumpHistoryMessage(message);
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
+        if (message.message_id && seenMessageIdsRef.current.has(message.message_id)) return;
+        if (message.message_id) seenMessageIdsRef.current.add(message.message_id);
         appendMessage(setMessages, mapSocketMessage(message));
         bumpHistoryMessage(message);
       });

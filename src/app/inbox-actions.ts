@@ -48,6 +48,10 @@ type MessageDocument = Models.Document & {
 };
 
 const PAGE_LIMIT = 10;
+// 1 000 is the per-query maximum the Appwrite SDK allows.
+// The transcript view is append-only, so loading the full history in one
+// query is acceptable for most sessions. Long-running sessions with >1 000
+// messages will need paginated loading — tracked as a future improvement.
 const MESSAGE_LIMIT = 1000;
 
 export async function listConversationSessions({
@@ -156,8 +160,17 @@ async function resolveSession(
     if (session.tenant_id === tenantId) {
       return session;
     }
-  } catch {
-    // If not found or error, fall back to querying by session_token
+    // The document exists but belongs to a different tenant — this is a
+    // security-relevant miscall: fail loudly so it's visible in logs rather
+    // than silently falling through to the token query.
+    throw new Error(`Session '${sessionId}' does not belong to tenant '${tenantId}'.`);
+  } catch (error) {
+    // Re-throw explicit tenant-mismatch errors immediately; only suppress
+    // Appwrite 404 / network errors so we can fall through to the token query.
+    if (error instanceof Error && error.message.includes("does not belong to tenant")) {
+      throw error;
+    }
+    // Not found by document ID — fall back to querying by session_token
   }
 
   // 2. Query by session_token

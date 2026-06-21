@@ -224,7 +224,7 @@ function BotsContent() {
                   <div
                     role="button"
                     tabIndex={0}
-                    className={`group/card relative min-h-[160px] cursor-pointer overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
+                    className={`group/card relative min-h-[160px] cursor-pointer overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0099ff] ${
                       bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
                     } ${botCardClass(index)}`}
                     key={bot.$id}
@@ -240,15 +240,19 @@ function BotsContent() {
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
                       <div className="flex items-center gap-2">
                         <button
-                          className="grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200"
+                          className="grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                           onClick={(event) => {
                             event.stopPropagation();
                             requestDeleteBotFor(bot);
                           }}
                           onKeyDown={(event) => {
-                            // Prevent keydown from bubbling to the card's onKeyDown
-                            // handler, which would trigger selectBot simultaneously.
+                            // Stop propagation so the card's onKeyDown (selectBot) doesn't
+                            // also fire. Prevent default to stop Space from scrolling the page.
                             event.stopPropagation();
+                            event.preventDefault();
+                            if (event.key === "Enter" || event.key === " ") {
+                              requestDeleteBotFor(bot);
+                            }
                           }}
                           type="button"
                           title="Delete agent"
