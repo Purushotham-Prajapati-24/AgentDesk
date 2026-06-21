@@ -53,9 +53,38 @@ function BotsContent() {
 
   const [isDrafting, setIsDrafting] = useState(isNew);
 
+  const isFormDirty = useMemo(() => {
+    if (selectedBot) {
+      return (
+        form.name !== selectedBot.name ||
+        form.system_prompt !== selectedBot.system_prompt ||
+        form.fallback_message !== selectedBot.fallback_message
+      );
+    }
+    return (
+      form.name !== EMPTY_FORM.name ||
+      form.system_prompt !== EMPTY_FORM.system_prompt ||
+      form.fallback_message !== EMPTY_FORM.fallback_message
+    );
+  }, [form, selectedBot]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__agentdesk_form_dirty = isFormDirty;
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__agentdesk_form_dirty = false;
+      }
+    };
+  }, [isFormDirty]);
+
   useEffect(() => {
     setIsDrafting(isNew);
-  }, [tenant?.$id, isNew]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.$id]);
 
   useEffect(() => {
     if (isNew) {
@@ -113,6 +142,12 @@ function BotsContent() {
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
   function selectBot(bot: Bot) {
+    if (bot.$id === selectedId) {
+      return;
+    }
+    if (isFormDirty && !confirm("Discard unsaved changes?")) {
+      return;
+    }
     setSelectedId(bot.$id);
     setForm(botToForm(bot));
     setStatus("");
@@ -215,9 +250,16 @@ function BotsContent() {
               <button
                 className="min-h-[160px] rounded-2xl border border-[#262626] bg-[#141414] p-4 text-left transition hover:-translate-y-1 hover:border-white/50"
                 onClick={() => {
+                  if (selectedId === null && isDrafting) {
+                    return;
+                  }
+                  if (isFormDirty && !confirm("Discard unsaved changes?")) {
+                    return;
+                  }
                   setSelectedId(null);
                   setForm(EMPTY_FORM);
                   setStatus("");
+                  setIsDrafting(true);
                 }}
                 type="button"
               >

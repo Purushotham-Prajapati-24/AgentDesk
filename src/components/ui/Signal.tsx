@@ -44,6 +44,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ?? navItems[0];
   }, [pathname]);
 
+  function handleNavigation(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (typeof window !== "undefined") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((window as any).__agentdesk_form_dirty) {
+        if (!confirm("Discard unsaved changes?")) {
+          event.preventDefault();
+          return;
+        }
+      }
+    }
+    setMobileNavOpen(false);
+  }
+
   useEffect(() => {
     if (!mobileNavOpen) {
       return;
@@ -74,7 +87,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <div className="flex min-h-[100svh] min-w-0 flex-col gap-3 overflow-y-auto p-3 safe-bottom-padding lg:sticky lg:top-0 lg:min-h-screen lg:gap-5 lg:overflow-visible lg:p-4">
             <div className="flex items-center justify-between">
-              <Link className="group rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3 transition hover:border-[#0099ff]/70 lg:p-4" href="/">
+              <Link
+                className="group rounded-3xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-3 transition hover:border-[#0099ff]/70 lg:p-4"
+                href="/"
+                onClick={handleNavigation}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-text)] text-[var(--ui-bg)] lg:h-11 lg:w-11">
                     <Boxes aria-hidden="true" className="h-6 w-6" />
@@ -100,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 id="nav-create-agent"
                 className="mb-2 flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-dashed border-[#0099ff]/50 bg-[#0099ff]/10 px-3 py-2 text-sm font-semibold text-[#0099ff] hover:bg-[#0099ff]/20 hover:border-[#0099ff] transition duration-200"
                 href="/bots?new=true"
-                onClick={() => setMobileNavOpen(false)}
+                onClick={handleNavigation}
               >
                 <Plus aria-hidden="true" className="h-4 w-4" />
                 <span>Create agent</span>
@@ -119,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                     href={item.href}
                     key={item.href}
-                    onClick={() => setMobileNavOpen(false)}
+                    onClick={handleNavigation}
                   >
                     <Icon aria-hidden="true" className="h-5 w-5" />
                     {item.label}

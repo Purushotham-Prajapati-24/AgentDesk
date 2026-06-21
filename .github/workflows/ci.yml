@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -34,7 +34,15 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Security audit check
-        run: npm audit --audit-level=critical
+        run: |
+          npm audit --audit-level=critical > npm-audit.log || (cat npm-audit.log && exit 1)
+
+      - name: Upload Security Audit Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        with:
+          name: npm-audit-log
+          path: npm-audit.log
 
       - name: Lint check
         run: npm run lint

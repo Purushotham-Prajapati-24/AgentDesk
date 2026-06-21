@@ -116,6 +116,12 @@ export default function InboxPage() {
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   // Tracks the active session ID to guard against late-arriving listConversationMessages promises.
   const activeSessionIdRef = useRef<string | null>(DEFAULT_ROOM.sessionId);
+  // Tracks the active room session ID for WebSocket message routing/filtering.
+  const roomSessionIdRef = useRef<string>(room.sessionId);
+
+  useEffect(() => {
+    roomSessionIdRef.current = room.sessionId;
+  }, [room]);
 
   function trackMessageId(id: string): boolean {
     if (!id) return false;
@@ -288,17 +294,23 @@ export default function InboxPage() {
         // the history card counter stay in lockstep. appendMessage's internal
         // setState updater runs asynchronously, so we can't rely on it alone.
         if (message.message_id && trackMessageId(message.message_id)) return;
-        appendMessage(setMessages, mapSocketMessage(message));
+        if (message.session_id === roomSessionIdRef.current) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
         bumpHistoryMessage(message);
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
         if (message.message_id && trackMessageId(message.message_id)) return;
-        appendMessage(setMessages, mapSocketMessage(message));
+        if (message.session_id === roomSessionIdRef.current) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
         bumpHistoryMessage(message);
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
         if (message.message_id && trackMessageId(message.message_id)) return;
-        appendMessage(setMessages, mapSocketMessage(message));
+        if (message.session_id === roomSessionIdRef.current) {
+          appendMessage(setMessages, mapSocketMessage(message));
+        }
         bumpHistoryMessage(message);
       });
       socket.on("server-error", (response: AckResponse<never>) => {
@@ -1370,9 +1382,7 @@ function mapSocketMessage(message: SocketEventMessage): ChatMessage {
 
 function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage) {
   setMessages((current) => {
-    if (message.id) {
-      if (current.some((item) => item.id === message.id)) return current;
-    }
+    if (message.id && current.some((item) => item.id === message.id)) return current;
     return [...current, message];
   });
 }

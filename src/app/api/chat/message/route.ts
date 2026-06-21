@@ -76,10 +76,10 @@ export async function POST(request: Request) {
 
     const fallbackMessage = stringValue(bot.fallback_message, "I cannot answer that from the available support context.");
 
-    const durableSession = await findSession(databases, parsed.value);
-    const durableStatus = normalizeSessionStatus(durableSession?.status);
+    const session = await ensureSession(databases, parsed.value);
+    const durableStatus = normalizeSessionStatus(session?.status);
     if (durableStatus === "paused_by_human") {
-      void persistCustomerMessage(databases, parsed.value);
+      void persistCustomerMessage(databases, parsed.value, session);
       return streamDoneOnly();
     }
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
 
     const shouldCallRag = await checkRagPermission(parsed.value.tenant_id, parsed.value.session_token);
     if (!shouldCallRag) {
-      void persistCustomerMessage(databases, parsed.value);
+      void persistCustomerMessage(databases, parsed.value, session);
       return streamDoneOnly();
     }
 
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
       return streamStaticMessage("This workspace is out of chat credits. Add credits in Usage before sending more bot replies.");
     }
 
-    void persistCustomerMessage(databases, parsed.value);
+    void persistCustomerMessage(databases, parsed.value, session);
 
     const contextChunks = await retrieveContextChunks(parsed.value.message, parsed.value.tenant_id, parsed.value.bot_id);
     if (contextChunks.length === 0) {
@@ -115,8 +115,10 @@ export async function POST(request: Request) {
         tenantId: parsed.value.tenant_id,
         botId: parsed.value.bot_id,
       });
-      const messageId = await persistBotMessage(databases, parsed.value, fallbackMessage, 0);
-      await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage, messageId);
+      const messageId = await persistBotMessage(databases, parsed.value, session, fallbackMessage, 0);
+      if (messageId) {
+        await broadcastBotMessage(parsed.value.tenant_id, session.$id, fallbackMessage, messageId);
+      }
       return streamStaticMessage(fallbackMessage);
     }
 
@@ -129,8 +131,10 @@ export async function POST(request: Request) {
         await debitCredits(databases, parsed.value.tenant_id, parsed.value.bot_id, parsed.value.session_token, tokenCount);
       },
       onMessageComplete: async (content, tokenCount) => {
-        const messageId = await persistBotMessage(databases, parsed.value, content || fallbackMessage, tokenCount);
-        await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage, messageId);
+        const messageId = await persistBotMessage(databases, parsed.value, session, content || fallbackMessage, tokenCount);
+        if (messageId) {
+          await broadcastBotMessage(parsed.value.tenant_id, session.$id, content || fallbackMessage, messageId);
+        }
       },
     });
   } catch {
@@ -299,28 +303,30 @@ async function debitCredits(
 async function persistCustomerMessage(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
+  session: SessionDocument,
 ): Promise<string | null> {
-  return await persistMessage(databases, request, "customer", request.message, 0);
+  return await persistMessage(databases, request, session, "customer", request.message, 0);
 }
 
 async function persistBotMessage(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
+  session: SessionDocument,
   content: string,
   tokenCount: number,
 ): Promise<string | null> {
-  return await persistMessage(databases, request, "bot", content, tokenCount);
+  return await persistMessage(databases, request, session, "bot", content, tokenCount);
 }
 
 async function persistMessage(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   request: ChatRequest,
+  session: SessionDocument,
   sender: "customer" | "bot",
   content: string,
   tokenCount: number,
 ): Promise<string | null> {
   try {
-    const session = await ensureSession(databases, request);
     const createdAt = new Date().toISOString();
     const doc = await databases.createDocument(databaseId(), messagesCollectionId(), ID.unique(), {
       tenant_id: request.tenant_id,
