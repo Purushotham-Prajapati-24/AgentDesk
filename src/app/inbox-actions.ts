@@ -94,14 +94,14 @@ export async function listConversationMessages({
     const messages = await databases.listDocuments(databaseId(), messagesCollectionId(), [
       Query.equal("tenant_id", tenantId),
       Query.equal("session_id", session.$id),
-      Query.orderAsc("created"),
+      Query.orderDesc("created"),
       Query.limit(MESSAGE_LIMIT),
     ]);
 
     return {
       success: true,
       data: {
-        messages: messages.documents.map((document) => mapMessage(document as MessageDocument)),
+        messages: messages.documents.map((document) => mapMessage(document as MessageDocument)).reverse(),
       },
     };
   } catch (error: unknown) {

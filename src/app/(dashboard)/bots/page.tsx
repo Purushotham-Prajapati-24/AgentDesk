@@ -50,6 +50,14 @@ function BotsContent() {
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
   useEffect(() => {
+    if (isNew) {
+      setSelectedId(null);
+      setForm(EMPTY_FORM);
+      setStatus("");
+    }
+  }, [isNew]);
+
+  useEffect(() => {
     if (!tenant?.$id) {
       return;
     }
@@ -63,6 +71,14 @@ function BotsContent() {
       setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
+        if (isNew) {
+          setSelectedId(null);
+          setForm(EMPTY_FORM);
+        } else {
+          const firstBot = response.bots[0] ?? null;
+          setSelectedId(firstBot?.$id ?? null);
+          setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+        }
       } else {
         setStatus(response.error);
       }
@@ -71,30 +87,7 @@ function BotsContent() {
     return () => {
       isActive = false;
     };
-  }, [tenant?.$id]);
-
-  useEffect(() => {
-    if (isNew) {
-      Promise.resolve().then(() => {
-        setSelectedId(null);
-        setForm(EMPTY_FORM);
-        setStatus("");
-      });
-    } else if (bots.length > 0) {
-      Promise.resolve().then(() => {
-        setSelectedId((currId) => {
-          if (currId === null) {
-            const firstBot = bots[0];
-            Promise.resolve().then(() => {
-              setForm(botToForm(firstBot));
-            });
-            return firstBot.$id;
-          }
-          return currId;
-        });
-      });
-    }
-  }, [isNew, bots]);
+  }, [tenant?.$id, isNew]);
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -189,7 +182,7 @@ function BotsContent() {
 
   return (
     <div className="cockpit-lane min-h-screen">
-      <BotsHeader botCount={bots.length} />
+      <BotsHeader />
 
       <div className="mx-auto flex flex-col lg:flex-row justify-between gap-6 max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <section className="grid content-start gap-4 md:grid-cols-2 flex-1">
@@ -217,20 +210,13 @@ function BotsContent() {
                 </Panel>
               ) : (
                 bots.map((bot, index) => (
-                  <div
-                    role="button"
-                    tabIndex={0}
+                  <button
                     className={`group/card relative min-h-[160px] cursor-pointer overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 ${
                       bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
                     } ${botCardClass(index)}`}
                     key={bot.$id}
                     onClick={() => selectBot(bot)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        selectBot(bot);
-                      }
-                    }}
+                    type="button"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
@@ -252,7 +238,7 @@ function BotsContent() {
                     </div>
                     <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
                     <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
-                  </div>
+                  </button>
                 ))
               )}
             </>
@@ -262,22 +248,22 @@ function BotsContent() {
         {isAgentListLoading ? (
           <AgentFormSkeleton />
         ) : (
-          <Panel className="h-fit w-full lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
+          <Panel className="h-fit w-full lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden rounded-2xl border-(--ui-border) bg-(--ui-panel) p-5">
           <form onSubmit={saveBot}>
-            <section className="mb-5 flex items-start justify-between gap-3 border-b border-[var(--ui-border)] pb-4">
+            <section className="mb-5 flex items-start justify-between gap-3 border-b border-(--ui-border) pb-4">
               <div className="min-w-0 flex-1">
-                <h2 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-[var(--ui-text)]">{selectedBot ? "Edit agent" : "Create agent"}</h2>
+                <h2 className="text-3xl font-semibold leading-tight tracking-[-0.04em] text-(--ui-text)">{selectedBot ? "Edit agent" : "Create agent"}</h2>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-mono">
                   {selectedBot ? (
                     <>
                       <span className="rounded-full bg-[#0099ff]/10 border border-[#0099ff]/30 px-2.5 py-0.5 font-semibold text-[#0099ff] dark:bg-[#0099ff]/20">
                         Agent ID
                       </span>
-                      <span className="font-semibold text-[var(--ui-text)] select-all">{selectedBot.$id}</span>
+                      <span className="font-semibold text-(--ui-text) select-all">{selectedBot.$id}</span>
                       <button
                         onClick={handleCopy}
                         type="button"
-                        className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-muted)] hover:text-[#0099ff] hover:border-[#0099ff]/50 transition duration-200"
+                        className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full border border-(--ui-border) bg-(--ui-bg) text-(--ui-muted) hover:text-[#0099ff] hover:border-[#0099ff]/50 transition duration-200"
                         title="Copy Agent ID"
                       >
                         {isCopied ? (
@@ -292,7 +278,7 @@ function BotsContent() {
                       <span className="rounded-full bg-[#f59e0b]/10 border border-[#f59e0b]/30 px-2.5 py-0.5 font-semibold text-[#f59e0b] dark:bg-[#f59e0b]/20">
                         New agent draft
                       </span>
-                      <span className="text-[var(--ui-muted)]">ID will be generated upon saving</span>
+                      <span className="text-(--ui-muted)">ID will be generated upon saving</span>
                     </>
                   )}
                 </div>
@@ -301,9 +287,9 @@ function BotsContent() {
 
             <div className="grid gap-4">
               <label className="block">
-                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Agent name</span>
+                <span className="studio-kicker mb-2 block text-(--ui-muted)">Agent name</span>
                 <input
-                  className="min-h-11 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 text-sm font-semibold text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
+                  className="min-h-11 w-full rounded-lg border border-(--ui-border) bg-(--ui-bg) px-3 text-sm font-semibold text-(--ui-text) focus:border-(--ui-blue) focus:bg-(--ui-panel)"
                   maxLength={80}
                   required
                   value={form.name}
@@ -312,9 +298,9 @@ function BotsContent() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">System prompt</span>
+                <span className="studio-kicker mb-2 block text-(--ui-muted)">System prompt</span>
                 <textarea
-                  className="min-h-60 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 font-mono text-sm leading-6 text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
+                  className="min-h-60 w-full rounded-lg border border-(--ui-border) bg-(--ui-bg) px-3 py-3 font-mono text-sm leading-6 text-(--ui-text) focus:border-(--ui-blue) focus:bg-(--ui-panel)"
                   maxLength={4000}
                   required
                   value={form.system_prompt}
@@ -323,9 +309,9 @@ function BotsContent() {
               </label>
 
               <label className="block">
-                <span className="studio-kicker mb-2 block text-[var(--ui-muted)]">Fallback message</span>
+                <span className="studio-kicker mb-2 block text-(--ui-muted)">Fallback message</span>
                 <textarea
-                  className="min-h-28 w-full rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-3 text-sm font-semibold leading-6 text-[var(--ui-text)] focus:border-[var(--ui-blue)] focus:bg-[var(--ui-panel)]"
+                  className="min-h-28 w-full rounded-lg border border-(--ui-border) bg-(--ui-bg) px-3 py-3 text-sm font-semibold leading-6 text-(--ui-text) focus:border-(--ui-blue) focus:bg-(--ui-panel)"
                   maxLength={500}
                   required
                   value={form.fallback_message}
@@ -334,7 +320,7 @@ function BotsContent() {
               </label>
             </div>
 
-            {status ? <p className="mt-5 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-bg)] px-3 py-2 text-sm font-semibold text-[var(--ui-text)]">{status}</p> : null}
+            {status ? <p className="mt-5 rounded-lg border border-(--ui-border) bg-(--ui-bg) px-3 py-2 text-sm font-semibold text-(--ui-text)">{status}</p> : null}
 
             <div className="mt-5 grid gap-3 sm:flex sm:flex-wrap">
               <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
@@ -420,7 +406,7 @@ function BotsPageSkeleton() {
 
 function BotsHeaderSkeleton() {
   return (
-    <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
+    <section className="studio-enter border-b border-(--ui-border) bg-(--ui-bg) px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
           <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
@@ -465,26 +451,26 @@ function AgentGridSkeleton() {
 
 function AgentCardSkeleton() {
   return (
-    <div className="min-h-[160px] overflow-hidden rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-panel)] p-4">
+    <div className="min-h-[160px] overflow-hidden rounded-2xl border border-(--ui-border) bg-(--ui-panel) p-4">
       <div className="flex items-center justify-between gap-3">
-        <Skeleton className="h-6 w-20 rounded-full bg-[var(--ui-bg)]" />
-        <Skeleton className="h-6 w-6 rounded-full bg-[var(--ui-bg)]" />
+        <Skeleton className="h-6 w-20 rounded-full bg-(--ui-bg)" />
+        <Skeleton className="h-6 w-6 rounded-full bg-(--ui-bg)" />
       </div>
-      <Skeleton className="mt-10 h-7 w-3/4 bg-[var(--ui-bg)]" />
-      <Skeleton className="mt-3 h-4 w-2/3 bg-[var(--ui-bg)]" />
+      <Skeleton className="mt-10 h-7 w-3/4 bg-(--ui-bg)" />
+      <Skeleton className="mt-3 h-4 w-2/3 bg-(--ui-bg)" />
     </div>
   );
 }
 
 function AgentFormSkeleton() {
   return (
-    <Panel className="h-fit w-full lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden rounded-2xl border-[var(--ui-border)] bg-[var(--ui-panel)] p-5">
-      <div className="mb-5 border-b border-[var(--ui-border)] pb-4">
+    <Panel className="h-fit w-full lg:w-[480px] xl:w-[560px] shrink-0 overflow-hidden rounded-2xl border-(--ui-border) bg-(--ui-panel) p-5">
+      <div className="mb-5 border-b border-(--ui-border) pb-4">
         <div className="min-w-0 flex-1">
-          <Skeleton className="h-8 w-48 bg-[var(--ui-bg)]" />
+          <Skeleton className="h-8 w-48 bg-(--ui-bg)" />
           <div className="mt-3 flex items-center gap-2">
-            <Skeleton className="h-6 w-20 rounded-full bg-[var(--ui-bg)]" />
-            <Skeleton className="h-4 w-32 bg-[var(--ui-bg)]" />
+            <Skeleton className="h-6 w-20 rounded-full bg-(--ui-bg)" />
+            <Skeleton className="h-4 w-32 bg-(--ui-bg)" />
           </div>
         </div>
       </div>
@@ -496,8 +482,8 @@ function AgentFormSkeleton() {
       </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <Skeleton className="h-11 w-28 rounded-md bg-[var(--ui-bg)]" />
-        <Skeleton className="h-11 w-24 rounded-md bg-[var(--ui-bg)]" />
+        <Skeleton className="h-11 w-28 rounded-md bg-(--ui-bg)" />
+        <Skeleton className="h-11 w-24 rounded-md bg-(--ui-bg)" />
       </div>
     </Panel>
   );
@@ -506,13 +492,13 @@ function AgentFormSkeleton() {
 function SkeletonField({ className, labelWidth }: { className: string; labelWidth: string }) {
   return (
     <div>
-      <Skeleton className={`mb-2 h-4 ${labelWidth} bg-[var(--ui-bg)]`} />
-      <Skeleton className={`w-full rounded-lg bg-[var(--ui-bg)] ${className}`} />
+      <Skeleton className={`mb-2 h-4 ${labelWidth} bg-(--ui-bg)`} />
+      <Skeleton className={`w-full rounded-lg bg-(--ui-bg) ${className}`} />
     </div>
   );
 }
 
-function BotsHeader({ botCount }: { botCount: number }) {
+function BotsHeader() {
   const steps = [
     "Write the agent's support instructions.",
     "Set the fallback response customers will see.",
@@ -520,15 +506,13 @@ function BotsHeader({ botCount }: { botCount: number }) {
   ];
 
   return (
-    <section className="studio-enter border-b border-[var(--ui-border)] bg-[var(--ui-bg)] px-4 py-6 sm:px-6 lg:px-8">
+    <section className="studio-enter border-b border-(--ui-border) bg-(--ui-bg) px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         <div className="overflow-hidden rounded-[2rem] border border-[#6366f1]/35 bg-[linear-gradient(135deg,#eef2ff_0%,#ccfbf1_46%,#6366f1_100%)] text-[#1e1b4b] shadow-[0_24px_70px_rgba(99,102,241,0.18)] dark:bg-[linear-gradient(135deg,#111827_0%,#134e4a_48%,#4f46e5_100%)] dark:text-[#eef2ff]">
           <div className="grid gap-4 p-5 sm:p-5 lg:grid-cols-[minmax(0,1fr)_330px] lg:p-6">
             <div className="min-w-0">
-              <p className="inline-flex items-center gap-2 rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
-                <span>Support agent setup</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#312e81]/50 dark:bg-[#ccfbf1]/50" />
-                <span>{botCount} configured</span>
+              <p className="inline-flex rounded-full border border-[#312e81]/20 bg-white/55 px-3 py-1 studio-kicker text-[#312e81] dark:border-white/20 dark:bg-black/20 dark:text-[#ccfbf1]">
+                Support agent setup
               </p>
               <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.04] tracking-[-0.02em] text-current sm:text-4xl lg:text-5xl">
                 Create customer support agents for this workspace.

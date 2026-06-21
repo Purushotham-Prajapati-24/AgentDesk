@@ -249,14 +249,18 @@ function streamCompletion({
           controller.enqueue(sse({ token: fallbackMessage }));
         }
 
-        controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
         await onComplete(finalTokenCount);
         await onMessageComplete(completionText, finalTokenCount);
-      } catch {
+        controller.enqueue(sseDone());
+      } catch (streamError) {
+        try {
+          await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
+        } catch {
+          // Suppress callback errors to avoid double-fault
+        }
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());
-        await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
       } finally {
         controller.close();
       }
@@ -557,7 +561,7 @@ async function broadcastBotMessage(tenantId: string, sessionId: string, content:
         tenant_id: tenantId,
         session_id: sessionId,
         content,
-        message_id: messageId || ID.unique(),
+        message_id: messageId || undefined,
         token: createHandoffToken({
           tenant_id: tenantId,
           session_id: sessionId,

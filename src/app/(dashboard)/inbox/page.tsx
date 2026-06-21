@@ -117,16 +117,12 @@ export default function InboxPage() {
    * When the socket reports a status change (session-state / bot-status-toggle),
    * immediately reflect it on the matching conversation card in the history panel
    * so the "paused by human" pill appears without a full page reload.
-   * Reads selectedConversationId from a ref to avoid stale closures in the socket effect.
+   * Uses state.session_id from the socket event to ensure we update the correct conversation.
    */
-  function updateHistoryStatus(newStatus: SessionStatus, updatedAt: string) {
-    const selectedId = selectedConversationIdRef.current;
-    if (!selectedId) {
-      return;
-    }
+  function updateHistoryStatus(sessionId: string, newStatus: SessionStatus, updatedAt: string) {
     setHistory((prev) =>
       prev.map((conversation) =>
-        conversation.id === selectedId
+        conversation.sessionToken === sessionId
           ? { ...conversation, status: newStatus, updatedAt: updatedAt || conversation.updatedAt }
           : conversation,
       ),
@@ -137,17 +133,13 @@ export default function InboxPage() {
    * When a new message arrives via the socket (customer / bot / agent),
    * bump the matching conversation card's lastMessage, lastSender, messageCount,
    * and updatedAt so the history panel stays in sync with the live transcript.
-   * Reads selectedConversationId from a ref to avoid stale closures in the socket effect.
+   * Uses sessionId from the current room context to ensure we update the correct conversation.
    */
-  function bumpHistoryMessage(message: SocketEventMessage) {
-    const selectedId = selectedConversationIdRef.current;
-    if (!selectedId) {
-      return;
-    }
+  function bumpHistoryMessage(sessionId: string, message: SocketEventMessage) {
     const now = message.created_at || new Date().toISOString();
     setHistory((prev) =>
       prev.map((conversation) =>
-        conversation.id === selectedId
+        conversation.sessionToken === sessionId
           ? {
               ...conversation,
               lastMessage: message.content,
@@ -248,23 +240,29 @@ export default function InboxPage() {
       });
       socket.on("session-state", (state: SessionState) => {
         setSessionStatus(state.status);
-        updateHistoryStatus(state.status, state.updated_at);
+        updateHistoryStatus(state.session_id, state.status, state.updated_at);
       });
       socket.on("bot-status-toggle", (state: SessionState) => {
         setSessionStatus(state.status);
-        updateHistoryStatus(state.status, state.updated_at);
+        updateHistoryStatus(state.session_id, state.status, state.updated_at);
       });
       socket.on("customer-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
-        bumpHistoryMessage(message);
+        const wasAdded = appendMessage(setMessages, mapSocketMessage(message));
+        if (wasAdded) {
+          bumpHistoryMessage(room.sessionId, message);
+        }
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
-        bumpHistoryMessage(message);
+        const wasAdded = appendMessage(setMessages, mapSocketMessage(message));
+        if (wasAdded) {
+          bumpHistoryMessage(room.sessionId, message);
+        }
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
-        appendMessage(setMessages, mapSocketMessage(message));
-        bumpHistoryMessage(message);
+        const wasAdded = appendMessage(setMessages, mapSocketMessage(message));
+        if (wasAdded) {
+          bumpHistoryMessage(room.sessionId, message);
+        }
       });
       socket.on("server-error", (response: AckResponse<never>) => {
         if (!response.success) {
@@ -1303,17 +1301,22 @@ function mapSocketMessage(message: SocketEventMessage): ChatMessage {
   };
 }
 
-function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage) {
+function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage): boolean {
+  let wasAdded = false;
   setMessages((current) => {
     if (current.some((item) => item.id === message.id)) {
+      wasAdded = false;
       return current;
     }
     const lastMessage = current[current.length - 1];
-    if (message.sender === "bot" && lastMessage && lastMessage.sender === "bot" && lastMessage.content === message.content) {
+    if (lastMessage && lastMessage.sender === message.sender && lastMessage.content === message.content) {
+      wasAdded = false;
       return current;
     }
+    wasAdded = true;
     return [...current, message];
   });
+  return wasAdded;
 }
 
 function senderLabel(sender: Sender) {
