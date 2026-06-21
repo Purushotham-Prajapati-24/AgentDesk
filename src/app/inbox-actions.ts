@@ -152,21 +152,45 @@ async function resolveSession(
     throw new Error("Invalid session ID.");
   }
 
-  // 1. Try fetching by document ID and tenant_id using listDocuments (to prevent cross-tenant probing)
-  try {
-    const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
-      Query.equal("$id", sessionId),
-      Query.equal("tenant_id", tenantId),
-      Query.limit(1),
-    ]);
-    if (result.documents.length > 0) {
-      return result.documents[0] as SessionDocument;
+  // 1. Treat the input as an Appwrite document $id first.
+  //    We filter by tenant_id in the same query so a valid $id that belongs
+  //    to a different tenant simply returns 0 documents — we do NOT fall back
+  //    to a session_token retry in that case, because the caller explicitly
+  //    supplied an $id and a cross-tenant retry would be a data leak.
+  let idLookupAttempted = false;
+  if (/^[a-zA-Z0-9]{20}$/.test(sessionId)) {
+    // Appwrite auto-generated IDs are exactly 20 alphanumeric characters.
+    idLookupAttempted = true;
+    try {
+      const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+        Query.equal("$id", sessionId),
+        Query.equal("tenant_id", tenantId),
+        Query.limit(1),
+      ]);
+      if (result.documents.length > 0) {
+        return result.documents[0] as SessionDocument;
+      }
+      // $id found in DB but not in this tenant — stop here, do not leak.
+      throw new Error("Conversation session was not found.");
+    } catch (error) {
+      // Re-throw security errors and "not found" errors immediately.
+      if (error instanceof Error && error.message === "Conversation session was not found.") {
+        throw error;
+      }
+      // Only fall through on genuine DB/transport errors for the $id path.
+      console.error("[inbox] resolveSession: $id DB lookup failed:", error);
     }
-  } catch (error) {
-    console.error("[inbox] resolveSession: lookup by $id failed, falling back to session_token. error:", error);
   }
 
-  // 2. Query by session_token
+  // 2. Fall back to session_token lookup only when the input is clearly a
+  //    session token (not an Appwrite $id) or when the $id DB call itself
+  //    threw an unexpected transport error.
+  if (idLookupAttempted) {
+    // We already tried $id — if we're here, it was a transport error.
+    // Do NOT retry by session_token: the caller passed an $id-shaped value.
+    throw new Error("Conversation session was not found.");
+  }
+
   const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
     Query.equal("tenant_id", tenantId),
     Query.equal("session_token", sessionId),

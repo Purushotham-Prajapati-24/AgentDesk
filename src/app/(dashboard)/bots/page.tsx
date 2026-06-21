@@ -190,6 +190,12 @@ function BotsContent() {
   }
 
   function requestDeleteBotFor(bot: Bot) {
+    // Guard: if the form has unsaved changes, confirm before discarding the
+    // draft. The delete modal itself is for a different bot card, so the user
+    // would lose their draft without any warning otherwise.
+    if (isFormDirty && !confirm("You have unsaved changes. Continue to delete this agent?")) {
+      return;
+    }
     setDeleteTarget(bot);
     setDeleteConfirmed(false);
     setStatus("");
@@ -294,7 +300,7 @@ function BotsContent() {
                     </button>
 
                     <button
-                      className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white z-10"
+                      className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white z-10"
                       onClick={() => {
                         requestDeleteBotFor(bot);
                       }}

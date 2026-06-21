@@ -94,3 +94,6 @@ packages/vue/dist/index.cjs.map
 
 
 plan.md
+
+# Local Git worktrees — never commit these
+.worktrees/

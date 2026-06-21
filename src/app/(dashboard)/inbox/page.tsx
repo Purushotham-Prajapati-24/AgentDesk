@@ -503,13 +503,21 @@ export default function InboxPage() {
         return;
       }
 
-      setMessages(
-        response.data.messages.map((message) => ({
-          id: message.id,
-          sender: message.sender,
-          content: message.content,
-          createdAt: message.createdAt,
-        })),
+      const loadedMessages = response.data.messages.map((message) => ({
+        id: message.id,
+        sender: message.sender,
+        content: message.content,
+        createdAt: message.createdAt,
+      }));
+      setMessages(loadedMessages);
+      // Sync the conversation card's messageCount with the actual number of
+      // messages returned from the DB. The history-list API returns a
+      // denormalised count from the sessions document which may lag behind
+      // the real transcript length.
+      setHistory((prev) =>
+        prev.map((c) =>
+          c.id === conversation.id ? { ...c, messageCount: loadedMessages.length } : c,
+        ),
       );
       // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO)
       seenMessageIdsRef.current.clear();
