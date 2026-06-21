@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import { ArrowRight, Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
@@ -50,39 +51,31 @@ function BotsContent() {
 
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
-  const [hasSetInitialSelection, setHasSetInitialSelection] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(isNew);
 
-  const [prevTenantId, setPrevTenantId] = useState(tenant?.$id);
-  if (tenant?.$id !== prevTenantId) {
-    setPrevTenantId(tenant?.$id);
-    setBots([]);
-    setIsAgentsLoading(true);
-    setHasSetInitialSelection(false);
-  }
+  useEffect(() => {
+    setIsDrafting(isNew);
+  }, [tenant?.$id, isNew]);
 
-  const [prevIsNew, setPrevIsNew] = useState(isNew);
-  if (isNew !== prevIsNew) {
-    setPrevIsNew(isNew);
+  useEffect(() => {
     if (isNew) {
       setSelectedId(null);
       setForm(EMPTY_FORM);
       setStatus("");
-      setHasSetInitialSelection(true);
-    }
-  }
-
-  useEffect(() => {
-    if (isNew) {
+      setIsDrafting(true);
       router.replace("/bots");
     }
   }, [isNew, router]);
 
   useEffect(() => {
     if (!tenant?.$id) {
+      setBots([]);
+      setIsAgentsLoading(false);
       return;
     }
 
     let isActive = true;
+    setIsAgentsLoading(true);
     listBots(tenant.$id).then((response) => {
       if (!isActive) {
         return;
@@ -90,17 +83,6 @@ function BotsContent() {
       setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
-        if (!hasSetInitialSelection) {
-          if (response.bots.length > 0) {
-            const firstBot = response.bots[0];
-            setSelectedId(firstBot.$id);
-            setForm(botToForm(firstBot));
-          } else {
-            setSelectedId(null);
-            setForm(EMPTY_FORM);
-          }
-          setHasSetInitialSelection(true);
-        }
       } else {
         setStatus(response.error);
       }
@@ -109,8 +91,24 @@ function BotsContent() {
     return () => {
       isActive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.$id]);
+
+  useEffect(() => {
+    if (isAgentsLoading) {
+      return;
+    }
+
+    if (!selectedId && !isDrafting) {
+      if (bots.length > 0) {
+        const firstBot = bots[0];
+        setSelectedId(firstBot.$id);
+        setForm(botToForm(firstBot));
+      } else {
+        setSelectedId(null);
+        setForm(EMPTY_FORM);
+      }
+    }
+  }, [isAgentsLoading, bots, selectedId, isDrafting]);
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -118,6 +116,7 @@ function BotsContent() {
     setSelectedId(bot.$id);
     setForm(botToForm(bot));
     setStatus("");
+    setIsDrafting(false);
   }
 
   async function handleCopy() {
@@ -153,11 +152,6 @@ function BotsContent() {
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
     setStatus(selectedBot ? "Agent configuration saved." : "Agent created.");
-    // Clear the ?new=true query param so the isNew effect doesn't
-    // re-fire and reset the form back to EMPTY_FORM on the next render.
-    if (isNew) {
-      router.replace("/bots");
-    }
   }
 
   function requestDeleteBotFor(bot: Bot) {
@@ -239,48 +233,35 @@ function BotsContent() {
               ) : (
                 bots.map((bot, index) => (
                   <div
-                    role="button"
-                    tabIndex={0}
-                    className={`group/card relative min-h-[160px] cursor-pointer overflow-hidden rounded-2xl p-4 text-left text-white transition hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0099ff] ${
-                      bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
-                    } ${botCardClass(index)}`}
                     key={bot.$id}
-                    onClick={() => selectBot(bot)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        selectBot(bot);
-                      }
-                    }}
+                    className="group/card relative min-h-[160px] transition hover:-translate-y-1"
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            requestDeleteBotFor(bot);
-                          }}
-                          onKeyDown={(event) => {
-                            // Stop propagation so the card's onKeyDown (selectBot) doesn't
-                            // also fire. Prevent default to stop Space from scrolling the page.
-                            event.stopPropagation();
-                            if (event.key === " ") {
-                              event.preventDefault();
-                            }
-                          }}
-                          type="button"
-                          title="Delete agent"
-                          aria-label={`Delete agent ${bot.name}`}
-                        >
-                          <Trash2 aria-hidden="true" className="h-4 w-4" />
-                        </button>
-                        <BotIcon aria-hidden="true" className="h-6 w-6" />
+                    <button
+                      type="button"
+                      className={`w-full h-full min-h-[160px] rounded-2xl p-4 text-left text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0099ff] ${
+                        bot.$id === selectedId ? "outline outline-2 outline-[#0099ff]" : ""
+                      } ${botCardClass(index)}`}
+                      onClick={() => selectBot(bot)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#090909]">{bot.$id === selectedId ? "active" : "configured"}</span>
+                        <BotIcon aria-hidden="true" className="mr-10 h-6 w-6" />
                       </div>
-                    </div>
-                    <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
-                    <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                      <h2 className="mt-10 break-words text-2xl font-semibold tracking-[-0.03em]">{bot.name}</h2>
+                      <p className="mt-2 truncate font-mono text-xs font-semibold text-white/75">{bot.$id}</p>
+                    </button>
+
+                    <button
+                      className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-black/25 text-white/80 hover:bg-[#dc2626] hover:text-white hover:scale-105 active:scale-[0.98] transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white z-10"
+                      onClick={() => {
+                        requestDeleteBotFor(bot);
+                      }}
+                      type="button"
+                      title="Delete agent"
+                      aria-label={`Delete agent ${bot.name}`}
+                    >
+                      <Trash2 aria-hidden="true" className="h-4 w-4" />
+                    </button>
                   </div>
                 ))
               )}

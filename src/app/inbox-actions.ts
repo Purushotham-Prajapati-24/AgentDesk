@@ -162,8 +162,8 @@ async function resolveSession(
     if (result.documents.length > 0) {
       return result.documents[0] as SessionDocument;
     }
-  } catch {
-    // Suppress Appwrite error and fall back to session_token query
+  } catch (error) {
+    console.error("[inbox] resolveSession: lookup by $id failed, falling back to session_token. error:", error);
   }
 
   // 2. Query by session_token

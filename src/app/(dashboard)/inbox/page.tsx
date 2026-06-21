@@ -114,6 +114,8 @@ export default function InboxPage() {
   // bumpHistoryMessage consult this synchronously so that messageCount in the
   // history panel never drifts from the actual transcript length.
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
+  // Tracks the active session ID to guard against late-arriving listConversationMessages promises.
+  const activeSessionIdRef = useRef<string | null>(DEFAULT_ROOM.sessionId);
 
   function trackMessageId(id: string): boolean {
     if (!id) return false;
@@ -376,6 +378,7 @@ export default function InboxPage() {
     setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
+    activeSessionIdRef.current = draftRoom.sessionId;
 
     setMessageLoading(true);
     try {
@@ -383,6 +386,10 @@ export default function InboxPage() {
         tenantId: draftRoom.tenantId,
         sessionId: draftRoom.sessionId,
       });
+
+      if (draftRoom.sessionId !== activeSessionIdRef.current) {
+        return;
+      }
 
       if (!response.success) {
         setMessages([]);
@@ -403,12 +410,17 @@ export default function InboxPage() {
         if (m.id) trackMessageId(m.id);
       });
     } catch (err) {
+      if (draftRoom.sessionId !== activeSessionIdRef.current) {
+        return;
+      }
       if (process.env.NODE_ENV !== "production") {
         console.error("[Inbox] Failed to list conversation messages for room:", err);
       }
       setMessages([]);
     } finally {
-      setMessageLoading(false);
+      if (draftRoom.sessionId === activeSessionIdRef.current) {
+        setMessageLoading(false);
+      }
     }
   }
 
@@ -456,6 +468,7 @@ export default function InboxPage() {
     setSessionStatus(conversation.status);
     setDraftRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
     setRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
+    activeSessionIdRef.current = conversation.id;
     setMessages([]);
     setMessageLoading(true);
     setMobilePanel("transcript");
@@ -467,6 +480,10 @@ export default function InboxPage() {
         tenantId: tenant.$id,
         sessionId: conversation.id,
       });
+
+      if (conversation.id !== activeSessionIdRef.current) {
+        return;
+      }
 
       if (!response.success) {
         setMessages([]);
@@ -488,10 +505,15 @@ export default function InboxPage() {
         if (m.id) trackMessageId(m.id);
       });
     } catch (messageError) {
+      if (conversation.id !== activeSessionIdRef.current) {
+        return;
+      }
       setMessages([]);
       setError(messageError instanceof Error ? messageError.message : "Unable to load conversation messages.");
     } finally {
-      setMessageLoading(false);
+      if (conversation.id === activeSessionIdRef.current) {
+        setMessageLoading(false);
+      }
     }
   }
 
@@ -1348,12 +1370,8 @@ function mapSocketMessage(message: SocketEventMessage): ChatMessage {
 
 function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMessage[]) => void, message: ChatMessage) {
   setMessages((current) => {
-    // Always dedup — if message.id is missing (legacy path), fall back to
-    // matching by sender + createdAt so we never add guaranteed duplicates.
     if (message.id) {
       if (current.some((item) => item.id === message.id)) return current;
-    } else {
-      if (current.some((item) => item.sender === message.sender && item.createdAt === message.createdAt)) return current;
     }
     return [...current, message];
   });
