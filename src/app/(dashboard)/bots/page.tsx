@@ -50,14 +50,6 @@ function BotsContent() {
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
   useEffect(() => {
-    if (isNew) {
-      setSelectedId(null);
-      setForm(EMPTY_FORM);
-      setStatus("");
-    }
-  }, [isNew]);
-
-  useEffect(() => {
     if (!tenant?.$id) {
       return;
     }
@@ -74,6 +66,7 @@ function BotsContent() {
         if (isNew) {
           setSelectedId(null);
           setForm(EMPTY_FORM);
+          setStatus("");
         } else {
           const firstBot = response.bots[0] ?? null;
           setSelectedId(firstBot?.$id ?? null);

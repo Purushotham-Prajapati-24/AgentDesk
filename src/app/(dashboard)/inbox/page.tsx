@@ -1305,12 +1305,10 @@ function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMe
   let wasAdded = false;
   setMessages((current) => {
     if (current.some((item) => item.id === message.id)) {
-      wasAdded = false;
       return current;
     }
     const lastMessage = current[current.length - 1];
     if (lastMessage && lastMessage.sender === message.sender && lastMessage.content === message.content) {
-      wasAdded = false;
       return current;
     }
     wasAdded = true;
