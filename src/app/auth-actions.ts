@@ -26,17 +26,35 @@ export type AuthTenant = {
   role: "admin" | "agent";
 };
 
-export async function loginWithMagicLink(email: string) {
+function sanitizeNextPath(value: string | undefined | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return null;
+  }
+  if (/[\r\n\t\0]/.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+export async function loginWithMagicLink(email: string, nextPath?: string) {
   const { account } = await createAdminClient();
-  
+
   try {
     const headersList = await headers();
     const origin = resolveAppOrigin(headersList);
-    
+    const safeNext = sanitizeNextPath(nextPath);
+    const verifyUrl = safeNext
+      ? `${origin}/verify?next=${encodeURIComponent(safeNext)}`
+      : `${origin}/verify`;
+
     await account.createMagicURLToken({
       userId: ID.unique(),
       email,
-      url: `${origin}/verify`,
+      url: verifyUrl,
     });
     return { success: true };
   } catch (error: unknown) {

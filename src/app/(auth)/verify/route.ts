@@ -3,15 +3,44 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+const DEFAULT_AUTHENTICATED_DESTINATION = "/bots";
+
+/**
+ * Validates a post-login redirect target.
+ * Only same-origin root-relative paths are accepted.
+ */
+function sanitizeNextPath(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return null;
+  }
+  if (/[\r\n\t\0]/.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+function resolveNextPath(request: NextRequest): string {
+  const fromQuery = sanitizeNextPath(request.nextUrl.searchParams.get("next"));
+  if (fromQuery) {
+    return fromQuery;
+  }
+  return DEFAULT_AUTHENTICATED_DESTINATION;
+}
+
 export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get("userId");
   const secret = request.nextUrl.searchParams.get("secret");
+  const nextPath = resolveNextPath(request);
 
   if (!userId || !secret) {
-    return redirectToLogin(request, "invalid_magic_link", 303);
+    return redirectToLogin(request, "invalid_magic_link", 303, nextPath);
   }
 
-  return new NextResponse(renderVerificationPage(userId, secret), {
+  return new NextResponse(renderVerificationPage(userId, secret, nextPath), {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Referrer-Policy": "no-referrer",
@@ -24,23 +53,33 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const userId = stringValue(formData.get("userId"));
   const secret = stringValue(formData.get("secret"));
+  const nextPath =
+    sanitizeNextPath(stringValue(formData.get("next"))) ?? DEFAULT_AUTHENTICATED_DESTINATION;
 
   if (!userId || !secret) {
-    return redirectToLogin(request, "invalid_magic_link");
+    return redirectToLogin(request, "invalid_magic_link", 307, nextPath);
   }
 
   const result = await verifyMagicLink(userId, secret);
   if (!result.success) {
     console.error("Magic link verification failed:", result.error);
-    return redirectToLogin(request, "verification_failed", 303);
+    return redirectToLogin(request, "verification_failed", 303, nextPath);
   }
 
-  return NextResponse.redirect(new URL("/inbox", request.url), 303);
+  return NextResponse.redirect(new URL(nextPath, request.url), 303);
 }
 
-function redirectToLogin(request: NextRequest, error: string, status = 307) {
+function redirectToLogin(
+  request: NextRequest,
+  error: string,
+  status = 307,
+  nextPath = DEFAULT_AUTHENTICATED_DESTINATION,
+) {
   const url = new URL("/login", request.url);
   url.searchParams.set("error", error);
+  if (nextPath !== DEFAULT_AUTHENTICATED_DESTINATION) {
+    url.searchParams.set("next", nextPath);
+  }
   return NextResponse.redirect(url, status);
 }
 
@@ -56,9 +95,10 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;");
 }
 
-function renderVerificationPage(userId: string, secret: string) {
+function renderVerificationPage(userId: string, secret: string, nextPath: string) {
   const escapedUserId = escapeHtml(userId);
   const escapedSecret = escapeHtml(secret);
+  const escapedNext = escapeHtml(nextPath);
 
   return `<!doctype html>
 <html lang="en">
@@ -133,6 +173,7 @@ function renderVerificationPage(userId: string, secret: string) {
       <form method="post" action="/verify">
         <input type="hidden" name="userId" value="${escapedUserId}" />
         <input type="hidden" name="secret" value="${escapedSecret}" />
+        <input type="hidden" name="next" value="${escapedNext}" />
         <button type="submit">Continue to workspace</button>
       </form>
     </main>

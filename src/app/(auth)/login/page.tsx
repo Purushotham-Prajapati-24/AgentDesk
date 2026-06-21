@@ -26,6 +26,7 @@ function LoginContent() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const queryMessage = getQueryMessage(searchParams.get("error"));
   const visibleMessage = message ?? queryMessage;
+  const nextPath = sanitizeLoginNext(searchParams.get("next"));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -33,7 +34,7 @@ function LoginContent() {
     setMessage(null);
 
     try {
-      const result = await loginWithMagicLink(email);
+      const result = await loginWithMagicLink(email, nextPath ?? undefined);
       if (!result.success) {
         throw new Error(result.error);
       }
@@ -146,4 +147,18 @@ function getQueryMessage(error: string | null): { type: "error"; text: string } 
   }
 
   return null;
+}
+
+function sanitizeLoginNext(value: string | null): string | null {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
+    return null;
+  }
+  if (/[\r\n\t\0]/.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
 }
