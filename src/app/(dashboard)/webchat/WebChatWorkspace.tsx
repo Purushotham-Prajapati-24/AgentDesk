@@ -648,8 +648,8 @@ export function WebChatWorkspace() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#f97316]/25 bg-[#f97316]/10 p-4">
-                <p className="text-sm font-semibold text-[#fdba74]">Saved agent settings will not change yet.</p>
+              <div className="rounded-2xl border border-[var(--ui-amber)]/25 bg-[var(--ui-amber)]/10 p-4">
+                <p className="text-sm font-semibold text-[var(--ui-amber)]">Saved agent settings will not change yet.</p>
                 <p className="mt-1 text-sm leading-6 text-white/60">The reset affects this editor draft. Nothing is written to the selected bot until you click Save changes.</p>
               </div>
             </div>
@@ -665,7 +665,7 @@ export function WebChatWorkspace() {
                 Cancel
               </Button>
               <Button
-                className="h-10 rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-4 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
+                className="h-10 rounded-full border-[var(--ui-amber)]/60 bg-[var(--ui-amber)] px-4 !text-white shadow-[0_10px_24px_rgba(245,158,11,0.22)] hover:border-[var(--ui-amber)]/80 hover:brightness-[1.06]"
                 leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
                 onClick={confirmResetConfig}
                 type="button"
@@ -730,7 +730,7 @@ export function WebChatWorkspace() {
             <div className="grid gap-3 border-t border-white/10 bg-[#070b14] p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-6">
               <p className="text-sm font-medium text-white/60">Open the live embed or continue to deployment snippets.</p>
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#38bdf8]/60 bg-[linear-gradient(135deg,#38bdf8_0%,#2563eb_52%,#1d4ed8_100%)] px-4 text-sm font-semibold !text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)] transition hover:border-[#93c5fd]/80 hover:brightness-[1.06]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--ui-blue)]/60 bg-[var(--ui-blue)] px-4 text-sm font-semibold !text-white shadow-[0_10px_24px_rgba(0,153,255,0.22)] transition hover:border-[var(--ui-blue)]/80 hover:brightness-[1.06]"
                 onClick={() => openLivePreview(saveSuccess.botId)}
                 type="button"
               >
@@ -738,7 +738,7 @@ export function WebChatWorkspace() {
                 Live preview
               </button>
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#0d9488]/60 bg-[linear-gradient(135deg,#06b6d4_0%,#0d9488_46%,#0f766e_100%)] px-4 text-sm font-semibold !text-white shadow-[0_10px_26px_rgba(13,148,136,0.24)] transition hover:border-[#2dd4bf]/80 hover:brightness-[1.06]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--ui-blue)]/60 bg-[var(--ui-blue)] px-4 text-sm font-semibold !text-white shadow-[0_10px_24px_rgba(0,153,255,0.22)] transition hover:border-[var(--ui-blue)]/80 hover:brightness-[1.06]"
                 onClick={() => {
                   setSaveSuccess(null);
                   setDeployModalOpen(true);
@@ -780,7 +780,7 @@ export function WebChatWorkspace() {
         <main className="grid min-w-0 content-start gap-3">
           <section className="sticky bottom-2 z-20 grid gap-2 rounded-[1.25rem] border border-[var(--ui-border)] bg-[color-mix(in_srgb,var(--ui-panel)_92%,transparent)] p-2 safe-bottom-padding shadow-[0_18px_50px_rgba(0,0,0,0.26)] backdrop-blur sm:grid-cols-3 xl:static xl:shadow-none xl:backdrop-blur-0">
             <Button
-              className="min-h-11 w-full rounded-full border-[#fb923c]/60 bg-[linear-gradient(135deg,#fbbf24_0%,#f97316_48%,#c2410c_100%)] px-3 !text-white shadow-[0_10px_24px_rgba(194,65,12,0.22)] hover:border-[#fdba74]/80 hover:brightness-[1.06]"
+              className="min-h-11 w-full rounded-full border-[var(--ui-amber)]/60 bg-[var(--ui-amber)] px-3 !text-white shadow-[0_10px_24px_rgba(245,158,11,0.22)] hover:border-[var(--ui-amber)]/80 hover:brightness-[1.06]"
               leftIcon={<RotateCcw aria-hidden="true" className="h-4 w-4" />}
               onClick={() => setResetConfirmOpen(true)}
               type="button"
@@ -808,7 +808,7 @@ export function WebChatWorkspace() {
               aria-controls="webchat-deploy-modal"
               aria-expanded={deployModalOpen}
               aria-haspopup="dialog"
-              className="min-h-11 w-full rounded-full border-[#0d9488]/60 bg-[linear-gradient(135deg,#06b6d4_0%,#0d9488_46%,#0f766e_100%)] px-3 !text-white shadow-[0_10px_26px_rgba(13,148,136,0.24)] hover:border-[#2dd4bf]/80 hover:brightness-[1.06]"
+              className="min-h-11 w-full rounded-full border-[var(--ui-blue)]/60 bg-[var(--ui-blue)] px-3 !text-white shadow-[0_10px_24px_rgba(0,153,255,0.22)] hover:border-[var(--ui-blue)]/80 hover:brightness-[1.06]"
               leftIcon={<CloudUpload aria-hidden="true" className="h-4 w-4" />}
               onClick={() => setDeployModalOpen(true)}
               type="button"

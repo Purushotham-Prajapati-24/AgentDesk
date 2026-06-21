@@ -116,7 +116,9 @@ export async function POST(request: Request) {
         botId: parsed.value.bot_id,
       });
       const messageId = await persistBotMessage(databases, parsed.value, fallbackMessage, 0);
-      await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage, messageId);
+      if (messageId) {
+        await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage, messageId);
+      }
       return streamStaticMessage(fallbackMessage);
     }
 
@@ -130,7 +132,9 @@ export async function POST(request: Request) {
       },
       onMessageComplete: async (content, tokenCount) => {
         const messageId = await persistBotMessage(databases, parsed.value, content || fallbackMessage, tokenCount);
-        await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage, messageId);
+        if (messageId) {
+          await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage, messageId);
+        }
       },
     });
   } catch {
@@ -554,7 +558,7 @@ async function checkRagPermission(tenantId: string, sessionId: string): Promise<
   }
 }
 
-async function broadcastBotMessage(tenantId: string, sessionId: string, content: string, messageId?: string | null): Promise<boolean> {
+async function broadcastBotMessage(tenantId: string, sessionId: string, content: string, messageId: string): Promise<boolean> {
   const wsUrl = getServerWebSocketUrl();
   if (!wsUrl) {
     return false;
@@ -570,7 +574,7 @@ async function broadcastBotMessage(tenantId: string, sessionId: string, content:
         tenant_id: tenantId,
         session_id: sessionId,
         content,
-        message_id: messageId || ID.unique(),
+        message_id: messageId,
         token: createHandoffToken({
           tenant_id: tenantId,
           session_id: sessionId,

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState, Panel } from "@/components/ui/Signal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type Bot = {
   $id: string;
@@ -34,6 +34,7 @@ const EMPTY_FORM: BotForm = {
 function BotsContent() {
   const { tenant, loading: tenantLoading } = useTenant();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isNew = searchParams.get("new") === "true";
 
   const [bots, setBots] = useState<Bot[]>([]);
@@ -82,13 +83,13 @@ function BotsContent() {
       return;
     }
     if (bots.length === 0) return;
-    setSelectedId((curr) => {
-      const next = curr ?? bots[0].$id;
-      const target = bots.find((b) => b.$id === next) ?? bots[0];
-      setForm(botToForm(target));
-      return next;
-    });
-  }, [isNew, bots]);
+    const nextId = selectedId && bots.some((b) => b.$id === selectedId) ? selectedId : bots[0].$id;
+    const target = bots.find((b) => b.$id === nextId) ?? bots[0];
+    if (selectedId !== nextId) {
+      setSelectedId(nextId);
+    }
+    setForm(botToForm(target));
+  }, [isNew, bots, selectedId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
@@ -132,6 +133,9 @@ function BotsContent() {
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
     setStatus("Agent configuration saved.");
+    if (isNew) {
+      router.replace("/bots");
+    }
   }
 
   function requestDeleteBotFor(bot: Bot) {
@@ -236,6 +240,9 @@ function BotsContent() {
                           onClick={(event) => {
                             event.stopPropagation();
                             requestDeleteBotFor(bot);
+                          }}
+                          onKeyDown={(event) => {
+                            event.stopPropagation();
                           }}
                           type="button"
                           title="Delete agent"

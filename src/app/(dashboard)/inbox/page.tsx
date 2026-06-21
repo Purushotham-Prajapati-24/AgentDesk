@@ -108,12 +108,6 @@ export default function InboxPage() {
   // Tracks whether the one-time initial auto-select has already fired.
   // Prevents updateRoom() + history re-fetch from overwriting a manual selection.
   const initialAutoSelectedRef = useRef(false);
-  // Mirrors selectedConversationId so socket handlers (registered once per room)
-  // always read the currently selected conversation without capturing a stale closure.
-  const selectedConversationIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    selectedConversationIdRef.current = selectedConversationId;
-  }, [selectedConversationId]);
 
   // Socket event handler helpers for inbox page history panel updates
   function updateHistoryStatus(sessionId: string, newStatus: SessionStatus, updatedAt: string) {
@@ -245,19 +239,25 @@ export default function InboxPage() {
         if (message.session_id === room.sessionId) {
           appendMessage(setMessages, mapSocketMessage(message));
         }
-        bumpHistoryMessage(message.session_id ?? room.sessionId, message);
+        if (message.session_id) {
+          bumpHistoryMessage(message.session_id, message);
+        }
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
         if (message.session_id === room.sessionId) {
           appendMessage(setMessages, mapSocketMessage(message));
         }
-        bumpHistoryMessage(message.session_id ?? room.sessionId, message);
+        if (message.session_id) {
+          bumpHistoryMessage(message.session_id, message);
+        }
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
         if (message.session_id === room.sessionId) {
           appendMessage(setMessages, mapSocketMessage(message));
         }
-        bumpHistoryMessage(message.session_id ?? room.sessionId, message);
+        if (message.session_id) {
+          bumpHistoryMessage(message.session_id, message);
+        }
       });
       socket.on("server-error", (response: AckResponse<never>) => {
         if (!response.success) {
@@ -1307,7 +1307,7 @@ function appendMessage(setMessages: (updater: (current: ChatMessage[]) => ChatMe
       lastMessage &&
       lastMessage.sender === "bot" &&
       lastMessage.content === message.content &&
-      Date.now() - new Date(lastMessage.createdAt).getTime() < 500
+      new Date(message.createdAt).getTime() - new Date(lastMessage.createdAt).getTime() < 500
     ) {
       return current;
     }
