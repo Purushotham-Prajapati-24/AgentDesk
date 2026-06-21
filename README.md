@@ -1,13 +1,18 @@
-# AgentDesk
+<p align="center">
+  <img src="public/agentdesk-banner.png" alt="AgentDesk Banner" width="100%">
+</p>
 
-AgentDesk is a multi-tenant AI customer support workspace for teams that need grounded answers, embeddable WebChat, live human handoff, and credit-aware usage tracking in one product.
+<h1 align="center">AgentDesk</h1>
 
 <p align="center">
-  <a href="https://agentdeskbot.vercel.app">Live Demo</a>
-  |
-  <a href="https://agentdeskbot.vercel.app/docs">Hosted Docs</a>
-  |
-  <a href="https://github.com/Purushotham-Prajapati-24/AgentDesk/issues">Report an Issue</a>
+  <strong>Multi-tenant AI customer support workspace</strong><br>
+  Grounded answers · Embeddable WebChat · Live human handoff · Credit-aware usage tracking
+</p>
+
+<p align="center">
+  <a href="https://agentdeskbot.vercel.app"><img src="https://img.shields.io/badge/Live_Demo-Visit-0f172a?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0xIDE1aC0ydi02aDJ2NnptMC04aC0yVjloMnY0eiIvPjwvc3ZnPg==&logoColor=white" alt="Live Demo"></a>
+  <a href="https://agentdeskbot.vercel.app/docs"><img src="https://img.shields.io/badge/Docs-Read-2563eb?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyLjAyYy0xLjczIDAtMy4zMS45OS00LjI0IDIuNDhsLS44IDEuMTJhNS45OCA1Ljk4IDAgMDAtMS4xNCAzLjRjMCAzLjMyIDIuNjkgNi4wMSA2LjAxIDYuMDFzNi4wMS0yLjY5IDYuMDEtNi4wMWE1Ljk4IDUuOTggMCAwMC0xLjE0LTMuNGwtLjgtMS4xMkE1Ljk4IDUuOTggMCAwMDEyIDIuMDJ6TTExIDE2aDJ2LTJoLTJ2MnptMC00aDJWN2gtNHY1aDJ6Ii8+PC9zdmc+" alt="Docs"></a>
+  <a href="https://github.com/Purushotham-Prajapati-24/AgentDesk/issues"><img src="https://img.shields.io/badge/Report_Issue-GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Report an Issue"></a>
 </p>
 
 <p align="center">
@@ -18,6 +23,12 @@ AgentDesk is a multi-tenant AI customer support workspace for teams that need gr
   <img alt="Appwrite" src="https://img.shields.io/badge/Appwrite-25.x-f02e65?logo=appwrite&logoColor=white">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-Hybrid_Search-dc244c">
   <img alt="Socket.IO" src="https://img.shields.io/badge/Socket.IO-4.x-010101?logo=socket.io&logoColor=white">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Purushotham-Prajapati-24/AgentDesk/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Purushotham-Prajapati-24/AgentDesk?style=social"></a>
+  <a href="https://github.com/Purushotham-Prajapati-24/AgentDesk/forks"><img alt="Forks" src="https://img.shields.io/github/forks/Purushotham-Prajapati-24/AgentDesk?style=social"></a>
+  <a href="https://github.com/Purushotham-Prajapati-24/AgentDesk/issues"><img alt="Issues" src="https://img.shields.io/github/issues/Purushotham-Prajapati-24/AgentDesk"></a>
 </p>
 
 ## Product Snapshots
