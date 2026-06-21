@@ -91,3 +91,7 @@ debug.log
 diff.txt
 packages/react/dist/index.cjs.map
 packages/vue/dist/index.cjs.map
+
+
+SECURITY_AUDIT.md
+plan.md

@@ -9,10 +9,10 @@ import {
   CreditCard,
   FileText,
   Inbox,
-  LayoutDashboard,
   LogOut,
   Menu,
   MessagesSquare,
+  Plus,
   Radio,
   ShieldCheck,
   TestTube2,
@@ -26,14 +26,13 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 type StatusTone = "hot" | "warn" | "neutral" | "danger" | "dark" | "info";
 
 const navItems = [
-  { href: "/", label: "Home", icon: LayoutDashboard },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/monitor", label: "Monitor", icon: ChartNoAxesCombined },
   { href: "/bots", label: "Agents", icon: Bot },
-  { href: "/webchat", label: "WebChat", icon: MessagesSquare },
-  { href: "/documents", label: "Knowledge", icon: FileText },
-  { href: "/billing", label: "Usage", icon: CreditCard },
+  { href: "/documents", label: "Knowledge base", icon: FileText },
+  { href: "/webchat", label: "Webchat customization", icon: MessagesSquare },
   { href: "/widget-test.html", label: "Widget Test", icon: TestTube2 },
+  { href: "/billing", label: "Usage", icon: CreditCard },
+  { href: "/monitor", label: "Monitor", icon: ChartNoAxesCombined },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -41,7 +40,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const currentSection = useMemo(() => {
-    return navItems.find((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`))) ?? navItems[0];
+    return navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ?? navItems[0];
   }, [pathname]);
 
   useEffect(() => {
@@ -96,9 +95,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <nav aria-label="Workspace navigation" className="flex min-w-0 flex-col gap-1 overflow-y-auto lg:grid lg:overflow-visible">
+              <Link
+                id="nav-create-agent"
+                className="mb-2 flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full border border-dashed border-[#0099ff]/50 bg-[#0099ff]/10 px-3 py-2 text-sm font-semibold text-[#0099ff] hover:bg-[#0099ff]/20 hover:border-[#0099ff] transition duration-200"
+                href="/bots?new=true"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                <span>Create agent</span>
+              </Link>
+
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
                     className={cn(

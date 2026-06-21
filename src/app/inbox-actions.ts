@@ -48,7 +48,7 @@ type MessageDocument = Models.Document & {
 };
 
 const PAGE_LIMIT = 10;
-const MESSAGE_LIMIT = 100;
+const MESSAGE_LIMIT = 1000;
 
 export async function listConversationSessions({
   tenantId,
@@ -87,11 +87,13 @@ export async function listConversationMessages({
   try {
     const { account, databases } = await createSessionClient();
     await assertTenantAccess(account, tenantId);
-    await assertSessionTenant(databases, tenantId, sessionId);
+    
+    // Resolve session by ID or token, verifying it belongs to the tenant
+    const session = await resolveSession(databases, tenantId, sessionId);
 
     const messages = await databases.listDocuments(databaseId(), messagesCollectionId(), [
       Query.equal("tenant_id", tenantId),
-      Query.equal("session_id", sessionId),
+      Query.equal("session_id", session.$id),
       Query.orderAsc("created"),
       Query.limit(MESSAGE_LIMIT),
     ]);
@@ -139,7 +141,7 @@ async function fetchSessions(
   }
 }
 
-async function assertSessionTenant(
+async function resolveSession(
   databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
   tenantId: string,
   sessionId: string,
@@ -148,10 +150,29 @@ async function assertSessionTenant(
     throw new Error("Invalid session ID.");
   }
 
-  const session = (await databases.getDocument(databaseId(), sessionsCollectionId(), sessionId)) as SessionDocument;
-  if (session.tenant_id !== tenantId) {
-    throw new Error("Conversation does not belong to this tenant.");
+  // 1. Try fetching directly by document ID (fastest)
+  try {
+    const session = (await databases.getDocument(databaseId(), sessionsCollectionId(), sessionId)) as SessionDocument;
+    if (session.tenant_id === tenantId) {
+      return session;
+    }
+  } catch {
+    // If not found or error, fall back to querying by session_token
   }
+
+  // 2. Query by session_token
+  const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
+    Query.equal("tenant_id", tenantId),
+    Query.equal("session_token", sessionId),
+    Query.limit(1),
+  ]);
+
+  const session = result.documents[0] as SessionDocument | undefined;
+  if (!session) {
+    throw new Error("Conversation session was not found.");
+  }
+
+  return session;
 }
 
 async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessionClient>>["account"], tenantId: string) {

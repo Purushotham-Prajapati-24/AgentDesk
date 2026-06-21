@@ -32,7 +32,7 @@ const platformLinks = [
     icon: Bot,
   },
   {
-    title: "WebChat",
+    title: "Webchat customization",
     eyebrow: "Launch",
     description: "Tune the widget identity, launcher, theme, and production embed without touching app code.",
     href: "/webchat",
