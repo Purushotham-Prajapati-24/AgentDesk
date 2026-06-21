@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     return redirectToLogin(request, "verification_failed", 303);
   }
 
-  return NextResponse.redirect(new URL("/inbox", request.url), 303);
+  return NextResponse.redirect(new URL("/bots", request.url), 303);
 }
 
 function redirectToLogin(request: NextRequest, error: string, status = 307) {

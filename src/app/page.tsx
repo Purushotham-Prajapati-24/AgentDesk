@@ -73,6 +73,7 @@ const proofPoints = [
 ] as const;
 
 export default function Home() {
+
   return (
     <main className="cream-lane min-h-screen overflow-hidden">
       <section className="marketing-dark-band relative isolate flex h-screen flex-col justify-start gap-2 overflow-hidden bg-[var(--marketing-bg)] px-4 pb-6 pt-2 text-[var(--marketing-ink)] sm:gap-4 sm:px-6 lg:px-8">

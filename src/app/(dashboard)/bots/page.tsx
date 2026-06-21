@@ -50,6 +50,16 @@ function BotsContent() {
 
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
+  const [hasSetInitialSelection, setHasSetInitialSelection] = useState(false);
+
+  const [prevTenantId, setPrevTenantId] = useState(tenant?.$id);
+  if (tenant?.$id !== prevTenantId) {
+    setPrevTenantId(tenant?.$id);
+    setBots([]);
+    setIsAgentsLoading(true);
+    setHasSetInitialSelection(false);
+  }
+
   const [prevIsNew, setPrevIsNew] = useState(isNew);
   if (isNew !== prevIsNew) {
     setPrevIsNew(isNew);
@@ -57,6 +67,7 @@ function BotsContent() {
       setSelectedId(null);
       setForm(EMPTY_FORM);
       setStatus("");
+      setHasSetInitialSelection(true);
     }
   }
 
@@ -76,21 +87,19 @@ function BotsContent() {
       if (!isActive) {
         return;
       }
-
       setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
-        // isNew is a stable URL-param value captured at the time this effect runs.
-        // Handling selection here (inside an async .then()) avoids any reactive
-        // useEffect dependency on isNew that would trigger cascading setState.
-        if (isNew) {
-          setSelectedId(null);
-          setForm(EMPTY_FORM);
-          setStatus("");
-        } else {
-          const firstBot = response.bots[0] ?? null;
-          setSelectedId(firstBot?.$id ?? null);
-          setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+        if (!hasSetInitialSelection) {
+          if (response.bots.length > 0) {
+            const firstBot = response.bots[0];
+            setSelectedId(firstBot.$id);
+            setForm(botToForm(firstBot));
+          } else {
+            setSelectedId(null);
+            setForm(EMPTY_FORM);
+          }
+          setHasSetInitialSelection(true);
         }
       } else {
         setStatus(response.error);
@@ -100,16 +109,8 @@ function BotsContent() {
     return () => {
       isActive = false;
     };
-    // isNew is intentionally excluded from the dep array — we only re-fetch when
-    // the tenant changes. The ?new=true flag is consumed once by the closure and
-    // then cleared via router.replace() on successful save, so stale-closure risk
-    // is by design and acceptable here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.$id]);
-
-  // When the bots list arrives, set the initial selection.
-  // isNew is captured as a stable closure value inside the async .then() body,
-  // so we don't need a separate reactive effect for it.
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -151,7 +152,7 @@ function BotsContent() {
     setBots((current) => [nextBot, ...current.filter((bot) => bot.$id !== nextBot.$id)]);
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
-    setStatus("Agent configuration saved.");
+    setStatus(selectedBot ? "Agent configuration saved." : "Agent created.");
     // Clear the ?new=true query param so the isNew effect doesn't
     // re-fire and reset the form back to EMPTY_FORM on the next render.
     if (isNew) {
@@ -265,9 +266,8 @@ function BotsContent() {
                             // Stop propagation so the card's onKeyDown (selectBot) doesn't
                             // also fire. Prevent default to stop Space from scrolling the page.
                             event.stopPropagation();
-                            event.preventDefault();
-                            if (event.key === "Enter" || event.key === " ") {
-                              requestDeleteBotFor(bot);
+                            if (event.key === " ") {
+                              event.preventDefault();
                             }
                           }}
                           type="button"

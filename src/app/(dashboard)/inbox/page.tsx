@@ -163,13 +163,13 @@ export default function InboxPage() {
    * the currently-open room, which could mutate the wrong conversation row.
    */
   function bumpHistoryMessage(message: SocketEventMessage) {
-    let targetSessionId = message.session_id;
+    const targetSessionId = message.session_id;
     if (!targetSessionId) {
       console.warn(
-        "[inbox] bumpHistoryMessage: event missing session_id, falling back to room.sessionId. message_id=",
+        "[inbox] bumpHistoryMessage: event missing session_id, skipping history bump. message_id=",
         message.message_id
       );
-      targetSessionId = room.sessionId;
+      return;
     }
     const now = message.created_at || new Date().toISOString();
     setHistory((prev) =>
@@ -314,7 +314,6 @@ export default function InboxPage() {
       socket?.disconnect();
       socketRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room]);
 
   useEffect(() => {
