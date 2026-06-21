@@ -6,7 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
+    "//dev-note": "Using --webpack to prevent hot-reload bugs with workspace monorepo link resolution in dev mode",
     "dev:ws": "npm --prefix websocket-server start",
     "build": "npm run build:widget && npm run build:sdk && next build",
     "build:sdk": "npm run build -w @agentdeskbot/core && npm run build -w @agentdeskbot/react -w @agentdeskbot/vue",

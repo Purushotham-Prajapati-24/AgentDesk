@@ -116,9 +116,7 @@ export async function POST(request: Request) {
         botId: parsed.value.bot_id,
       });
       const messageId = await persistBotMessage(databases, parsed.value, fallbackMessage, 0);
-      if (messageId) {
-        await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage, messageId);
-      }
+      await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, fallbackMessage, messageId);
       return streamStaticMessage(fallbackMessage);
     }
 
@@ -132,9 +130,7 @@ export async function POST(request: Request) {
       },
       onMessageComplete: async (content, tokenCount) => {
         const messageId = await persistBotMessage(databases, parsed.value, content || fallbackMessage, tokenCount);
-        if (messageId) {
-          await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage, messageId);
-        }
+        await broadcastBotMessage(parsed.value.tenant_id, parsed.value.session_token, content || fallbackMessage, messageId);
       },
     });
   } catch {
@@ -255,25 +251,12 @@ function streamCompletion({
 
         controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
-        try {
-          await onComplete(finalTokenCount);
-        } catch (onCompleteError) {
-          console.error("[chat] onComplete callback failed:", onCompleteError);
-        }
-        try {
-          await onMessageComplete(completionText, finalTokenCount);
-        } catch (onMessageCompleteError) {
-          console.error("[chat] onMessageComplete callback failed:", onMessageCompleteError);
-        }
-      } catch (streamError) {
-        console.error("[chat] Stream execution failed:", streamError);
+        await onComplete(finalTokenCount);
+        await onMessageComplete(completionText, finalTokenCount);
+      } catch {
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());
-        try {
-          await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
-        } catch (fallbackPersistError) {
-          console.error("[chat] Fallback onMessageComplete callback failed:", fallbackPersistError);
-        }
+        await onMessageComplete(fallbackMessage, estimateTokens(fallbackMessage) + estimateTokens(message));
       } finally {
         controller.close();
       }
@@ -558,7 +541,7 @@ async function checkRagPermission(tenantId: string, sessionId: string): Promise<
   }
 }
 
-async function broadcastBotMessage(tenantId: string, sessionId: string, content: string, messageId: string): Promise<boolean> {
+async function broadcastBotMessage(tenantId: string, sessionId: string, content: string, messageId?: string | null): Promise<boolean> {
   const wsUrl = getServerWebSocketUrl();
   if (!wsUrl) {
     return false;
@@ -574,7 +557,7 @@ async function broadcastBotMessage(tenantId: string, sessionId: string, content:
         tenant_id: tenantId,
         session_id: sessionId,
         content,
-        message_id: messageId,
+        message_id: messageId || ID.unique(),
         token: createHandoffToken({
           tenant_id: tenantId,
           session_id: sessionId,
