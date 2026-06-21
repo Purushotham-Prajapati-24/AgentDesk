@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState, Panel } from "@/components/ui/Signal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 type Bot = {
   $id: string;
@@ -34,6 +34,7 @@ const EMPTY_FORM: BotForm = {
 function BotsContent() {
   const { tenant, loading: tenantLoading } = useTenant();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isNew = searchParams.get("new") === "true";
 
   const [bots, setBots] = useState<Bot[]>([]);
@@ -63,6 +64,18 @@ function BotsContent() {
       setIsAgentsLoading(false);
       if (response.success) {
         setBots(response.bots);
+        // isNew is a stable URL-param value captured at the time this effect runs.
+        // Handling selection here (inside an async .then()) avoids any reactive
+        // useEffect dependency on isNew that would trigger cascading setState.
+        if (isNew) {
+          setSelectedId(null);
+          setForm(EMPTY_FORM);
+          setStatus("");
+        } else {
+          const firstBot = response.bots[0] ?? null;
+          setSelectedId(firstBot?.$id ?? null);
+          setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+        }
       } else {
         setStatus(response.error);
       }
@@ -71,30 +84,16 @@ function BotsContent() {
     return () => {
       isActive = false;
     };
+    // isNew is intentionally excluded from the dep array — we only re-fetch when
+    // the tenant changes. The ?new=true flag is consumed once by the closure and
+    // then cleared via router.replace() on successful save, so stale-closure risk
+    // is by design and acceptable here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.$id]);
 
-  useEffect(() => {
-    if (isNew) {
-      Promise.resolve().then(() => {
-        setSelectedId(null);
-        setForm(EMPTY_FORM);
-        setStatus("");
-      });
-    } else if (bots.length > 0) {
-      Promise.resolve().then(() => {
-        setSelectedId((currId) => {
-          if (currId === null) {
-            const firstBot = bots[0];
-            Promise.resolve().then(() => {
-              setForm(botToForm(firstBot));
-            });
-            return firstBot.$id;
-          }
-          return currId;
-        });
-      });
-    }
-  }, [isNew, bots]);
+  // When the bots list arrives, set the initial selection.
+  // isNew is captured as a stable closure value inside the async .then() body,
+  // so we don't need a separate reactive effect for it.
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -137,6 +136,11 @@ function BotsContent() {
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
     setStatus("Agent configuration saved.");
+    // Clear the ?new=true query param so the isNew effect doesn't
+    // re-fire and reset the form back to EMPTY_FORM on the next render.
+    if (isNew) {
+      router.replace("/bots");
+    }
   }
 
   function requestDeleteBotFor(bot: Bot) {
@@ -240,6 +244,11 @@ function BotsContent() {
                           onClick={(event) => {
                             event.stopPropagation();
                             requestDeleteBotFor(bot);
+                          }}
+                          onKeyDown={(event) => {
+                            // Prevent keydown from bubbling to the card's onKeyDown
+                            // handler, which would trigger selectBot simultaneously.
+                            event.stopPropagation();
                           }}
                           type="button"
                           title="Delete agent"
