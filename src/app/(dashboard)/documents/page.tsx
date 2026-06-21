@@ -242,7 +242,7 @@ export default function DocumentsPage() {
               <p className="inline-flex rounded-full border border-[#134e4a]/20 bg-white/55 px-3 py-1 font-mono text-xs font-semibold uppercase text-[#134e4a] dark:border-white/20 dark:bg-black/20 dark:text-[#fde68a]">
                 Knowledge intake
               </p>
-              <h1 className="mt-3 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-current sm:text-5xl lg:text-6xl">
+              <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-[1.1] tracking-[-0.03em] text-current sm:text-4xl lg:text-5xl">
                 Turn trusted files and URLs into agent-ready answers.
               </h1>
             </div>
