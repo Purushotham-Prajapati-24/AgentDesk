@@ -132,9 +132,6 @@ export default function InboxPage() {
 
   useEffect(() => {
     selectedConversationIdRef.current = selectedConversationId;
-    // Reset the seen-message set whenever the operator switches to a different
-    // conversation — new messages for the new session should never be suppressed.
-    seenMessageIdsRef.current.clear();
   }, [selectedConversationId]);
 
   /**
@@ -166,15 +163,13 @@ export default function InboxPage() {
    * the currently-open room, which could mutate the wrong conversation row.
    */
   function bumpHistoryMessage(message: SocketEventMessage) {
-    // Require an explicit session_id from the server event.
-    // Never fall back to the room's sessionId: that would silently mutate
-    // the currently-open card for any legacy event missing the field.
-    const targetSessionId = message.session_id;
+    let targetSessionId = message.session_id;
     if (!targetSessionId) {
-      // Log only the non-content identifier — never log message.content or
-      // the full payload, which may contain user PII.
-      console.warn("[inbox] bumpHistoryMessage: event missing session_id, message_id=", message.message_id);
-      return;
+      console.warn(
+        "[inbox] bumpHistoryMessage: event missing session_id, falling back to room.sessionId. message_id=",
+        message.message_id
+      );
+      targetSessionId = room.sessionId;
     }
     const now = message.created_at || new Date().toISOString();
     setHistory((prev) =>
@@ -319,6 +314,7 @@ export default function InboxPage() {
       socket?.disconnect();
       socketRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room]);
 
   useEffect(() => {

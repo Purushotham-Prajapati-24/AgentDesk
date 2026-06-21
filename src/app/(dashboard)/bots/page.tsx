@@ -50,6 +50,22 @@ function BotsContent() {
 
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
+  const [prevIsNew, setPrevIsNew] = useState(isNew);
+  if (isNew !== prevIsNew) {
+    setPrevIsNew(isNew);
+    if (isNew) {
+      setSelectedId(null);
+      setForm(EMPTY_FORM);
+      setStatus("");
+    }
+  }
+
+  useEffect(() => {
+    if (isNew) {
+      router.replace("/bots");
+    }
+  }, [isNew, router]);
+
   useEffect(() => {
     if (!tenant?.$id) {
       return;
