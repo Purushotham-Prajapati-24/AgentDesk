@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import ts from "typescript";
+import ts from "typescript/lib/typescript.js";
 
 const projectRoot = process.cwd();
 const sourcePath = path.join(projectRoot, "widget", "index.tsx");
