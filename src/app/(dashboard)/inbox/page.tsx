@@ -294,21 +294,24 @@ export default function InboxPage() {
         // the history card counter stay in lockstep. appendMessage's internal
         // setState updater runs asynchronously, so we can't rely on it alone.
         if (message.message_id && trackMessageId(message.message_id)) return;
-        if (message.session_id === roomSessionIdRef.current) {
+        // Gate on the document $id (activeSessionIdRef), not the session_token
+        // (roomSessionIdRef). The WebSocket server broadcasts with session_id
+        // equal to session.$id — the two values are different strings.
+        if (message.session_id === activeSessionIdRef.current) {
           appendMessage(setMessages, mapSocketMessage(message));
         }
         bumpHistoryMessage(message);
       });
       socket.on("agent-message", (message: SocketEventMessage) => {
         if (message.message_id && trackMessageId(message.message_id)) return;
-        if (message.session_id === roomSessionIdRef.current) {
+        if (message.session_id === activeSessionIdRef.current) {
           appendMessage(setMessages, mapSocketMessage(message));
         }
         bumpHistoryMessage(message);
       });
       socket.on("bot-message", (message: SocketEventMessage) => {
         if (message.message_id && trackMessageId(message.message_id)) return;
-        if (message.session_id === roomSessionIdRef.current) {
+        if (message.session_id === activeSessionIdRef.current) {
           appendMessage(setMessages, mapSocketMessage(message));
         }
         bumpHistoryMessage(message);

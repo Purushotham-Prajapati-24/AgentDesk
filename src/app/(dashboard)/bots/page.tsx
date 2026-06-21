@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable react-hooks/set-state-in-effect */
+
 
 import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import { ArrowRight, Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
@@ -81,22 +81,29 @@ function BotsContent() {
     };
   }, [isFormDirty]);
 
-  // Intercept browser-level navigation (back/forward, address-bar, tab close)
-  // so users don't silently lose draft work via the browser's own controls.
   useEffect(() => {
     if (!isFormDirty) return;
     function handleBeforeUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
+      // Firefox and Safari also require returnValue to be set for the native
+      // "Leave site?" dialog to appear.
+      event.returnValue = "";
     }
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isFormDirty]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    // This effect intentionally reads `isNew` at tenant-mount time only.
+    // Adding `isNew` to the dep array would cause the ?new=true draft to be
+    // discarded immediately after router.replace removes the query param.
     setIsDrafting(isNew);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenant?.$id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isNew) {
       setSelectedId(null);
@@ -106,7 +113,9 @@ function BotsContent() {
       router.replace("/bots");
     }
   }, [isNew, router]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!tenant?.$id) {
       setBots([]);
@@ -132,7 +141,9 @@ function BotsContent() {
       isActive = false;
     };
   }, [tenant?.$id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isAgentsLoading) {
       return;
@@ -149,6 +160,7 @@ function BotsContent() {
       }
     }
   }, [isAgentsLoading, bots, selectedId, isDrafting]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isAgentListLoading = Boolean(tenant?.$id) && isAgentsLoading;
 
@@ -205,12 +217,11 @@ function BotsContent() {
   }
 
   function requestDeleteBotFor(bot: Bot) {
-    // Only warn about unsaved changes when the bot being deleted is the one
-    // currently open in the editor, or when we're in a new-agent draft.
-    // Deleting a different card should never discard unrelated edits silently,
-    // but the confirm message only makes sense in these two cases.
-    const isDeletingEditedBot = bot.$id === selectedId || isDrafting;
-    if (isDeletingEditedBot && isFormDirty && !confirm("You have unsaved changes that will be discarded. Continue?")) {
+    // Only prompt about unsaved changes when deleting the bot that is currently
+    // open in the editor (selected) or when the user has a new-agent draft in
+    // progress. Never interrupt deletion of an unrelated card.
+    const isEditingThisBot = bot.$id === selectedId || isDrafting;
+    if (isEditingThisBot && isFormDirty && !confirm("You have unsaved changes that will be discarded. Continue?")) {
       return;
     }
     setDeleteTarget(bot);

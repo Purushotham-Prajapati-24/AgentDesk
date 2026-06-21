@@ -52,6 +52,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           event.preventDefault();
           return;
         }
+        // Clear immediately so rapid follow-up clicks don't re-trigger the dialog
+        // before BotsContent unmounts and the cleanup effect fires.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).__agentdesk_form_dirty = false;
       }
     }
     setMobileNavOpen(false);
