@@ -391,6 +391,9 @@ export default function InboxPage() {
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
     activeSessionIdRef.current = draftRoom.sessionId;
+    // Clear dedup set unconditionally on room switch so stale IDs from the
+    // previous room can never suppress replayed events in the new room.
+    seenMessageIdsRef.current.clear();
 
     setMessageLoading(true);
     try {
@@ -481,6 +484,9 @@ export default function InboxPage() {
     setDraftRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
     setRoom({ tenantId: conversation.tenantId, sessionId: conversation.sessionToken });
     activeSessionIdRef.current = conversation.id;
+    // Clear dedup set unconditionally on room switch so stale IDs from the
+    // previous room can never suppress replayed events in the new room.
+    seenMessageIdsRef.current.clear();
     setMessages([]);
     setMessageLoading(true);
     setMobilePanel("transcript");
@@ -519,8 +525,8 @@ export default function InboxPage() {
           c.id === conversation.id ? { ...c, messageCount: loadedMessages.length } : c,
         ),
       );
-      // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO)
-      seenMessageIdsRef.current.clear();
+      // Seed the dedup set with all historically-loaded message IDs (capped at 500 FIFO).
+      // clear() was already called unconditionally above.
       response.data.messages.forEach((m) => {
         if (m.id) trackMessageId(m.id);
       });

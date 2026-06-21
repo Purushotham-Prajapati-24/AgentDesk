@@ -81,6 +81,17 @@ function BotsContent() {
     };
   }, [isFormDirty]);
 
+  // Intercept browser-level navigation (back/forward, address-bar, tab close)
+  // so users don't silently lose draft work via the browser's own controls.
+  useEffect(() => {
+    if (!isFormDirty) return;
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isFormDirty]);
+
   useEffect(() => {
     setIsDrafting(isNew);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,14 +197,20 @@ function BotsContent() {
     setBots((current) => [nextBot, ...current.filter((bot) => bot.$id !== nextBot.$id)]);
     setSelectedId(nextBot.$id);
     setForm(botToForm(nextBot));
+    // Clear draft mode so auto-select logic doesn't stay in a phantom drafting state.
+    if (!selectedBot) {
+      setIsDrafting(false);
+    }
     setStatus(selectedBot ? "Agent configuration saved." : "Agent created.");
   }
 
   function requestDeleteBotFor(bot: Bot) {
-    // Guard: if the form has unsaved changes, confirm before discarding the
-    // draft. The delete modal itself is for a different bot card, so the user
-    // would lose their draft without any warning otherwise.
-    if (isFormDirty && !confirm("You have unsaved changes. Continue to delete this agent?")) {
+    // Only warn about unsaved changes when the bot being deleted is the one
+    // currently open in the editor, or when we're in a new-agent draft.
+    // Deleting a different card should never discard unrelated edits silently,
+    // but the confirm message only makes sense in these two cases.
+    const isDeletingEditedBot = bot.$id === selectedId || isDrafting;
+    if (isDeletingEditedBot && isFormDirty && !confirm("You have unsaved changes that will be discarded. Continue?")) {
       return;
     }
     setDeleteTarget(bot);

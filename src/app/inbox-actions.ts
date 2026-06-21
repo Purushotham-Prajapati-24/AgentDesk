@@ -1,6 +1,6 @@
 "use server";
 
-import { Query, type Models } from "node-appwrite";
+import { AppwriteException, Query, type Models } from "node-appwrite";
 import { createSessionClient } from "@/lib/server/appwrite";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { mapSessionSummary } from "@/lib/server/monitor-rollups";
@@ -152,45 +152,31 @@ async function resolveSession(
     throw new Error("Invalid session ID.");
   }
 
-  // 1. Treat the input as an Appwrite document $id first.
-  //    We filter by tenant_id in the same query so a valid $id that belongs
-  //    to a different tenant simply returns 0 documents — we do NOT fall back
-  //    to a session_token retry in that case, because the caller explicitly
-  //    supplied an $id and a cross-tenant retry would be a data leak.
-  let idLookupAttempted = false;
-  if (/^[a-zA-Z0-9]{20}$/.test(sessionId)) {
-    // Appwrite auto-generated IDs are exactly 20 alphanumeric characters.
-    idLookupAttempted = true;
-    try {
-      const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
-        Query.equal("$id", sessionId),
-        Query.equal("tenant_id", tenantId),
-        Query.limit(1),
-      ]);
-      if (result.documents.length > 0) {
-        return result.documents[0] as SessionDocument;
-      }
-      // $id found in DB but not in this tenant — stop here, do not leak.
+  // Strategy: try databases.getDocument($id) first.
+  //   - Found AND tenant matches  → return it.
+  //   - Found BUT wrong tenant     → throw immediately (cross-tenant, do not retry).
+  //   - AppwriteException code 404 → not a document $id; fall through to token lookup.
+  //   - Any other exception        → real transport/auth error; re-throw as-is so the
+  //                                   caller can distinguish a 503 from a 404.
+  try {
+    const doc = await databases.getDocument(databaseId(), sessionsCollectionId(), sessionId) as SessionDocument;
+    // Document found — enforce tenant boundary.
+    if (String(doc.tenant_id) !== tenantId) {
+      // Valid $id but belongs to a different tenant — do not leak, do not retry.
       throw new Error("Conversation session was not found.");
-    } catch (error) {
-      // Re-throw security errors and "not found" errors immediately.
-      if (error instanceof Error && error.message === "Conversation session was not found.") {
-        throw error;
-      }
-      // Only fall through on genuine DB/transport errors for the $id path.
-      console.error("[inbox] resolveSession: $id DB lookup failed:", error);
+    }
+    return doc;
+  } catch (error) {
+    if (error instanceof AppwriteException && error.code === 404) {
+      // sessionId is not a document $id — fall through to session_token lookup below.
+    } else {
+      // Re-throw: either the tenant mismatch error above, a real transport error,
+      // or a permission error. Do not swallow real failures as "not found".
+      throw error;
     }
   }
 
-  // 2. Fall back to session_token lookup only when the input is clearly a
-  //    session token (not an Appwrite $id) or when the $id DB call itself
-  //    threw an unexpected transport error.
-  if (idLookupAttempted) {
-    // We already tried $id — if we're here, it was a transport error.
-    // Do NOT retry by session_token: the caller passed an $id-shaped value.
-    throw new Error("Conversation session was not found.");
-  }
-
+  // sessionId was not found as a document $id — treat it as a session_token.
   const result = await databases.listDocuments(databaseId(), sessionsCollectionId(), [
     Query.equal("tenant_id", tenantId),
     Query.equal("session_token", sessionId),
