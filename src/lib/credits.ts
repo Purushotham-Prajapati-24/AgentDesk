@@ -54,30 +54,40 @@ const DEFAULT_ACTIVE_SESSION_WINDOW_MINUTES = 30;
  * unbounded pagination that caused the 2+ second billing spikes.
  */
 const RECENT_TRANSACTIONS_LIMIT = 100;
+const ROLLUP_TTL_MINUTES = 60;
+
+function isRollupExpired(reconciledAt: string): boolean {
+  return Date.now() - new Date(reconciledAt).getTime() > ROLLUP_TTL_MINUTES * 60 * 1000;
+}
 
 export async function getTenantBillingSnapshot(tenantId: string): Promise<
   | { success: true; data: BillingSnapshot }
   | { success: false; error: string }
 > {
   try {
-    const [{ databases }] = await Promise.all([createAdminClient(), assertTenantAccess(tenantId)]);
+    const [{ databases }, tenantDoc] = await Promise.all([
+      createAdminClient(),
+      assertTenantAccess(tenantId, "read"),
+    ]);
     const activeSessionWindowMinutes = numberEnv(
       "BILLING_ACTIVE_SESSION_WINDOW_MINUTES",
       DEFAULT_ACTIVE_SESSION_WINDOW_MINUTES,
     );
 
+    const tenantCredits = numberValue(tenantDoc.credits);
+
     // Attempt the fast rollup-backed path first.  If the tenant rollup has been
     // reconciled (balance_reconciled_at is set), we can read precomputed totals
     // instead of paginating every ledger row and file row.
     const rollup = await readTenantRollup(databases, tenantId);
-    if (rollup && rollup.balance_reconciled_at) {
-      return getBillingSnapshotFromRollup(databases, tenantId, rollup, activeSessionWindowMinutes);
+    if (rollup && rollup.balance_reconciled_at && !isRollupExpired(rollup.balance_reconciled_at)) {
+      return getBillingSnapshotFromRollup(databases, tenantId, rollup, activeSessionWindowMinutes, tenantCredits);
     }
 
     // Fallback: full paginate-and-sum.  This is the original path, used when
     // the tenant has not yet been reconciled (e.g. before backfill script runs).
     // New tenants reconcile nearly instantly since they have ~0 rows.
-    return getBillingSnapshotFromFullPaginate(databases, tenantId, activeSessionWindowMinutes);
+    return getBillingSnapshotFromFullPaginate(databases, tenantId, activeSessionWindowMinutes, tenantCredits);
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load billing data." };
   }
@@ -92,9 +102,9 @@ async function getBillingSnapshotFromRollup(
   tenantId: string,
   rollup: { credit_balance: number; document_storage_bytes: number },
   activeSessionWindowMinutes: number,
+  tenantCredits: number,
 ): Promise<{ success: true; data: BillingSnapshot }> {
-  const [tenantCredits, recentTransactions, activeSessionCount, messageCount] = await Promise.all([
-    getTenantCredits(databases, tenantId),
+  const [recentTransactions, activeSessionCount, messageCount] = await Promise.all([
     listRecentTransactions(databases, tenantId),
     countOpenRecentSessions(databases, tenantId, activeSessionWindowMinutes),
     countTenantDocuments(databases, messagesCollectionId(), tenantId),
@@ -123,9 +133,9 @@ async function getBillingSnapshotFromFullPaginate(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   tenantId: string,
   activeSessionWindowMinutes: number,
+  tenantCredits: number,
 ): Promise<{ success: true; data: BillingSnapshot }> {
-  const [tenantCredits, ledgerDocuments, activeSessionCount, messageCount, fileDocuments] = await Promise.all([
-    getTenantCredits(databases, tenantId),
+  const [ledgerDocuments, activeSessionCount, messageCount, fileDocuments] = await Promise.all([
     listAllTenantDocuments<LedgerDocument>(databases, ledgerCollectionId(), tenantId, [Query.orderDesc("created")]),
     countOpenRecentSessions(databases, tenantId, activeSessionWindowMinutes),
     countTenantDocuments(databases, messagesCollectionId(), tenantId),
@@ -162,13 +172,16 @@ async function getBillingSnapshotFromFullPaginate(
 
 export async function getTenantCreditBalance(tenantId: string): Promise<number> {
   try {
-    const { databases } = await createAdminClient();
-    await assertTenantAccess(tenantId);
+    const [{ databases }, tenantDoc] = await Promise.all([
+      createAdminClient(),
+      assertTenantAccess(tenantId, "read"),
+    ]);
+
+    const tenantCredits = numberValue(tenantDoc.credits);
 
     // Fast path: read the reconciled rollup balance directly (one getDocument).
     const rollup = await readTenantRollup(databases, tenantId);
-    if (rollup && rollup.balance_reconciled_at) {
-      const tenantCredits = await getTenantCredits(databases, tenantId);
+    if (rollup && rollup.balance_reconciled_at && !isRollupExpired(rollup.balance_reconciled_at)) {
       return tenantCredits + rollup.credit_balance;
     }
 
@@ -338,18 +351,6 @@ async function listAllTenantDocuments<T extends Models.Document>(
     if (!cursor) {
       return documents;
     }
-  }
-}
-
-async function getTenantCredits(
-  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
-  tenantId: string,
-) {
-  try {
-    const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantCreditsDocument;
-    return numberValue(tenant.credits);
-  } catch {
-    return 0;
   }
 }
 

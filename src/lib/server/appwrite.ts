@@ -1,10 +1,7 @@
 "use server";
-
+ 
 import { Client, Account, Databases, Storage, Users } from "node-appwrite";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
-
+ 
 export async function createSessionClient() {
   if (process.env.NODE_ENV === "test") {
     const dummyClient = new Client();
@@ -26,14 +23,14 @@ export async function createSessionClient() {
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
     .setProject(projectId);
 
-  const { cookies } = require("next/headers");
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
 
   // Appwrite session secrets are long tokens (>10 chars). Filter out any blank/stale
   // phantom cookies that may have been left behind by incorrect client-side logout code.
   const MIN_SECRET_LENGTH = 10;
   const findValidSecret = (name: string) =>
-    cookieStore.getAll(name).find(c => c.value.length >= MIN_SECRET_LENGTH)?.value;
+    cookieStore.getAll(name).find((c: { name: string; value: string }) => c.value.length >= MIN_SECRET_LENGTH)?.value;
 
   const sessionSecret =
     findValidSecret("session") ??
@@ -41,7 +38,7 @@ export async function createSessionClient() {
     findValidSecret(`a_session_${projectId.toLowerCase()}_legacy`);
 
   if (!sessionSecret) {
-    throw new Error("No session. Received cookies: " + cookieStore.getAll().map(c => c.name).join(", "));
+    throw new Error("No session. Received cookies: " + cookieStore.getAll().map((c: { name: string; value: string }) => c.name).join(", "));
   }
 
   client.setSession(sessionSecret);
