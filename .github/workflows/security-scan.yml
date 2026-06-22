@@ -113,16 +113,24 @@ jobs:
         id: count
         working-directory: ${{ github.workspace }}
         run: |
+          # ADVISORY MODE: this step exits 0 on every path. The scanner
+          # job's overall result must stay "success" in advisory mode,
+          # otherwise any branch protection requiring this check becomes
+          # a hidden gate that the workflow description does not
+          # advertise. The failure signal is carried by (a) the
+          # ::error:: annotation in the step log, (b) the sarif_missing
+          # job output, and (c) the summary job's ::error:: — three
+          # layers of surfacing without a non-zero exit.
           if [ ! -f semgrep.sarif ]; then
             echo "::error::semgrep.sarif was not produced — scanner likely failed before SARIF was written."
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           elif ! count=$(jq '[.runs[].results // [] | length] | add // 0' semgrep.sarif 2>/dev/null); then
             echo "::error::failed to parse semgrep.sarif — schema drift or truncated output"
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           fi
           echo "sarif_missing=false" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
@@ -193,16 +201,19 @@ jobs:
         if: always()
         id: count
         run: |
+          # ADVISORY MODE: exit 0 on every path. The scanner job's
+          # overall result must stay "success" in advisory mode (see
+          # the Semgrep count step comment for the full rationale).
           if [ ! -f trivy.sarif ]; then
             echo "::error::trivy.sarif was not produced — scanner likely failed before SARIF was written."
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           elif ! count=$(jq '[.runs[].results // [] | length] | add // 0' trivy.sarif 2>/dev/null); then
             echo "::error::failed to parse trivy.sarif — schema drift or truncated output"
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           fi
           echo "sarif_missing=false" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
@@ -284,16 +295,19 @@ jobs:
         if: always()
         id: count
         run: |
+          # ADVISORY MODE: exit 0 on every path. The scanner job's
+          # overall result must stay "success" in advisory mode (see
+          # the Semgrep count step comment for the full rationale).
           if [ ! -f results.sarif ]; then
             echo "::error::results.sarif was not produced — scanner likely failed before SARIF was written."
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           elif ! count=$(jq '[.runs[].results // [] | length] | add // 0' results.sarif 2>/dev/null); then
             echo "::error::failed to parse results.sarif — schema drift or truncated output"
             echo "count=0" >> "$GITHUB_OUTPUT"
             echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
-            exit 1
+            exit 0
           fi
           echo "sarif_missing=false" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
@@ -352,39 +366,64 @@ jobs:
           trivy_failed=0
           gitleaks_failed=0
 
-          # Differentiate "scanner produced SARIF with N findings" from
-          # "scanner never produced SARIF". Without the sarif_missing check
-          # below, a silently-failed scanner (network blip, registry down,
-          # bad config) would announce as 0 findings — indistinguishable
-          # from a genuinely clean scan. Treating SARIF-missing as a
-          # finding surfaces the failure without conflating it with the
-          # real finding count.
+          # Three independent checks per scanner. All three can fire on
+          # the same scanner — they convey distinct information:
           #
-          # Default empty outputs to safe values via `|| 'default'`. If
-          # the count step was skipped or its outputs never propagated
-          # (cancelled job, runner quirk, schema drift), the `||` guards
-          # prevent malformed `::error::` annotations like "Semgrep:
-          # finding(s)" with a double-space and no count.
+          #  1. needs.<scanner>.result != "success" catches failures
+          #     that happen BEFORE the count step runs (upload-sarif
+          #     schema rejection, Code Scanning API network blip,
+          #     runner crash). The count step's `if: always()` does
+          #     not protect against a runner dying mid-job, so this
+          #     signal is the only way to see those failures here.
+          #
+          #  2. sarif_missing=true catches "scanner ran but produced
+          #     no usable SARIF" — the scanner step failed before
+          #     writing its output file. Different from #1 because
+          #     the job itself succeeded (count step exits 0 in
+          #     advisory mode).
+          #
+          #  3. count != 0 catches real findings. Independent of the
+          #     above two — a job can succeed AND produce SARIF AND
+          #     have findings, and we want all three signals.
+          #
+          # Default empty outputs via `|| 'default'` so an unset
+          # output produces no annotation rather than a broken one
+          # like "Semgrep:   finding(s)" with a double space.
+          if [ "${{ needs.semgrep.result }}" != "success" ]; then
+            echo "::error::  Semgrep:  scanner job did not complete cleanly (result: ${{ needs.semgrep.result }})"
+            semgrep_failed=1
+          fi
           if [ "${{ needs.semgrep.outputs.sarif_missing || 'false' }}" = "true" ]; then
             echo "::error::  Semgrep:  scanner failed to produce SARIF"
             semgrep_failed=1
-          elif [ "${{ needs.semgrep.outputs.count || '0' }}" != "0" ]; then
+          fi
+          if [ "${{ needs.semgrep.outputs.count || '0' }}" != "0" ]; then
             echo "::error::  Semgrep:  ${{ needs.semgrep.outputs.count || '0' }} finding(s)"
             semgrep_failed=1
           fi
 
+          if [ "${{ needs.trivy.result }}" != "success" ]; then
+            echo "::error::  Trivy:    scanner job did not complete cleanly (result: ${{ needs.trivy.result }})"
+            trivy_failed=1
+          fi
           if [ "${{ needs.trivy.outputs.sarif_missing || 'false' }}" = "true" ]; then
             echo "::error::  Trivy:    scanner failed to produce SARIF"
             trivy_failed=1
-          elif [ "${{ needs.trivy.outputs.count || '0' }}" != "0" ]; then
+          fi
+          if [ "${{ needs.trivy.outputs.count || '0' }}" != "0" ]; then
             echo "::error::  Trivy:    ${{ needs.trivy.outputs.count || '0' }} finding(s)"
             trivy_failed=1
           fi
 
+          if [ "${{ needs.gitleaks.result }}" != "success" ]; then
+            echo "::error::  Gitleaks: scanner job did not complete cleanly (result: ${{ needs.gitleaks.result }})"
+            gitleaks_failed=1
+          fi
           if [ "${{ needs.gitleaks.outputs.sarif_missing || 'false' }}" = "true" ]; then
             echo "::error::  Gitleaks: scanner failed to produce SARIF"
             gitleaks_failed=1
-          elif [ "${{ needs.gitleaks.outputs.count || '0' }}" != "0" ]; then
+          fi
+          if [ "${{ needs.gitleaks.outputs.count || '0' }}" != "0" ]; then
             echo "::error::  Gitleaks: ${{ needs.gitleaks.outputs.count || '0' }} finding(s)"
             gitleaks_failed=1
           fi
