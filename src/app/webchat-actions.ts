@@ -1,8 +1,8 @@
 "use server";
 
 import { Query, type Models } from "node-appwrite";
-import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
+import { createAdminClient } from "@/lib/server/appwrite";
+import { assertTenantAccess } from "@/lib/server/tenant-access";
 import {
   DEFAULT_WEBCHAT_CONFIG,
   WebChatConfigSchema,
@@ -59,17 +59,16 @@ export async function listWebChatBots(tenantId: string): Promise<
   | { success: false; error: string }
 > {
   try {
-    const { account, databases } = await createSessionClient();
-    await assertTenantAccess(account, tenantId);
+    const { databases } = await createAdminClient();
+    await assertTenantAccess(tenantId, "read");
 
-    const { databases: adminDatabases } = await createAdminClient();
     const [response, configResponse] = await Promise.all([
       databases.listDocuments(databaseId, botsCollectionId, [
       Query.equal("tenant_id", tenantId),
       Query.orderDesc("$updatedAt"),
       Query.limit(100),
       ]),
-      listWebChatConfigDocuments(adminDatabases, tenantId),
+      listWebChatConfigDocuments(databases, tenantId),
     ]);
 
     const configsByBotId = new Map(
@@ -106,9 +105,8 @@ export async function saveWebChatBotConfig({
   config: WebChatConfig;
 }): Promise<{ success: true; config: WebChatConfig } | { success: false; error: string }> {
   try {
-    const { account } = await createSessionClient();
     const { databases } = await createAdminClient();
-    await assertTenantAccess(account, tenantId);
+    await assertTenantAccess(tenantId, "update");
     await assertBotTenant(databases, botId, tenantId);
 
     const parsedConfig = WebChatConfigSchema.parse({
@@ -346,17 +344,8 @@ function webChatConfigToThemeConfig(config: WebChatConfig) {
   };
 }
 
-async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessionClient>>["account"], tenantId: string) {
-  if (!isSafeId(tenantId)) {
-    throw new Error("Invalid tenant scope.");
-  }
-
-  const user = await account.get();
-  await getAuthorizedTenantDocument(user.$id, tenantId);
-}
-
 async function assertBotTenant(
-  databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   botId: string,
   tenantId: string,
 ) {
