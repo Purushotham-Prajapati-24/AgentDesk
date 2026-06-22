@@ -114,21 +114,25 @@ export async function deleteBot(botId: string, tenantId: string) {
       deleteWebChatConfigs(databases, tenantId, botId),
     ]);
 
-    // Surface partial failures so they don't vanish silently.  We still proceed
-    // to delete the parent document below; a warn per branch is the right level
-    // for a best-effort cascade that already prefers partial cleanup.
+    // Surface partial failures so they don't vanish silently.
     const cleanupLabels = ["knowledge points", "bot documents", "webchat configs"];
+    const failures: string[] = [];
     cleanupResults.forEach((result, index) => {
       if (result.status === "rejected") {
+        const errorMsg = getErrorMessage(result.reason);
         console.warn(
           `[deleteBot] partial cleanup failure (${cleanupLabels[index]}) for bot ${botId} in tenant ${tenantId}:`,
-          getErrorMessage(result.reason),
+          errorMsg,
         );
+        failures.push(`${cleanupLabels[index]}: ${errorMsg}`);
       }
     });
 
-    // Parent document must be deleted last to maintain referential integrity
-    // even if the child cleanups partially fail.
+    if (failures.length > 0) {
+      throw new Error(`Cleanup failed: ${failures.join("; ")}`);
+    }
+
+    // Parent document must be deleted last to maintain referential integrity.
     await databases.deleteDocument(databaseId, collectionId, botId);
     return { success: true as const };
   } catch (error: unknown) {

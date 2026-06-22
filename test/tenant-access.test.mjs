@@ -64,13 +64,17 @@ test("assertTenantAccess allows read access for legacy prefs fallback", async ()
   assert.equal(tenant.$id, "legacy_tenant");
 });
 
-test("assertTenantAccess allows delete access for legacy prefs fallback", async () => {
+test("assertTenantAccess denies delete access for legacy prefs fallback", async () => {
   mockGetDocument.mock.mockImplementationOnce(async () => {
     return { $id: "legacy_tenant", $permissions: [] };
   });
 
-  const tenant = await assertTenantAccess("legacy_tenant", "delete");
-  assert.equal(tenant.$id, "legacy_tenant");
+  await assert.rejects(
+    async () => {
+      await assertTenantAccess("legacy_tenant", "delete");
+    },
+    /You do not have access to this tenant./
+  );
 });
 
 test("assertTenantAccess defaults to read permission", async () => {

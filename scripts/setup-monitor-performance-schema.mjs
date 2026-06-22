@@ -126,6 +126,7 @@ async function addTenantRollupFields() {
   await createIntegerAttribute(tenantRollupsCollectionId, "handoffs", false, 0);
   await createIntegerAttribute(tenantRollupsCollectionId, "document_storage_bytes", false, 0);
   await createFloatAttribute(tenantRollupsCollectionId, "credit_balance", false, 0);
+  await createStringAttribute(tenantRollupsCollectionId, "balance_reconciled_at", 50, false, "");
   await createStringAttribute(tenantRollupsCollectionId, "updated", 50, false, "");
 }
 

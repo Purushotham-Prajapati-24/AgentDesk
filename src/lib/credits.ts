@@ -57,7 +57,11 @@ const RECENT_TRANSACTIONS_LIMIT = 100;
 const ROLLUP_TTL_MINUTES = 60;
 
 function isRollupExpired(reconciledAt: string): boolean {
-  return Date.now() - new Date(reconciledAt).getTime() > ROLLUP_TTL_MINUTES * 60 * 1000;
+  const time = new Date(reconciledAt).getTime();
+  if (isNaN(time)) {
+    return true;
+  }
+  return Date.now() - time > ROLLUP_TTL_MINUTES * 60 * 1000;
 }
 
 export async function getTenantBillingSnapshot(tenantId: string): Promise<

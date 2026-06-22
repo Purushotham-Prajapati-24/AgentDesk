@@ -26,8 +26,8 @@ export const getAuthorizedTenantDocument = cache(async function getAuthorizedTen
   if (!tenantAllowsUser(tenant, userId, action)) {
     const user = await users.get(userId);
     const prefs = user.prefs as { tenant_id?: unknown };
-    // Legacy fallback: users with tenant_id in prefs are granted full access (including read/update/delete)
-    if (prefs.tenant_id === tenantId) {
+    // Legacy fallback: users with tenant_id in prefs are granted read-only access
+    if (action === "read" && prefs.tenant_id === tenantId) {
       return tenant;
     }
 
