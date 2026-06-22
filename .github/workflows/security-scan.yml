@@ -328,6 +328,15 @@ jobs:
         # - Trivy  : no exit-code, exits 0 on findings
         # - Gitleaks: continue-on-error: true, exits 0 even on leaks
         run: |
+          # Emit a machine-detectable ::warning:: banner so the Actions
+          # UI / commit status / webhook listeners see "non-blocking"
+          # before reading any finding annotations. A maintainer
+          # enabling branch protection requiring this check would
+          # otherwise see a green ✓ and assume the workflow gates;
+          # this banner makes the advisory state unambiguous from
+          # outside the file.
+          echo "::warning title=Advisory mode — non-blocking::This workflow surfaces findings via annotations but does NOT gate pushes or PRs. A green check on this job does NOT mean 'no findings'. Triage in the Security tab: ${{ github.server_url }}/${{ github.repository }}/security/code-scanning"
+
           echo "=============================="
           echo "       SECURITY SCAN REPORT  "
           echo "  (advisory mode — never fails the workflow)"
@@ -350,27 +359,33 @@ jobs:
           # from a genuinely clean scan. Treating SARIF-missing as a
           # finding surfaces the failure without conflating it with the
           # real finding count.
-          if [ "${{ needs.semgrep.outputs.sarif_missing }}" = "true" ]; then
+          #
+          # Default empty outputs to safe values via `|| 'default'`. If
+          # the count step was skipped or its outputs never propagated
+          # (cancelled job, runner quirk, schema drift), the `||` guards
+          # prevent malformed `::error::` annotations like "Semgrep:
+          # finding(s)" with a double-space and no count.
+          if [ "${{ needs.semgrep.outputs.sarif_missing || 'false' }}" = "true" ]; then
             echo "::error::  Semgrep:  scanner failed to produce SARIF"
             semgrep_failed=1
-          elif [ "${{ needs.semgrep.outputs.count }}" != "0" ]; then
-            echo "::error::  Semgrep:  ${{ needs.semgrep.outputs.count }} finding(s)"
+          elif [ "${{ needs.semgrep.outputs.count || '0' }}" != "0" ]; then
+            echo "::error::  Semgrep:  ${{ needs.semgrep.outputs.count || '0' }} finding(s)"
             semgrep_failed=1
           fi
 
-          if [ "${{ needs.trivy.outputs.sarif_missing }}" = "true" ]; then
+          if [ "${{ needs.trivy.outputs.sarif_missing || 'false' }}" = "true" ]; then
             echo "::error::  Trivy:    scanner failed to produce SARIF"
             trivy_failed=1
-          elif [ "${{ needs.trivy.outputs.count }}" != "0" ]; then
-            echo "::error::  Trivy:    ${{ needs.trivy.outputs.count }} finding(s)"
+          elif [ "${{ needs.trivy.outputs.count || '0' }}" != "0" ]; then
+            echo "::error::  Trivy:    ${{ needs.trivy.outputs.count || '0' }} finding(s)"
             trivy_failed=1
           fi
 
-          if [ "${{ needs.gitleaks.outputs.sarif_missing }}" = "true" ]; then
+          if [ "${{ needs.gitleaks.outputs.sarif_missing || 'false' }}" = "true" ]; then
             echo "::error::  Gitleaks: scanner failed to produce SARIF"
             gitleaks_failed=1
-          elif [ "${{ needs.gitleaks.outputs.count }}" != "0" ]; then
-            echo "::error::  Gitleaks: ${{ needs.gitleaks.outputs.count }} finding(s)"
+          elif [ "${{ needs.gitleaks.outputs.count || '0' }}" != "0" ]; then
+            echo "::error::  Gitleaks: ${{ needs.gitleaks.outputs.count || '0' }} finding(s)"
             gitleaks_failed=1
           fi
 
