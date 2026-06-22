@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { loginWithMagicLink } from "@/app/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { InteractiveRobotSpline } from "@/components/ui/interactive-3d-robot";
+import { sanitizeNextPath } from "@/lib/auth-redirect";
 
 const ROBOT_SCENE_URL = "https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode";
 
@@ -26,6 +27,7 @@ function LoginContent() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const queryMessage = getQueryMessage(searchParams.get("error"));
   const visibleMessage = message ?? queryMessage;
+  const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -33,7 +35,7 @@ function LoginContent() {
     setMessage(null);
 
     try {
-      const result = await loginWithMagicLink(email);
+      const result = await loginWithMagicLink(email, nextPath ?? undefined);
       if (!result.success) {
         throw new Error(result.error);
       }

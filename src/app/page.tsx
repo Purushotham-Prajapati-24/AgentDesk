@@ -3,6 +3,7 @@ import { ArrowRight, Bot, CreditCard, FileText, Inbox, MessageSquare, Radio, Shi
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeroGeometric } from "@/components/ui/shape-landing-hero";
 import { MagneticText } from "@/components/ui/morphing-cursor";
+import { AuthAwareCta } from "@/components/AuthAwareCta";
 
 const showcaseCards = [
   {
@@ -91,27 +92,28 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle variant="cockpit" />
-            <Link
+            <AuthAwareCta
+              ariaLabel="Enter AgentDesk"
+              busyClassName="inline-flex min-h-9 cursor-wait items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#22c55e] to-[#4ade80] px-4 text-xs font-semibold text-white opacity-80 shadow-[0_12px_28px_rgba(34,197,94,0.22)]"
               className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#22c55e] to-[#4ade80] px-4 text-xs font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.22)] transition hover:-translate-y-0.5 hover:from-[#16a34a] hover:to-[#22c55e] active:scale-[0.98]"
-              href="/login"
             >
               <span>Enter</span>
               <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </Link>
+            </AuthAwareCta>
           </div>
         </nav>
 
         <HeroGeometric
           actions={
             <div className="flex flex-row gap-2 w-full sm:w-auto">
-              <Link href="/login" className="flex-1 sm:flex-initial">
-                <span
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#1456f0] to-[#0099ff] px-3 text-xs font-semibold text-white shadow-[0_16px_36px_rgba(20,86,240,0.24)] transition hover:-translate-y-0.5 hover:from-[#114cd6] hover:to-[#38bdf8] active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm"
-                >
-                  <span>Open workspace</span>
-                  <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
-                </span>
-              </Link>
+              <AuthAwareCta
+                ariaLabel="Open workspace"
+                busyClassName="inline-flex h-10 w-full cursor-wait items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#1456f0] to-[#0099ff] px-3 text-xs font-semibold text-white opacity-80 shadow-[0_16px_36px_rgba(20,86,240,0.24)] sm:h-12 sm:px-6 sm:text-sm"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#1456f0] to-[#0099ff] px-3 text-xs font-semibold text-white shadow-[0_16px_36px_rgba(20,86,240,0.24)] transition hover:-translate-y-0.5 hover:from-[#114cd6] hover:to-[#38bdf8] active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm"
+              >
+                <span>Open workspace</span>
+                <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+              </AuthAwareCta>
               <Link href="/docs" className="flex-1 sm:flex-initial">
                 <span className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[var(--marketing-border)] bg-[var(--marketing-chip)]/80 px-3 text-xs font-semibold text-[var(--marketing-ink)] backdrop-blur transition hover:-translate-y-0.5 hover:border-[#0099ff] hover:bg-[#0099ff]/15 active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm">
                   Read docs
@@ -234,9 +236,15 @@ export default function Home() {
               Open the workspace and tune from real conversations.
             </h2>
           </div>
-          <Link
+          <AuthAwareCta
+            ariaLabel="Open AgentDesk"
+            busyClassName="marketing-cta inline-flex min-h-11 cursor-wait items-center justify-center gap-2 rounded-full border px-6 text-sm font-semibold opacity-80"
+            busyStyle={{
+              backgroundColor: "var(--marketing-inverse)",
+              borderColor: "var(--marketing-inverse)",
+              color: "var(--marketing-on-inverse)",
+            }}
             className="marketing-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-6 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98]"
-            href="/login"
             style={{
               backgroundColor: "var(--marketing-inverse)",
               borderColor: "var(--marketing-inverse)",
@@ -245,7 +253,7 @@ export default function Home() {
           >
             <span>Open AgentDesk</span>
             <Sparkles aria-hidden="true" className="h-4 w-4" />
-          </Link>
+          </AuthAwareCta>
         </div>
       </section>
     </main>
