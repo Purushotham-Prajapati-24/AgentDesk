@@ -1,27 +1,12 @@
 import { verifyMagicLink } from "@/app/auth-actions";
+import {
+  DEFAULT_AUTHENTICATED_DESTINATION,
+  escapeHtml,
+  sanitizeNextPath,
+} from "@/lib/auth-redirect";
 import { NextResponse, type NextRequest } from "next/server";
 
 export const dynamic = "force-dynamic";
-
-const DEFAULT_AUTHENTICATED_DESTINATION = "/bots";
-
-/**
- * Validates a post-login redirect target.
- * Only same-origin root-relative paths are accepted.
- */
-function sanitizeNextPath(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return null;
-  }
-  if (/[\r\n\t\0]/.test(trimmed)) {
-    return null;
-  }
-  return trimmed;
-}
 
 function resolveNextPath(request: NextRequest): string {
   const fromQuery = sanitizeNextPath(request.nextUrl.searchParams.get("next"));
@@ -57,7 +42,11 @@ export async function POST(request: NextRequest) {
     sanitizeNextPath(stringValue(formData.get("next"))) ?? DEFAULT_AUTHENTICATED_DESTINATION;
 
   if (!userId || !secret) {
-    return redirectToLogin(request, "invalid_magic_link", 307, nextPath);
+    // 303 See Other: forces the browser to GET /login on the redirect
+    // target. 307 would preserve POST and Next.js page routes only
+    // accept GET, so the user would see a 405 instead of the login
+    // form with the error message.
+    return redirectToLogin(request, "invalid_magic_link", 303, nextPath);
   }
 
   const result = await verifyMagicLink(userId, secret);
@@ -72,7 +61,11 @@ export async function POST(request: NextRequest) {
 function redirectToLogin(
   request: NextRequest,
   error: string,
-  status = 307,
+  // 303 See Other by default: forces GET on the redirect target. Safe
+  // for both GET and POST callers because /login is a GET-only page
+  // route in the App Router — preserving the original method (307)
+  // would cause a 405 when the original was POST.
+  status = 303,
   nextPath = DEFAULT_AUTHENTICATED_DESTINATION,
 ) {
   const url = new URL("/login", request.url);
@@ -85,14 +78,6 @@ function redirectToLogin(
 
 function stringValue(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value : "";
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
 }
 
 function renderVerificationPage(userId: string, secret: string, nextPath: string) {

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { loginWithMagicLink } from "@/app/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { InteractiveRobotSpline } from "@/components/ui/interactive-3d-robot";
+import { sanitizeNextPath } from "@/lib/auth-redirect";
 
 const ROBOT_SCENE_URL = "https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode";
 
@@ -26,7 +27,7 @@ function LoginContent() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const queryMessage = getQueryMessage(searchParams.get("error"));
   const visibleMessage = message ?? queryMessage;
-  const nextPath = sanitizeLoginNext(searchParams.get("next"));
+  const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -147,18 +148,4 @@ function getQueryMessage(error: string | null): { type: "error"; text: string } 
   }
 
   return null;
-}
-
-function sanitizeLoginNext(value: string | null): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return null;
-  }
-  if (/[\r\n\t\0]/.test(trimmed)) {
-    return null;
-  }
-  return trimmed;
 }

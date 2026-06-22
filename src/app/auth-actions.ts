@@ -4,6 +4,7 @@ import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
 import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
+import { sanitizeNextPath } from "@/lib/auth-redirect";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -25,20 +26,6 @@ export type AuthTenant = {
   balance: number;
   role: "admin" | "agent";
 };
-
-function sanitizeNextPath(value: string | undefined | null): string | null {
-  if (!value) {
-    return null;
-  }
-  const trimmed = value.trim();
-  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return null;
-  }
-  if (/[\r\n\t\0]/.test(trimmed)) {
-    return null;
-  }
-  return trimmed;
-}
 
 export async function loginWithMagicLink(email: string, nextPath?: string) {
   const { account } = await createAdminClient();
