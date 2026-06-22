@@ -149,7 +149,7 @@ async function deleteBotDocuments(
     // avoiding hammering Appwrite with unbounded concurrency.
     for (let i = 0; i < documents.length; i += DELETE_BATCH_SIZE) {
       const batch = documents.slice(i, i + DELETE_BATCH_SIZE);
-      await Promise.all(
+      const results = await Promise.allSettled(
         batch.map(async (document) => {
           const storagePath = typeof document.storage_path === "string" ? document.storage_path : "";
           if (storagePath) {
@@ -163,11 +163,20 @@ async function deleteBotDocuments(
           }
 
           await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
+          return document;
+        }),
+      );
+
+      // Record rollup deltas only for documents whose storage + DB deletion
+      // both succeeded.  Prevents negative drift when partial batch fails.
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].status === "fulfilled") {
+          const document = results[j].value;
           await recordBestEffort("document storage rollup", "bot-actions", () =>
             recordDocumentStorageRemoved(databases, stringValue(document.tenant_id, tenantId), numberValue(document.file_size, 0)),
           );
-        }),
-      );
+        }
+      }
     }
   } catch (error: unknown) {
     if (!isMissingResourceError(error)) {

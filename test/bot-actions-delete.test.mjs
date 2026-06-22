@@ -11,7 +11,8 @@ const DELETE_BATCH_SIZE = 8;
 
 /**
  * Replicates the batching pattern from bot-actions.ts:deleteBotDocuments.
- * Returns arrays of document IDs processed per batch, and any errors thrown.
+ * Returns { processed: document IDs that succeeded, rollupIds: IDs whose
+ * rollup deltas should be recorded (only fulfilled results).
  */
 async function batchProcessDocuments(
   documentIds,
@@ -19,21 +20,23 @@ async function batchProcessDocuments(
   batchSize = DELETE_BATCH_SIZE,
 ) {
   const processed = [];
+  const rollupIds = [];
   for (let i = 0; i < documentIds.length; i += batchSize) {
     const batch = documentIds.slice(i, i + batchSize);
-    const batchResults = await Promise.allSettled(batch.map((id) => batchProcessor(id)));
-    for (let j = 0; j < batchResults.length; j++) {
-      if (batchResults[j].status === "fulfilled") {
-        processed.push(batchResults[j].value);
+    const results = await Promise.allSettled(batch.map((id) => batchProcessor(id)));
+    for (let j = 0; j < results.length; j++) {
+      if (results[j].status === "fulfilled") {
+        processed.push(results[j].value);
+        rollupIds.push(results[j].value);
       }
     }
   }
-  return processed;
+  return { processed, rollupIds };
 }
 
 test("batchProcessDocuments processes all documents across batches", async () => {
   const documentIds = Array.from({ length: 20 }, (_, i) => `doc_${i}`);
-  const processed = await batchProcessDocuments(documentIds, async (id) => id);
+  const { processed } = await batchProcessDocuments(documentIds, async (id) => id);
 
   assert.equal(processed.length, 20);
   assert.deepEqual(processed, documentIds);
@@ -43,7 +46,6 @@ test("batchProcessDocuments respects batch size", async () => {
   const callBatches = [];
   const documentIds = Array.from({ length: 20 }, (_, i) => `doc_${i}`);
 
-  // Track concurrent calls by recording when each starts/ends
   await batchProcessDocuments(documentIds, async (id) => {
     callBatches.push(id);
     return id;
@@ -62,40 +64,70 @@ test("batchProcessDocuments processes exactly 3 batches for 20 documents with si
     concurrent++;
     maxConcurrent = Math.max(maxConcurrent, concurrent);
     batchStarts.push(id);
-    // Simulate async work
     await new Promise((resolve) => setTimeout(resolve, 1));
     concurrent--;
     return id;
   }, 8);
 
-  // Max concurrent should not exceed batch size
   assert.ok(maxConcurrent <= 8, `max concurrent ${maxConcurrent} should be <= 8`);
   assert.equal(batchStarts.length, 20);
 });
 
 test("batchProcessDocuments with single document is processed in one batch", async () => {
-  const processed = await batchProcessDocuments(["doc_only"], async (id) => id);
+  const { processed } = await batchProcessDocuments(["doc_only"], async (id) => id);
   assert.deepEqual(processed, ["doc_only"]);
 });
 
 test("batchProcessDocuments with zero documents returns empty", async () => {
-  const processed = await batchProcessDocuments([], async (id) => id);
+  const { processed, rollupIds } = await batchProcessDocuments([], async (id) => id);
   assert.deepEqual(processed, []);
+  assert.deepEqual(rollupIds, []);
 });
 
 test("batchProcessDocuments: one failing file does not prevent siblings from being processed", async () => {
   const documentIds = ["doc_ok_1", "doc_fail", "doc_ok_2"];
 
-  const processed = await batchProcessDocuments(documentIds, async (id) => {
+  const { processed, rollupIds } = await batchProcessDocuments(documentIds, async (id) => {
     if (id === "doc_fail") {
       throw new Error("storage error");
     }
     return id;
   });
 
-  // Promise.allSettled swallows the rejection — both siblings should still complete
   assert.equal(processed.length, 2);
   assert.ok(processed.includes("doc_ok_1"));
   assert.ok(processed.includes("doc_ok_2"));
   assert.ok(!processed.includes("doc_fail"));
+});
+
+test("batchProcessDocuments: rollup deltas only recorded for successful deletions (no drift)", async () => {
+  const documentIds = [
+    { id: "doc_ok_1", size: 100 },
+    { id: "doc_fail", size: 200 },
+    { id: "doc_ok_2", size: 300 },
+  ];
+
+  const { processed, rollupIds } = await batchProcessDocuments(
+    documentIds.map((d) => d.id),
+    async (id) => {
+      const doc = documentIds.find((d) => d.id === id);
+      if (doc && doc.id === "doc_fail") {
+        throw new Error("storage error");
+      }
+      return id;
+    },
+  );
+
+  // Only succeeded docs should have rollup entries — prevents negative drift
+  assert.equal(rollupIds.length, 2);
+  assert.ok(rollupIds.includes("doc_ok_1"));
+  assert.ok(rollupIds.includes("doc_ok_2"));
+  assert.ok(!rollupIds.includes("doc_fail"));
+
+  // Verify total rollup bytes = only successful docs
+  const totalRollupBytes = rollupIds.reduce((sum, id) => {
+    const doc = documentIds.find((d) => d.id === id);
+    return sum + (doc?.size ?? 0);
+  }, 0);
+  assert.equal(totalRollupBytes, 400); // 100 + 300, NOT 100 + 200 + 300
 });

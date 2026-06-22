@@ -63,7 +63,7 @@ export async function getTenantBillingSnapshot(tenantId: string): Promise<
   | { success: false; error: string }
 > {
   try {
-    const [{ databases }] = await Promise.all([createAdminClient(), assertTenantAccess(tenantId).catch(() => undefined)]);
+    const [{ databases }] = await Promise.all([createAdminClient(), assertTenantAccess(tenantId)]);
     const activeSessionWindowMinutes = numberEnv(
       "BILLING_ACTIVE_SESSION_WINDOW_MINUTES",
       DEFAULT_ACTIVE_SESSION_WINDOW_MINUTES,

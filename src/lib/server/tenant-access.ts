@@ -32,8 +32,10 @@ export const getAuthorizedTenantDocument = cache(async function getAuthorizedTen
  * account.get() at most once even if called by multiple server actions or by
  * getCurrentUser() + getCurrentTenant() together.
  *
- * React cache() dedupes by argument, so the userId param makes it stable across
- * call sites that resolve the same user.
+ * React cache() dedupes by the function's argument list.  Since this function
+ * takes zero arguments, it dedupes all calls within the same render pass
+ * regardless of call site — which is correct because the session cookie
+ * determines the account and is immutable for the lifetime of a request.
  */
 export const getCurrentAccount = cache(async function getCurrentAccount() {
   const { account } = await createSessionClient();
