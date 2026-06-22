@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - master
-    # On direct pushes to master, skip purely-documentation changes
-    # to save CI minutes. PRs always run the full scan because that's
-    # where reviewers make merge decisions.
+    # Skip changeset noise only. docs/** and **.md were intentionally
+    # removed from the ignore list: a .md change can carry a leaked
+    # secret (changelog example, doc snippet), so any push that could
+    # touch text content should be scanned. PRs always run the full
+    # scan because that's where reviewers make merge decisions.
     paths-ignore:
-      - 'docs/**'
-      - '**.md'
       - '.changeset/**'
   pull_request:
     branches:
@@ -81,8 +81,15 @@ jobs:
 
       # `if: always()` ensures SARIF still uploads when the scan
       # above fails — i.e. when it actually found something.
+      # CRITICAL: this step needs working-directory set to where
+      # semgrep actually wrote the SARIF. The container WORKDIR is
+      # /src (set by semgrep/semgrep image), but the Run Semgrep step
+      # above used working-directory: github.workspace, so it wrote
+      # to /github/workspace/semgrep.sarif. Without this override the
+      # upload silently fails.
       - name: Upload Semgrep SARIF → Security tab
         if: always()
+        working-directory: ${{ github.workspace }}
         uses: github/codeql-action/upload-sarif@1a818fd5f97ed0ee9a823421bd5b171add01227f # v4.36.2
         with:
           sarif_file: semgrep.sarif
@@ -91,15 +98,33 @@ jobs:
       # In advisory mode, semgrep exits 0 on findings so the job
       # result is always "success". Mirror the gitleaks approach:
       # count SARIF entries directly so the report job can see them.
+      # Same working-directory caveat as the Upload step above.
+      #
+      # Two output signals go to the summary job:
+      #   count          — number of findings (0 if SARIF missing/unparseable)
+      #   sarif_missing  — "true" if the scanner failed to produce usable SARIF,
+      #                    so the summary can distinguish "really clean" from
+      #                    "scanner never ran" (network blip, registry down,
+      #                    auth failure, etc.). Without this signal the
+      #                    summary job would announce "All scanners reported
+      #                    clean" when one scanner had silently failed.
       - name: Count Semgrep findings
         if: always()
         id: count
+        working-directory: ${{ github.workspace }}
         run: |
-          if [ -f semgrep.sarif ]; then
-            count=$(python3 -c "import json; d=json.load(open('semgrep.sarif')); print(sum(len(r.get('results', [])) for r in d.get('runs', [])))" 2>/dev/null || echo 0)
-          else
-            count=0
+          if [ ! -f semgrep.sarif ]; then
+            echo "::error::semgrep.sarif was not produced — scanner likely failed before SARIF was written."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          elif ! count=$(jq '[.runs[].results // [] | length] | add // 0' semgrep.sarif 2>/dev/null); then
+            echo "::error::failed to parse semgrep.sarif — schema drift or truncated output"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "sarif_missing=false" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
@@ -158,15 +183,28 @@ jobs:
       # In advisory mode, trivy exits 0 on findings so the job result
       # is always "success". Count SARIF entries so the report job
       # can see them, matching the gitleaks/semgrep pattern.
+      #
+      # Two output signals go to the summary job:
+      #   count          — number of findings (0 if SARIF missing/unparseable)
+      #   sarif_missing  — "true" if the scanner failed to produce usable SARIF.
+      #                    Common cause: trivyignores file path is wrong,
+      #                    or scan-ref is not a directory the action can read.
       - name: Count Trivy findings
         if: always()
         id: count
         run: |
-          if [ -f trivy.sarif ]; then
-            count=$(python3 -c "import json; d=json.load(open('trivy.sarif')); print(sum(len(r.get('results', [])) for r in d.get('runs', [])))" 2>/dev/null || echo 0)
-          else
-            count=0
+          if [ ! -f trivy.sarif ]; then
+            echo "::error::trivy.sarif was not produced — scanner likely failed before SARIF was written."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          elif ! count=$(jq '[.runs[].results // [] | length] | add // 0' trivy.sarif 2>/dev/null); then
+            echo "::error::failed to parse trivy.sarif — schema drift or truncated output"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "sarif_missing=false" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
@@ -199,15 +237,26 @@ jobs:
         # FIRST — before re-enabling Semgrep/Trivy gating.
         #
         # gitleaks-action runs `gitleaks detect --report-format=sarif
-        # --report-path=results.sarif` under the hood and uploads that
-        # file as a workflow artifact (downloadable from the run page).
-        # It does NOT post to the GitHub Security tab on its own —
-        # the next step does that explicitly.
+        # --report-path=results.sarif` under the hood. By default it
+        # also uploads that SARIF as a downloadable workflow artifact.
+        # We intentionally do NOT enable that: gitleaks' SARIF writer
+        # embeds the matched secret text verbatim in
+        # runs[].results[].locations[].physicalLocation.region.snippet.text
+        # (verified against gitleaks/report/sarif.go), and workflow
+        # artifacts are stored unredacted. Publishing that artifact
+        # would leak the very secrets the scan just found — to anyone
+        # with read access to the run, or to the public on a public
+        # repo. The next step uploads the same SARIF to the GitHub
+        # Security / Code Scanning tab, where GitHub's backend
+        # redacts secret values in the UI. That upload path is the
+        # one we want.
         continue-on-error: true
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          # GITLEAKS_ENABLE_UPLOAD_ARTIFACT intentionally omitted —
+          # see the comment block above. Keep secrets out of raw
+          # artifacts; the Security-tab upload is the canonical store.
           GITLEAKS_ENABLE_SUMMARY: "true"
 
       # gitleaks-action does not post SARIF to the Security tab — it
@@ -227,15 +276,26 @@ jobs:
       # job's result to detect gitleaks findings. Instead, count
       # entries in the SARIF file directly and surface that count to
       # the report job via $GITHUB_OUTPUT. Same pattern as Semgrep/Trivy.
+      #
+      # Two output signals go to the summary job:
+      #   count          — number of findings (0 if SARIF missing/unparseable)
+      #   sarif_missing  — "true" if the scanner failed to produce usable SARIF.
       - name: Count Gitleaks findings
         if: always()
         id: count
         run: |
-          if [ -f results.sarif ]; then
-            count=$(python3 -c "import json; d=json.load(open('results.sarif')); print(sum(len(r.get('results', [])) for r in d.get('runs', [])))" 2>/dev/null || echo 0)
-          else
-            count=0
+          if [ ! -f results.sarif ]; then
+            echo "::error::results.sarif was not produced — scanner likely failed before SARIF was written."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
+          elif ! count=$(jq '[.runs[].results // [] | length] | add // 0' results.sarif 2>/dev/null); then
+            echo "::error::failed to parse results.sarif — schema drift or truncated output"
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            echo "sarif_missing=true" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "sarif_missing=false" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
@@ -272,24 +332,52 @@ jobs:
           echo "       SECURITY SCAN REPORT  "
           echo "  (advisory mode — never fails the workflow)"
           echo "=============================="
-          echo "Semgrep  (SAST):         ${{ needs.semgrep.result }}   (findings: ${{ needs.semgrep.outputs.count }})"
-          echo "Trivy    (Dependencies): ${{ needs.trivy.result }}   (findings: ${{ needs.trivy.outputs.count }})"
-          echo "Gitleaks (Secrets):      ${{ needs.gitleaks.result }}   (findings: ${{ needs.gitleaks.outputs.count }})"
+          echo "Semgrep  (SAST):         ${{ needs.semgrep.result }}   (SARIF: ${{ needs.semgrep.outputs.sarif_missing }}, findings: ${{ needs.semgrep.outputs.count || 'N/A' }})"
+          echo "Trivy    (Dependencies): ${{ needs.trivy.result }}   (SARIF: ${{ needs.trivy.outputs.sarif_missing }}, findings: ${{ needs.trivy.outputs.count || 'N/A' }})"
+          echo "Gitleaks (Secrets):      ${{ needs.gitleaks.result }}   (SARIF: ${{ needs.gitleaks.outputs.sarif_missing }}, findings: ${{ needs.gitleaks.outputs.count || 'N/A' }})"
+          echo "=============================="
+          echo "  (SARIF column: false = scan ran cleanly;  true = scanner failed before SARIF was written)"
           echo "=============================="
 
           semgrep_failed=0
           trivy_failed=0
           gitleaks_failed=0
-          [ "${{ needs.semgrep.outputs.count }}" != "0" ]  && semgrep_failed=1
-          [ "${{ needs.trivy.outputs.count }}" != "0" ]    && trivy_failed=1
-          [ "${{ needs.gitleaks.outputs.count }}" != "0" ] && gitleaks_failed=1
+
+          # Differentiate "scanner produced SARIF with N findings" from
+          # "scanner never produced SARIF". Without the sarif_missing check
+          # below, a silently-failed scanner (network blip, registry down,
+          # bad config) would announce as 0 findings — indistinguishable
+          # from a genuinely clean scan. Treating SARIF-missing as a
+          # finding surfaces the failure without conflating it with the
+          # real finding count.
+          if [ "${{ needs.semgrep.outputs.sarif_missing }}" = "true" ]; then
+            echo "::error::  Semgrep:  scanner failed to produce SARIF"
+            semgrep_failed=1
+          elif [ "${{ needs.semgrep.outputs.count }}" != "0" ]; then
+            echo "::error::  Semgrep:  ${{ needs.semgrep.outputs.count }} finding(s)"
+            semgrep_failed=1
+          fi
+
+          if [ "${{ needs.trivy.outputs.sarif_missing }}" = "true" ]; then
+            echo "::error::  Trivy:    scanner failed to produce SARIF"
+            trivy_failed=1
+          elif [ "${{ needs.trivy.outputs.count }}" != "0" ]; then
+            echo "::error::  Trivy:    ${{ needs.trivy.outputs.count }} finding(s)"
+            trivy_failed=1
+          fi
+
+          if [ "${{ needs.gitleaks.outputs.sarif_missing }}" = "true" ]; then
+            echo "::error::  Gitleaks: scanner failed to produce SARIF"
+            gitleaks_failed=1
+          elif [ "${{ needs.gitleaks.outputs.count }}" != "0" ]; then
+            echo "::error::  Gitleaks: ${{ needs.gitleaks.outputs.count }} finding(s)"
+            gitleaks_failed=1
+          fi
+
           saw_finding=$((semgrep_failed + trivy_failed + gitleaks_failed))
 
           if [ "$saw_finding" -gt 0 ]; then
-            echo "::error title=Security findings::One or more scanners reported findings."
-            echo "::error::  Semgrep:  ${{ needs.semgrep.outputs.count }} finding(s)"
-            echo "::error::  Trivy:    ${{ needs.trivy.outputs.count }} finding(s)"
-            echo "::error::  Gitleaks: ${{ needs.gitleaks.outputs.count }} finding(s)"
+            echo "::error title=Security findings::One or more scanners reported findings or failed."
             echo "::error::Triage in the Security tab:"
             echo "::error::${{ github.server_url }}/${{ github.repository }}/security/code-scanning"
           else
