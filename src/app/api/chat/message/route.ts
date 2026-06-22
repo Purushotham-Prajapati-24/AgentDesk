@@ -256,17 +256,14 @@ function streamCompletion({
         controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
         
-        // Fire-and-forget the awaits so they do not block stream closure for the client
-        void Promise.allSettled([
-          Promise.resolve(onComplete(finalTokenCount)),
-          Promise.resolve(onMessageComplete(completionText, finalTokenCount))
-        ]).then((results) => {
-          results.forEach((res, i) => {
-            if (res.status === "rejected") {
-              console.error(`[chat/message] Hook ${i === 0 ? "onComplete" : "onMessageComplete"} failed:`, res.reason);
-            }
+        // Run credit debit (onComplete) and database persistence (onMessageComplete) sequentially.
+        // If credit debiting (onComplete) fails, the promise chain is rejected and onMessageComplete is aborted
+        // to prevent database persistence or WebSocket broadcasts of unpaid messages.
+        Promise.resolve(onComplete(finalTokenCount))
+          .then(() => Promise.resolve(onMessageComplete(completionText, finalTokenCount)))
+          .catch((err) => {
+            console.error("[chat/message] Sequential completion hook execution failed:", err);
           });
-        });
       } catch {
         controller.enqueue(sse({ token: fallbackMessage }));
         controller.enqueue(sseDone());

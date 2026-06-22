@@ -3,6 +3,7 @@
 import React, { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { TenantProvider } from "@/context/TenantContext";
+import { FormDirtyProvider } from "@/context/FormDirtyContext";
 import { AppShell } from "@/components/ui/Signal";
 import { useRouter } from "next/navigation";
 
@@ -42,7 +43,9 @@ export default function DashboardLayout({
   return (
     <DashboardGuard>
       <TenantProvider>
-        <AppShell>{children}</AppShell>
+        <FormDirtyProvider>
+          <AppShell>{children}</AppShell>
+        </FormDirtyProvider>
       </TenantProvider>
     </DashboardGuard>
   );

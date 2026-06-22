@@ -116,12 +116,6 @@ export default function InboxPage() {
   const seenMessageIdsRef = useRef<Set<string>>(new Set());
   // Tracks the active session ID to guard against late-arriving listConversationMessages promises.
   const activeSessionIdRef = useRef<string | null>(DEFAULT_ROOM.sessionId);
-  // Tracks the active room session ID for WebSocket message routing/filtering.
-  const roomSessionIdRef = useRef<string>(room.sessionId);
-
-  useEffect(() => {
-    roomSessionIdRef.current = room.sessionId;
-  }, [room]);
 
   function trackMessageId(id: string): boolean {
     if (!id) return false;
@@ -212,115 +206,124 @@ export default function InboxPage() {
     let disposed = false;
 
     async function connectWhenHealthy() {
-      // Render free-tier services spin down after inactivity.
-      // Retry the health check for up to ~40 s before giving up.
-      const MAX_RETRIES = 8;
-      let healthy = false;
-      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        // Render free-tier services spin down after inactivity.
+        // Retry the health check for up to ~40 s before giving up.
+        const MAX_RETRIES = 8;
+        let healthy = false;
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          if (disposed) return;
+          healthy = await checkLiveHandoffHealth(wsUrl, abortController.signal);
+          if (healthy) break;
+          if (attempt === 0) {
+            setWakingUp(true);
+            setError(null);
+          }
+          if (attempt < MAX_RETRIES - 1) {
+            await new Promise<void>((resolve) => setTimeout(resolve, 5000));
+          }
+        }
+
+        setWakingUp(false);
         if (disposed) return;
-        healthy = await checkLiveHandoffHealth(wsUrl, abortController.signal);
-        if (healthy) break;
-        if (attempt === 0) {
-          setWakingUp(true);
+
+        if (!healthy) {
+          setSocketStatus("disconnected");
+          setError(`Live handoff server is unavailable at ${wsUrl}. Start the WebSocket service or update NEXT_PUBLIC_WEBSOCKET_URL.`);
+          return;
+        }
+
+        const tokenResponse = await fetch("/api/handoff/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenant_id: room.tenantId,
+            session_id: room.sessionId,
+          }),
+          signal: abortController.signal,
+        });
+        const tokenBody = (await tokenResponse.json()) as
+          | { success: true; data: { token: string } }
+          | { success: false; error: { message: string } };
+        if (!tokenResponse.ok || !tokenBody.success) {
+          setSocketStatus("disconnected");
+          setError(tokenBody.success ? "Unable to authorize live handoff." : tokenBody.error.message);
+          return;
+        }
+
+        const namespace = `${wsUrl}/tenant-${room.tenantId}`;
+        socket = io(namespace, {
+          auth: {
+            tenant_id: room.tenantId,
+            session_id: room.sessionId,
+            role: "agent",
+            agent_token: tokenBody.data.token,
+          },
+          reconnectionAttempts: 5,
+          timeout: 8000,
+        });
+
+        socketRef.current = socket;
+
+        socket.on("connect", () => {
+          setSocketStatus("connected");
           setError(null);
+        });
+        socket.on("disconnect", () => {
+          setSocketStatus("disconnected");
+        });
+        socket.on("connect_error", (connectionError) => {
+          setSocketStatus("disconnected");
+          setError(`Unable to connect to the live handoff server at ${wsUrl}. ${connectionError.message}`);
+        });
+        socket.on("session-state", (state: SessionState) => {
+          setSessionStatus(state.status);
+          updateHistoryStatus(state.status, state.updated_at);
+        });
+        socket.on("bot-status-toggle", (state: SessionState) => {
+          setSessionStatus(state.status);
+          updateHistoryStatus(state.status, state.updated_at);
+        });
+        socket.on("customer-message", (message: SocketEventMessage) => {
+          // Consult the shared dedup set synchronously so both the transcript and
+          // the history card counter stay in lockstep. appendMessage's internal
+          // setState updater runs asynchronously, so we can't rely on it alone.
+          if (message.message_id && trackMessageId(message.message_id)) return;
+          // Gate on the document $id (activeSessionIdRef), not the session_token.
+          // The WebSocket server broadcasts with session_id equal to session.$id.
+          if (message.session_id === activeSessionIdRef.current) {
+            appendMessage(setMessages, mapSocketMessage(message));
+          }
+          bumpHistoryMessage(message);
+        });
+        socket.on("agent-message", (message: SocketEventMessage) => {
+          if (message.message_id && trackMessageId(message.message_id)) return;
+          if (message.session_id === activeSessionIdRef.current) {
+            appendMessage(setMessages, mapSocketMessage(message));
+          }
+          bumpHistoryMessage(message);
+        });
+        socket.on("bot-message", (message: SocketEventMessage) => {
+          if (message.message_id && trackMessageId(message.message_id)) return;
+          if (message.session_id === activeSessionIdRef.current) {
+            appendMessage(setMessages, mapSocketMessage(message));
+          }
+          bumpHistoryMessage(message);
+        });
+        socket.on("server-error", (response: AckResponse<never>) => {
+          if (!response.success) {
+            setError(response.error.message);
+          }
+        });
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // Quietly ignore abort signals
+          return;
         }
-        if (attempt < MAX_RETRIES - 1) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 5000));
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Failed to establish live handoff connection:", err);
         }
       }
-
-      setWakingUp(false);
-      if (disposed) return;
-
-      if (!healthy) {
-        setSocketStatus("disconnected");
-        setError(`Live handoff server is unavailable at ${wsUrl}. Start the WebSocket service or update NEXT_PUBLIC_WEBSOCKET_URL.`);
-        return;
-      }
-
-      const tokenResponse = await fetch("/api/handoff/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenant_id: room.tenantId,
-          session_id: room.sessionId,
-        }),
-        signal: abortController.signal,
-      });
-      const tokenBody = (await tokenResponse.json()) as
-        | { success: true; data: { token: string } }
-        | { success: false; error: { message: string } };
-      if (!tokenResponse.ok || !tokenBody.success) {
-        setSocketStatus("disconnected");
-        setError(tokenBody.success ? "Unable to authorize live handoff." : tokenBody.error.message);
-        return;
-      }
-
-      const namespace = `${wsUrl}/tenant-${room.tenantId}`;
-      socket = io(namespace, {
-        auth: {
-          tenant_id: room.tenantId,
-          session_id: room.sessionId,
-          role: "agent",
-          agent_token: tokenBody.data.token,
-        },
-        reconnectionAttempts: 5,
-        timeout: 8000,
-      });
-
-      socketRef.current = socket;
-
-      socket.on("connect", () => {
-        setSocketStatus("connected");
-        setError(null);
-      });
-      socket.on("disconnect", () => {
-        setSocketStatus("disconnected");
-      });
-      socket.on("connect_error", (connectionError) => {
-        setSocketStatus("disconnected");
-        setError(`Unable to connect to the live handoff server at ${wsUrl}. ${connectionError.message}`);
-      });
-      socket.on("session-state", (state: SessionState) => {
-        setSessionStatus(state.status);
-        updateHistoryStatus(state.status, state.updated_at);
-      });
-      socket.on("bot-status-toggle", (state: SessionState) => {
-        setSessionStatus(state.status);
-        updateHistoryStatus(state.status, state.updated_at);
-      });
-      socket.on("customer-message", (message: SocketEventMessage) => {
-        // Consult the shared dedup set synchronously so both the transcript and
-        // the history card counter stay in lockstep. appendMessage's internal
-        // setState updater runs asynchronously, so we can't rely on it alone.
-        if (message.message_id && trackMessageId(message.message_id)) return;
-        // Gate on the document $id (activeSessionIdRef), not the session_token
-        // (roomSessionIdRef). The WebSocket server broadcasts with session_id
-        // equal to session.$id — the two values are different strings.
-        if (message.session_id === activeSessionIdRef.current) {
-          appendMessage(setMessages, mapSocketMessage(message));
-        }
-        bumpHistoryMessage(message);
-      });
-      socket.on("agent-message", (message: SocketEventMessage) => {
-        if (message.message_id && trackMessageId(message.message_id)) return;
-        if (message.session_id === activeSessionIdRef.current) {
-          appendMessage(setMessages, mapSocketMessage(message));
-        }
-        bumpHistoryMessage(message);
-      });
-      socket.on("bot-message", (message: SocketEventMessage) => {
-        if (message.message_id && trackMessageId(message.message_id)) return;
-        if (message.session_id === activeSessionIdRef.current) {
-          appendMessage(setMessages, mapSocketMessage(message));
-        }
-        bumpHistoryMessage(message);
-      });
-      socket.on("server-error", (response: AckResponse<never>) => {
-        if (!response.success) {
-          setError(response.error.message);
-        }
-      });
     }
 
     void connectWhenHealthy();
@@ -387,25 +390,27 @@ export default function InboxPage() {
       setError("Tenant and session IDs must be 3-120 characters using letters, numbers, underscores, or hyphens.");
       return;
     }
+    const targetSessionId = draftRoom.sessionId;
     setMessages([]);
     setSelectedConversationId(null);
     setMobilePanel("transcript");
     setSocketStatus(WEB_SOCKET_URL ? "connecting" : "disconnected");
     setError(WEB_SOCKET_URL ? null : WEB_SOCKET_CONFIG_ERROR);
     setRoom(draftRoom);
-    activeSessionIdRef.current = draftRoom.sessionId;
+    activeSessionIdRef.current = targetSessionId;
     // Clear dedup set unconditionally on room switch so stale IDs from the
     // previous room can never suppress replayed events in the new room.
     seenMessageIdsRef.current.clear();
 
     setMessageLoading(true);
+    let resolvedSessionId: string | null = null;
     try {
       const response = await listConversationMessages({
         tenantId: draftRoom.tenantId,
-        sessionId: draftRoom.sessionId,
+        sessionId: targetSessionId,
       });
 
-      if (draftRoom.sessionId !== activeSessionIdRef.current) {
+      if (activeSessionIdRef.current !== targetSessionId) {
         return;
       }
 
@@ -413,6 +418,9 @@ export default function InboxPage() {
         setMessages([]);
         return;
       }
+
+      resolvedSessionId = response.data.resolvedSessionId;
+      activeSessionIdRef.current = resolvedSessionId;
 
       setMessages(
         response.data.messages.map((message) => ({
@@ -428,7 +436,7 @@ export default function InboxPage() {
         if (m.id) trackMessageId(m.id);
       });
     } catch (err) {
-      if (draftRoom.sessionId !== activeSessionIdRef.current) {
+      if (activeSessionIdRef.current !== targetSessionId && activeSessionIdRef.current !== resolvedSessionId) {
         return;
       }
       if (process.env.NODE_ENV !== "production") {
@@ -436,7 +444,7 @@ export default function InboxPage() {
       }
       setMessages([]);
     } finally {
-      if (draftRoom.sessionId === activeSessionIdRef.current) {
+      if (activeSessionIdRef.current === targetSessionId || activeSessionIdRef.current === resolvedSessionId) {
         setMessageLoading(false);
       }
     }

@@ -85,7 +85,7 @@ export async function listConversationMessages({
 }: {
   tenantId: string;
   sessionId: string;
-}): Promise<{ success: true; data: { messages: ConversationMessage[] } } | { success: false; error: string }> {
+}): Promise<{ success: true; data: { messages: ConversationMessage[]; resolvedSessionId: string } } | { success: false; error: string }> {
   try {
     const { account, databases } = await createSessionClient();
     await assertTenantAccess(account, tenantId);
@@ -100,10 +100,13 @@ export async function listConversationMessages({
       Query.limit(MESSAGE_LIMIT),
     ]);
 
+    // DX Comment: The listDocuments query retrieves the latest messages sorted descending (newest first).
+    // By reversing the array below, we return the messages in chronological order (oldest first) for the UI transcript.
     return {
       success: true,
       data: {
         messages: messages.documents.reverse().map((document) => mapMessage(document as MessageDocument)),
+        resolvedSessionId: session.$id,
       },
     };
   } catch (error: unknown) {

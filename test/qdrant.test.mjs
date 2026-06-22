@@ -161,6 +161,19 @@ test("hybrid collection setup creates tenant-aware and bot keyword payload index
   assert.equal(qdrant.payloadIndexSchemas.bot_id, "keyword");
 });
 
+test("deleteKnowledgePointsForBot deletes points with tenant and bot filters", async () => {
+  const calls = mockFetch([{ ok: true, json: async () => ({}) }]);
+
+  const result = await qdrant.deleteKnowledgePointsForBot("tenant-1", "bot-1");
+
+  assert.deepEqual(result, { skipped: false, deleted: true });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/points\/delete\?wait=true$/);
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    filter: qdrant.tenantBotFilter("tenant-1", "bot-1"),
+  });
+});
+
 function mockFetch(responses) {
   const calls = [];
 

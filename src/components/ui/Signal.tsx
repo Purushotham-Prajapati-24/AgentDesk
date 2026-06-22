@@ -22,10 +22,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useFormDirty } from "@/context/FormDirtyContext";
 
 type StatusTone = "hot" | "warn" | "neutral" | "danger" | "dark" | "info";
 
 const navItems = [
+  { href: "/", label: "Home", icon: Bot },
   { href: "/bots", label: "Agents", icon: Bot },
   { href: "/documents", label: "Knowledge base", icon: FileText },
   { href: "/webchat", label: "Webchat customization", icon: MessagesSquare },
@@ -39,24 +41,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { isFormDirty, setIsFormDirty } = useFormDirty();
+
   const currentSection = useMemo(() => {
-    if (pathname === "/") return { href: "/", label: "Home", icon: Bot };
-    return navItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) ?? navItems[0];
+    return (
+      navItems.find(
+        (item) =>
+          pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`))
+      ) ?? navItems[0]
+    );
   }, [pathname]);
 
   function handleNavigation(event: React.MouseEvent<HTMLAnchorElement>) {
-    if (typeof window !== "undefined") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((window as any).__agentdesk_form_dirty) {
-        if (!confirm("Discard unsaved changes?")) {
-          event.preventDefault();
-          return;
-        }
-        // Clear immediately so rapid follow-up clicks don't re-trigger the dialog
-        // before BotsContent unmounts and the cleanup effect fires.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).__agentdesk_form_dirty = false;
+    if (isFormDirty) {
+      if (!confirm("Discard unsaved changes?")) {
+        event.preventDefault();
+        return;
       }
+      setIsFormDirty(false);
     }
     setMobileNavOpen(false);
   }
@@ -127,7 +129,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span>Create agent</span>
               </Link>
 
-              {navItems.map((item) => {
+              {navItems.filter((item) => item.href !== "/").map((item) => {
                 const Icon = item.icon;
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (

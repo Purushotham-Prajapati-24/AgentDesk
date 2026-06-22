@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
 import { ArrowRight, Bot as BotIcon, Check, Copy, Plus, Trash2 } from "lucide-react";
 import { createBot, deleteBot, listBots, updateBot } from "@/app/bot-actions";
 import { useTenant } from "@/context/TenantContext";
+import { useFormDirty } from "@/context/FormDirtyContext";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { EmptyState, Panel } from "@/components/ui/Signal";
@@ -52,8 +53,9 @@ function BotsContent() {
   const selectedBot = useMemo(() => bots.find((bot) => bot.$id === selectedId) ?? null, [bots, selectedId]);
 
   const [isDrafting, setIsDrafting] = useState(isNew);
+  const { setIsFormDirty } = useFormDirty();
 
-  const isFormDirty = useMemo(() => {
+  const isCurrentFormDirty = useMemo(() => {
     if (selectedBot) {
       return (
         form.name !== selectedBot.name ||
@@ -69,20 +71,14 @@ function BotsContent() {
   }, [form, selectedBot]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).__agentdesk_form_dirty = isFormDirty;
-    }
+    setIsFormDirty(isCurrentFormDirty);
     return () => {
-      if (typeof window !== "undefined") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (window as any).__agentdesk_form_dirty = false;
-      }
+      setIsFormDirty(false);
     };
-  }, [isFormDirty]);
+  }, [isCurrentFormDirty, setIsFormDirty]);
 
   useEffect(() => {
-    if (!isFormDirty) return;
+    if (!isCurrentFormDirty) return;
     function handleBeforeUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
       // Firefox and Safari also require returnValue to be set for the native
@@ -91,25 +87,15 @@ function BotsContent() {
     }
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isFormDirty]);
-
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    // This effect intentionally reads `isNew` at tenant-mount time only.
-    // Adding `isNew` to the dep array would cause the ?new=true draft to be
-    // discarded immediately after router.replace removes the query param.
-    setIsDrafting(isNew);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenant?.$id]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [isCurrentFormDirty]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (isNew) {
+      setIsDrafting(true);
       setSelectedId(null);
       setForm(EMPTY_FORM);
       setStatus("");
-      setIsDrafting(true);
       router.replace("/bots");
     }
   }, [isNew, router]);
@@ -125,6 +111,17 @@ function BotsContent() {
 
     let isActive = true;
     setIsAgentsLoading(true);
+
+    // Reset selection and draft state when tenant changes.
+    // We only reset isDrafting to false if we are not actively handling a new agent query param,
+    // which prevents racing with the isNew transition on mount.
+    setSelectedId(null);
+    setForm(EMPTY_FORM);
+    setStatus("");
+    if (!isNew) {
+      setIsDrafting(false);
+    }
+
     listBots(tenant.$id).then((response) => {
       if (!isActive) {
         return;
@@ -140,7 +137,8 @@ function BotsContent() {
     return () => {
       isActive = false;
     };
-  }, [tenant?.$id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant?.$id]); // Intentionally exclude isNew to avoid re-fetching on URL transition
   /* eslint-enable react-hooks/set-state-in-effect */
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -168,7 +166,7 @@ function BotsContent() {
     if (bot.$id === selectedId) {
       return;
     }
-    if (isFormDirty && !confirm("Discard unsaved changes?")) {
+    if (isCurrentFormDirty && !confirm("Discard unsaved changes?")) {
       return;
     }
     setSelectedId(bot.$id);
@@ -217,13 +215,6 @@ function BotsContent() {
   }
 
   function requestDeleteBotFor(bot: Bot) {
-    // Only prompt about unsaved changes when deleting the bot that is currently
-    // open in the editor (selected) or when the user has a new-agent draft in
-    // progress. Never interrupt deletion of an unrelated card.
-    const isEditingThisBot = bot.$id === selectedId || isDrafting;
-    if (isEditingThisBot && isFormDirty && !confirm("You have unsaved changes that will be discarded. Continue?")) {
-      return;
-    }
     setDeleteTarget(bot);
     setDeleteConfirmed(false);
     setStatus("");
@@ -236,6 +227,22 @@ function BotsContent() {
 
     setDeleteTarget(null);
     setDeleteConfirmed(false);
+  }
+
+  function cancelDraft() {
+    if (isCurrentFormDirty && !confirm("Discard unsaved changes?")) {
+      return;
+    }
+    setIsDrafting(false);
+    if (bots.length > 0) {
+      const firstBot = bots[0];
+      setSelectedId(firstBot.$id);
+      setForm(botToForm(firstBot));
+    } else {
+      setSelectedId(null);
+      setForm(EMPTY_FORM);
+    }
+    setStatus("");
   }
 
   async function removeSelectedBot() {
@@ -260,6 +267,9 @@ function BotsContent() {
       const firstBot = remainingBots[0] ?? null;
       setSelectedId(firstBot?.$id ?? null);
       setForm(firstBot ? botToForm(firstBot) : EMPTY_FORM);
+      if (!firstBot) {
+        setIsDrafting(true);
+      }
     }
     
     setDeleteTarget(null);
@@ -287,7 +297,7 @@ function BotsContent() {
                   if (selectedId === null && isDrafting) {
                     return;
                   }
-                  if (isFormDirty && !confirm("Discard unsaved changes?")) {
+                  if (isCurrentFormDirty && !confirm("Discard unsaved changes?")) {
                     return;
                   }
                   setSelectedId(null);
@@ -426,6 +436,15 @@ function BotsContent() {
               <Button className="w-full sm:w-auto" disabled={isSaving || !tenant?.$id} loading={isSaving} type="submit">
                 Save agent
               </Button>
+              {isDrafting && bots.length > 0 && (
+                <button
+                  type="button"
+                  onClick={cancelDraft}
+                  className="w-full sm:w-auto rounded-lg border border-[var(--ui-border)] px-4 py-2 text-sm font-semibold text-[var(--ui-muted)] hover:bg-[var(--ui-border)] hover:text-[var(--ui-text)] transition duration-200"
+                >
+                  Cancel
+                </button>
+              )}
             </div>
           </form>
         </Panel>
