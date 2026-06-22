@@ -1,3 +1,25 @@
+/**
+ * Test runner requirements
+ * ------------------------
+ * This file imports a TypeScript source file directly
+ * (`../src/lib/auth-redirect.ts`) from a `.mjs` test file. That only
+ * works because of two project-level decisions:
+ *
+ *   1. Node.js >= 22.6.0 — `import("./foo.ts")` requires the
+ *      --experimental-strip-types flag, which was unflagged in 22.6.
+ *      The `engines` field in package.json declares this requirement.
+ *
+ *   2. The `test` script in package.json passes
+ *      `--experimental-strip-types` to node so the loader strips type
+ *      annotations and treats the file as ESM. Without that flag the
+ *      `await import("../src/lib/auth-redirect.ts")` below throws
+ *      ERR_UNKNOWN_FILE_EXTENSION.
+ *
+ * If you ever run this file directly (`node test/auth-redirect.test.mjs`)
+ * outside of `npm test`, you will need to add the flag yourself, e.g.
+ *   node --experimental-strip-types test/auth-redirect.test.mjs
+ */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
