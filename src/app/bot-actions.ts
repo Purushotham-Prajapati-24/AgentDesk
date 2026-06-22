@@ -1,5 +1,15 @@
 "use server";
 
+/**
+ * Server actions for bot CRUD and deletion.
+ *
+ * SECURITY NOTE: All actions use the Appwrite admin client (which bypasses
+ * document-level permissions) and MUST call assertTenantAccess(tenantId) before
+ * performing any operation.  This ensures that only members of the tenant can
+ * mutate its bots.  Appwrite's document-level permissions are not the primary
+ * defense here — assertTenantAccess is.
+ */
+
 import { createAdminClient } from "@/lib/server/appwrite";
 import { assertTenantAccess } from "@/lib/server/tenant-access";
 import { deleteKnowledgePointsForBot } from "@/lib/server/qdrant";

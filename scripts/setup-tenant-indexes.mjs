@@ -24,6 +24,7 @@ const botsCollectionId = process.env.APPWRITE_BOTS_COLLECTION_ID || "bots";
 const ledgerCollectionId = process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID || "ledger";
 const documentsCollectionId = process.env.APPWRITE_DOCUMENT_FILES_COLLECTION_ID || "document_files";
 const webchatCollectionId = process.env.APPWRITE_WEBSITE_CHAT_CONFIG_COLLECTION_ID || "website_chat_config";
+const tenantRollupsCollectionId = process.env.APPWRITE_MONITOR_TENANT_ROLLUPS_COLLECTION_ID || "monitor_tenant_rollups";
 
 if (!endpoint || !projectId || !apiKey || !databaseId) {
   throw new Error("NEXT_PUBLIC_APPWRITE_ENDPOINT, NEXT_PUBLIC_APPWRITE_PROJECT_ID, APPWRITE_API_KEY, and database ID are required.");
@@ -113,6 +114,13 @@ async function addWebchatIndexes() {
   await createIndex(webchatCollectionId, "tenant_bot_idx", "key", ["tenant_id", "bot_id"]);
 }
 
+async function addTenantRollupIndexes() {
+  await waitForAttributes(tenantRollupsCollectionId, ["tenant_id"]);
+  // Primary lookup index for billing rollup reads (credits.ts:readTenantRollup).
+  // Every billing page request and chat debit gate hits this query.
+  await createIndex(tenantRollupsCollectionId, "tenant_id_idx", "key", ["tenant_id"]);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -122,6 +130,7 @@ async function run() {
   await addLedgerIndexes();
   await addDocumentIndexes();
   await addWebchatIndexes();
+  await addTenantRollupIndexes();
   console.log("Tenant indexes are ready.");
 }
 

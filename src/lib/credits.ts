@@ -34,6 +34,8 @@ type LedgerDocument = Models.Document & {
 
 type FileDocument = Models.Document & {
   file_size?: unknown;
+  file_type?: unknown;
+  parsed_text?: unknown;
 };
 
 type TenantCreditsDocument = Models.Document & {
@@ -137,7 +139,7 @@ async function getBillingSnapshotFromFullPaginate(
 
   const transactions = ledgerDocuments.map(mapLedgerDocument);
   const computedBalance = calculateBalance(transactions);
-  const computedStorageBytes = fileDocuments.reduce((total, document) => total + numberValue(document.file_size), 0);
+  const computedStorageBytes = fileDocuments.reduce((total, document) => total + documentStorageBytes(document), 0);
 
   // Persist the computed totals into the rollup for future fast-path reads.
   // This is the reconcile-on-miss pattern: the first request after setup does
@@ -242,23 +244,32 @@ async function persistBillingRollup(
       }
     }
 
-    await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
-      tenant_id: tenantId,
-      credit_balance: creditBalance,
-      document_storage_bytes: documentStorageBytes,
-      balance_reconciled_at: now,
-      updated: now,
-      // Include zero-init fields expected by monitor-rollups.ts
-      conversations: 0,
-      active_sessions: 0,
-      paused_sessions: 0,
-      closed_sessions: 0,
-      messages: 0,
-      customer_messages: 0,
-      bot_messages: 0,
-      agent_messages: 0,
-      handoffs: 0,
-    });
+    try {
+      await databases.createDocument(databaseId(), tenantRollupsCollectionId(), documentId, {
+        tenant_id: tenantId,
+        credit_balance: creditBalance,
+        document_storage_bytes: documentStorageBytes,
+        balance_reconciled_at: now,
+        updated: now,
+        // Include zero-init fields expected by monitor-rollups.ts
+        conversations: 0,
+        active_sessions: 0,
+        paused_sessions: 0,
+        closed_sessions: 0,
+        messages: 0,
+        customer_messages: 0,
+        bot_messages: 0,
+        agent_messages: 0,
+        handoffs: 0,
+      });
+    } catch (createError) {
+      // Two concurrent first-time reconcile requests may both reach createDocument.
+      // The second gets a 409 (document already created by the winner).  This is
+      // safe — swallow the 409; the rollup will be refreshed on next request.
+      if (errorCode(createError) !== 409) {
+        throw createError;
+      }
+    }
   } catch (error) {
     // Best-effort: don't block the billing page if rollup write fails.
     // The next request will reconcile again.
@@ -382,8 +393,13 @@ function databaseId() {
 
 function ledgerCollectionId() {
   // IMPORTANT: This must match the collection ID used by the chat debit writer
-  // (src/app/api/chat/message/route.ts).  The writer falls back to "ledger";
-  // if env vars are unset, reader and writer must hit the same collection.
+  // (src/app/api/chat/message/route.ts).  Both reader and writer fall back to
+  // "ledger" when NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID is unset.
+  //
+  // Note: the original default was "ledger_transactions".  It was changed to
+  // "ledger" when the debit writer was updated.  All deployed environments set
+  // NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID explicitly, so the fallback only
+  // affects local development where both reader and writer use the same value.
   return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger";
 }
 
@@ -409,6 +425,27 @@ function tenantRollupsCollectionId() {
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Computes the storage byte contribution of a single document.
+ * URL-type documents that have been ingested store their text in `parsed_text`;
+ * their storage cost is the byte length of that text.  All other document types
+ * use the `file_size` attribute from Appwrite storage metadata.
+ *
+ * IMPORTANT: This function is used by both the runtime billing path
+ * (getBillingSnapshotFromFullPaginate) and the backfill script.  Keep them
+ * aligned so the rollup value matches what the fallback would compute.
+ */
+export function documentStorageBytes(document: FileDocument): number {
+  if (
+    document.file_type === "url" &&
+    typeof document.parsed_text === "string" &&
+    document.parsed_text.trim() !== ""
+  ) {
+    return Buffer.byteLength(document.parsed_text, "utf8");
+  }
+  return numberValue(document.file_size);
 }
 
 function stringValue(value: unknown, fallback: string) {

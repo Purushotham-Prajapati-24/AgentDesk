@@ -94,6 +94,10 @@ function numberValue(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+// Canonical source: src/lib/credits.ts:documentStorageBytes().
+// Keep this copy in sync with that function so backfill values match the
+// runtime billing fallback.  URL-type documents count parsed_text byte length;
+// all other types use file_size.
 function documentStorageBytes(document) {
   if (document.file_type === "url" && typeof document.parsed_text === "string" && document.parsed_text.trim()) {
     return Buffer.byteLength(document.parsed_text, "utf8");
