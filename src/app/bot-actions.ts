@@ -189,7 +189,13 @@ async function deleteBotDocuments(
             }
           }
 
-          await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
+          try {
+            await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
+          } catch (error: unknown) {
+            if (!isMissingResourceError(error)) {
+              throw error;
+            }
+          }
           return document;
         }),
       );
