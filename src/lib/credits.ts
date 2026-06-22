@@ -3,6 +3,7 @@
 import { Query, type Models } from "node-appwrite";
 import { createAdminClient } from "@/lib/server/appwrite";
 import { assertTenantAccess } from "@/lib/server/tenant-access";
+import { documentStorageBytes, type FileDocument } from "@/lib/server/billing-helpers";
 import { createHash } from "node:crypto";
 
 export type LedgerTransaction = {
@@ -30,12 +31,6 @@ type LedgerDocument = Models.Document & {
   transaction_type?: unknown;
   description?: unknown;
   created?: unknown;
-};
-
-type FileDocument = Models.Document & {
-  file_size?: unknown;
-  file_type?: unknown;
-  parsed_text?: unknown;
 };
 
 type TenantCreditsDocument = Models.Document & {
@@ -425,27 +420,6 @@ function tenantRollupsCollectionId() {
 
 function numberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-/**
- * Computes the storage byte contribution of a single document.
- * URL-type documents that have been ingested store their text in `parsed_text`;
- * their storage cost is the byte length of that text.  All other document types
- * use the `file_size` attribute from Appwrite storage metadata.
- *
- * IMPORTANT: This function is used by both the runtime billing path
- * (getBillingSnapshotFromFullPaginate) and the backfill script.  Keep them
- * aligned so the rollup value matches what the fallback would compute.
- */
-export function documentStorageBytes(document: FileDocument): number {
-  if (
-    document.file_type === "url" &&
-    typeof document.parsed_text === "string" &&
-    document.parsed_text.trim() !== ""
-  ) {
-    return Buffer.byteLength(document.parsed_text, "utf8");
-  }
-  return numberValue(document.file_size);
 }
 
 function stringValue(value: unknown, fallback: string) {
