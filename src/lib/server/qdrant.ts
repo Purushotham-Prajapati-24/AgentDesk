@@ -165,7 +165,8 @@ export async function deleteKnowledgePointsForBot(tenantId: string, botId: strin
   });
 
   if (!response.ok) {
-    throw new Error("Qdrant bot knowledge deletion failed.");
+    const body = await safeReadQdrantBody(response);
+    throw new Error(`Qdrant bot knowledge deletion failed (status ${response.status}): ${body}`);
   }
 
   return { skipped: false, deleted: true };
@@ -252,6 +253,21 @@ function qdrantHeaders(apiKey: string) {
     "Content-Type": "application/json",
     "api-key": apiKey,
   };
+}
+
+/**
+ * Best-effort read of a Qdrant error response body for inclusion in thrown
+ * errors.  Bodies are typically small JSON blobs; we cap at 1KB so a malformed
+ * server can't OOM us with an unbounded stream, and never throw if the read
+ * itself fails — losing the body is better than masking the original error.
+ */
+async function safeReadQdrantBody(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    return text.length > 1024 ? `${text.slice(0, 1024)}…(truncated)` : text;
+  } catch {
+    return "<unreadable response body>";
+  }
 }
 
 export const payloadIndexSchemas = {

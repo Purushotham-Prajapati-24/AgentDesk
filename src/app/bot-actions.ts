@@ -98,11 +98,24 @@ export async function deleteBot(botId: string, tenantId: string) {
     // (Qdrant, Appwrite storage, Appwrite configs) so there is no ordering
     // constraint.  Promise.allSettled ensures a failure in one branch does not
     // abort the others — partial cleanup is better than no cleanup.
-    await Promise.allSettled([
+    const cleanupResults = await Promise.allSettled([
       deleteKnowledgePointsForBot(tenantId, botId),
       deleteBotDocuments(databases, storage, tenantId, botId),
       deleteWebChatConfigs(databases, tenantId, botId),
     ]);
+
+    // Surface partial failures so they don't vanish silently.  We still proceed
+    // to delete the parent document below; a warn per branch is the right level
+    // for a best-effort cascade that already prefers partial cleanup.
+    const cleanupLabels = ["knowledge points", "bot documents", "webchat configs"];
+    cleanupResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.warn(
+          `[deleteBot] partial cleanup failure (${cleanupLabels[index]}) for bot ${botId} in tenant ${tenantId}:`,
+          getErrorMessage(result.reason),
+        );
+      }
+    });
 
     // Parent document must be deleted last to maintain referential integrity
     // even if the child cleanups partially fail.
@@ -169,9 +182,9 @@ async function deleteBotDocuments(
 
       // Record rollup deltas only for documents whose storage + DB deletion
       // both succeeded.  Prevents negative drift when partial batch fails.
-      for (let j = 0; j < results.length; j++) {
-        if (results[j].status === "fulfilled") {
-          const document = results[j].value;
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          const document = result.value;
           await recordBestEffort("document storage rollup", "bot-actions", () =>
             recordDocumentStorageRemoved(databases, stringValue(document.tenant_id, tenantId), numberValue(document.file_size, 0)),
           );

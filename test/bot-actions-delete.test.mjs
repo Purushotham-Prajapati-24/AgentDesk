@@ -87,7 +87,7 @@ test("batchProcessDocuments with zero documents returns empty", async () => {
 test("batchProcessDocuments: one failing file does not prevent siblings from being processed", async () => {
   const documentIds = ["doc_ok_1", "doc_fail", "doc_ok_2"];
 
-  const { processed, rollupIds } = await batchProcessDocuments(documentIds, async (id) => {
+  const { processed } = await batchProcessDocuments(documentIds, async (id) => {
     if (id === "doc_fail") {
       throw new Error("storage error");
     }
@@ -107,7 +107,7 @@ test("batchProcessDocuments: rollup deltas only recorded for successful deletion
     { id: "doc_ok_2", size: 300 },
   ];
 
-  const { processed, rollupIds } = await batchProcessDocuments(
+  const { rollupIds } = await batchProcessDocuments(
     documentIds.map((d) => d.id),
     async (id) => {
       const doc = documentIds.find((d) => d.id === id);
