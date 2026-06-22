@@ -4,6 +4,7 @@ import { createChunks } from "@/lib/server/chunking";
 import { WebsiteCrawler } from "@/lib/server/crawler";
 import { createEmbeddings } from "@/lib/server/embeddings";
 import { claimIngestionLock, createWorkerId, releaseIngestionLock } from "@/lib/server/ingestion-locks";
+import { recordBestEffort } from "@/lib/server/best-effort";
 import { recordDocumentStorageAdded, recordDocumentStorageRemoved } from "@/lib/server/monitor-rollups";
 import { upsertKnowledgePoints } from "@/lib/server/qdrant";
 import { requireAuthenticatedTenant } from "@/lib/server/route-auth";
@@ -180,7 +181,7 @@ async function crawlQueuedDocument(
       last_error: "",
       updated: new Date().toISOString(),
     });
-    await recordBestEffort("document storage rollup", () => {
+    await recordBestEffort("document storage rollup", "ingest", () => {
       const tenantId = stringValue(document.tenant_id, "");
       return storageDelta >= 0
         ? recordDocumentStorageAdded(databases, tenantId, storageDelta)
@@ -311,10 +312,3 @@ function getUnknownAttribute(error: unknown) {
   return error.message.match(/Unknown attribute: "([^"]+)"/)?.[1] ?? null;
 }
 
-async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
-  try {
-    await callback();
-  } catch (error) {
-    console.warn(`[documents/ingest] ${label} update failed`, error);
-  }
-}

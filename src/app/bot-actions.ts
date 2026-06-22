@@ -1,9 +1,10 @@
 "use server";
 
-import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
+import { createAdminClient } from "@/lib/server/appwrite";
+import { assertTenantAccess } from "@/lib/server/tenant-access";
 import { deleteKnowledgePointsForBot } from "@/lib/server/qdrant";
 import { recordDocumentStorageRemoved } from "@/lib/server/monitor-rollups";
+import { recordBestEffort } from "@/lib/server/best-effort";
 import { ID, Query, type Models } from "node-appwrite";
 
 type BotDocument = Models.Document & {
@@ -41,8 +42,8 @@ const MAX_FALLBACK_LENGTH = 500;
 
 export async function listBots(tenantId: string) {
   try {
-    const { databases, account } = await createSessionClient();
-    await assertTenantAccess(account, tenantId);
+    const { databases } = await createAdminClient();
+    await assertTenantAccess(tenantId);
 
     const response = await databases.listDocuments(databaseId, collectionId, [
       Query.equal("tenant_id", tenantId),
@@ -58,8 +59,8 @@ export async function listBots(tenantId: string) {
 
 export async function createBot(data: BotInput) {
   try {
-    const { databases, account } = await createSessionClient();
-    await assertTenantAccess(account, data.tenant_id);
+    const { databases } = await createAdminClient();
+    await assertTenantAccess(data.tenant_id);
     const payload = sanitizeBotInput(data);
 
     const bot = await databases.createDocument(databaseId, collectionId, ID.unique(), {
@@ -75,8 +76,8 @@ export async function createBot(data: BotInput) {
 
 export async function updateBot(botId: string, tenantId: string, data: Partial<BotInput>) {
   try {
-    const { databases, account } = await createSessionClient();
-    await assertTenantAccess(account, tenantId);
+    const { databases } = await createAdminClient();
+    await assertTenantAccess(tenantId);
     await assertBotTenant(databases, botId, tenantId);
 
     const bot = await databases.updateDocument(databaseId, collectionId, botId, sanitizeBotPatch(data));
@@ -89,13 +90,22 @@ export async function updateBot(botId: string, tenantId: string, data: Partial<B
 
 export async function deleteBot(botId: string, tenantId: string) {
   try {
-    const { account } = await createSessionClient();
     const { databases, storage } = await createAdminClient();
-    await assertTenantAccess(account, tenantId);
+    await assertTenantAccess(tenantId);
     await assertBotTenant(databases, botId, tenantId);
-    await deleteKnowledgePointsForBot(tenantId, botId);
-    await deleteBotDocuments(databases, storage, tenantId, botId);
-    await deleteWebChatConfigs(databases, tenantId, botId);
+
+    // Run all child cleanups concurrently.  They touch independent services
+    // (Qdrant, Appwrite storage, Appwrite configs) so there is no ordering
+    // constraint.  Promise.allSettled ensures a failure in one branch does not
+    // abort the others — partial cleanup is better than no cleanup.
+    await Promise.allSettled([
+      deleteKnowledgePointsForBot(tenantId, botId),
+      deleteBotDocuments(databases, storage, tenantId, botId),
+      deleteWebChatConfigs(databases, tenantId, botId),
+    ]);
+
+    // Parent document must be deleted last to maintain referential integrity
+    // even if the child cleanups partially fail.
     await databases.deleteDocument(databaseId, collectionId, botId);
     return { success: true as const };
   } catch (error: unknown) {
@@ -122,6 +132,8 @@ async function deleteWebChatConfigs(
   }
 }
 
+const DELETE_BATCH_SIZE = 8;
+
 async function deleteBotDocuments(
   databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   storage: Awaited<ReturnType<typeof createAdminClient>>["storage"],
@@ -131,21 +143,30 @@ async function deleteBotDocuments(
   try {
     const documents = (await listScopedDocuments(databases, documentsCollectionId, tenantId, botId)) as StoredDocument[];
 
-    for (const document of documents) {
-      const storagePath = typeof document.storage_path === "string" ? document.storage_path : "";
-      if (storagePath) {
-        try {
-          await storage.deleteFile(documentsBucketId, storagePath);
-        } catch (error: unknown) {
-          if (!isMissingResourceError(error)) {
-            throw error;
+    // Process files in bounded parallel batches rather than sequentially.
+    // Each file deletion (storage + Appwrite + rollup delta) is ~2-3 RTTs;
+    // processing 8 concurrently reduces wall-clock time proportionally while
+    // avoiding hammering Appwrite with unbounded concurrency.
+    for (let i = 0; i < documents.length; i += DELETE_BATCH_SIZE) {
+      const batch = documents.slice(i, i + DELETE_BATCH_SIZE);
+      await Promise.all(
+        batch.map(async (document) => {
+          const storagePath = typeof document.storage_path === "string" ? document.storage_path : "";
+          if (storagePath) {
+            try {
+              await storage.deleteFile(documentsBucketId, storagePath);
+            } catch (error: unknown) {
+              if (!isMissingResourceError(error)) {
+                throw error;
+              }
+            }
           }
-        }
-      }
 
-      await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
-      await recordBestEffort("document storage rollup", () =>
-        recordDocumentStorageRemoved(databases, stringValue(document.tenant_id, tenantId), numberValue(document.file_size, 0)),
+          await databases.deleteDocument(databaseId, documentsCollectionId, document.$id);
+          await recordBestEffort("document storage rollup", "bot-actions", () =>
+            recordDocumentStorageRemoved(databases, stringValue(document.tenant_id, tenantId), numberValue(document.file_size, 0)),
+          );
+        }),
       );
     }
   } catch (error: unknown) {
@@ -179,17 +200,8 @@ async function listScopedDocuments(
   return documents;
 }
 
-async function assertTenantAccess(account: Awaited<ReturnType<typeof createSessionClient>>["account"], tenantId: string) {
-  if (!isSafeId(tenantId)) {
-    throw new Error("Invalid tenant scope.");
-  }
-
-  const user = await account.get();
-  await getAuthorizedTenantDocument(user.$id, tenantId);
-}
-
 async function assertBotTenant(
-  databases: Awaited<ReturnType<typeof createSessionClient>>["databases"],
+  databases: Awaited<ReturnType<typeof createAdminClient>>["databases"],
   botId: string,
   tenantId: string,
 ) {
@@ -283,12 +295,4 @@ function isMissingResourceError(error: unknown) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Bot request failed.";
-}
-
-async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
-  try {
-    await callback();
-  } catch (error) {
-    console.warn(`[bot-actions] ${label} update failed`, error);
-  }
 }

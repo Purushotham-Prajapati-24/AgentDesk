@@ -151,7 +151,12 @@ export async function deleteKnowledgePointsForBot(tenantId: string, botId: strin
     return { skipped: true, deleted: false };
   }
 
-  const response = await fetch(`${config.url}/collections/${activeCollection()}/points/delete?wait=true`, {
+  // wait=false: this is a user-triggered bot deletion. Blocking on Qdrant
+  // segment compaction adds latency the caller never benefits from — the bot
+  // document is gone either way, and the points are filtered by a stable
+  // (tenant_id, bot_id) tuple so async deletion is correct regardless of
+  // whether the parent doc still exists.
+  const response = await fetch(`${config.url}/collections/${activeCollection()}/points/delete?wait=false`, {
     method: "POST",
     headers: qdrantHeaders(config.apiKey),
     body: JSON.stringify({

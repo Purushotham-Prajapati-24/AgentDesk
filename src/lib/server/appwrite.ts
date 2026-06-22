@@ -53,24 +53,37 @@ export async function createGuestClient() {
   };
 }
 
+/**
+ * Module-level admin client singleton.
+ *
+ * The admin client carries only the API key (no per-request cookies), so it is
+ * safe to share across calls within the same Node.js process.  Reusing the
+ * underlying Client avoids repeated object construction on every server action
+ * while keeping the per-request session client unchanged.
+ */
+let adminClient: {
+  account: Account;
+  databases: Databases;
+  storage: Storage;
+  users: Users;
+} | null = null;
+
 export async function createAdminClient() {
+  if (adminClient) {
+    return adminClient;
+  }
+
   const client = new Client()
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
     .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "")
     .setKey(process.env.APPWRITE_API_KEY || "");
 
-  return {
-    get account() {
-      return new Account(client);
-    },
-    get databases() {
-      return new Databases(client);
-    },
-    get storage() {
-      return new Storage(client);
-    },
-    get users() {
-      return new Users(client);
-    },
+  adminClient = {
+    account: new Account(client),
+    databases: new Databases(client),
+    storage: new Storage(client),
+    users: new Users(client),
   };
+
+  return adminClient;
 }

@@ -5,6 +5,7 @@ import { createHandoffToken } from "@/lib/server/handoff-token";
 import { streamCompletionWithFallback } from "@/lib/server/llm-providers";
 import { retrieveContextChunks } from "@/lib/server/retrieval";
 import { recordCreditLedgerEntry, recordMessageCreated, recordSessionCreated } from "@/lib/server/monitor-rollups";
+import { recordBestEffort } from "@/lib/server/best-effort";
 
 type ChatRequest = {
   tenant_id: string;
@@ -297,7 +298,7 @@ async function debitCredits(
     description: `Chat debit for bot ${botId} session ${sessionToken}`,
     created: new Date().toISOString(),
   });
-  await recordBestEffort("credit ledger rollup", () => recordCreditLedgerEntry(databases, tenantId, debit));
+  await recordBestEffort("credit ledger rollup", "chat", () => recordCreditLedgerEntry(databases, tenantId, debit));
 }
 
 async function persistCustomerMessage(
@@ -336,7 +337,7 @@ async function persistMessage(
       tokens_used: Math.max(0, tokenCount),
       created: createdAt,
     });
-    await recordBestEffort("message rollup", () => recordMessageCreated(databases, session, sender, content, createdAt));
+    await recordBestEffort("message rollup", "chat", () => recordMessageCreated(databases, session, sender, content, createdAt));
     return doc.$id;
   } catch (err) {
     // Log the error so silent failures are visible in dev, but never crash chat delivery.
@@ -366,7 +367,7 @@ async function ensureSession(
     created,
     updated: created,
   })) as SessionDocument;
-  await recordBestEffort("session rollup", () => recordSessionCreated(databases, createdSession));
+  await recordBestEffort("session rollup", "chat", () => recordSessionCreated(databases, createdSession));
   return createdSession;
 }
 
@@ -474,14 +475,6 @@ function mentionsSystemInternals(message: string) {
 
 function estimateTokens(text: string) {
   return Math.ceil(text.length / 4);
-}
-
-async function recordBestEffort(label: string, callback: () => Promise<unknown>) {
-  try {
-    await callback();
-  } catch (error) {
-    console.warn(`[chat] ${label} update failed`, error);
-  }
 }
 
 function databaseId() {
