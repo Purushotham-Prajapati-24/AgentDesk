@@ -206,8 +206,11 @@ async function readTenantRollup(
       document_storage_bytes: numberValue(document.document_storage_bytes),
       balance_reconciled_at: typeof document.balance_reconciled_at === "string" ? document.balance_reconciled_at : null,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (errorCode(error) === 404) {
+      return null;
+    }
+    throw error;
   }
 }
 
@@ -259,9 +262,11 @@ async function persistBillingRollup(
       });
     } catch (createError) {
       // Two concurrent first-time reconcile requests may both reach createDocument.
-      // The second gets a 409 (document already created by the winner).  This is
-      // safe — swallow the 409; the rollup will be refreshed on next request.
-      if (errorCode(createError) !== 409) {
+      // The second gets a 409 (document already created by the winner).
+      // To prevent losing the most-recent computed values, update the document on 409.
+      if (errorCode(createError) === 409) {
+        await databases.updateDocument(databaseId(), tenantRollupsCollectionId(), documentId, data);
+      } else {
         throw createError;
       }
     }

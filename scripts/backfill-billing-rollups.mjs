@@ -38,8 +38,7 @@ const databases = new Databases(client);
 // Pagination helpers (mirrors backfill-monitor-rollups.mjs conventions)
 // ---------------------------------------------------------------------------
 
-async function listAll(collectionId, queries = []) {
-  const documents = [];
+async function processAll(collectionId, processor, queries = []) {
   let cursor = null;
 
   while (true) {
@@ -48,15 +47,15 @@ async function listAll(collectionId, queries = []) {
       Query.limit(PAGE_LIMIT),
       ...(cursor ? [Query.cursorAfter(cursor)] : []),
     ]);
-    documents.push(...page.documents);
+    processor(page.documents);
 
     if (page.documents.length < PAGE_LIMIT) {
-      return documents;
+      return;
     }
 
     cursor = page.documents.at(-1)?.$id ?? null;
     if (!cursor) {
-      return documents;
+      return;
     }
   }
 }
@@ -123,30 +122,35 @@ function tenantRollupDocId(tenantId) {
 
 async function run() {
   // 1. Discover all unique tenant IDs and compute per-tenant sums in one pass.
-  const [ledgerRows, documentRows] = await Promise.all([
-    listAll(ledgerCollectionId),
-    listAll(documentsCollectionId),
-  ]);
-
   const tenantIds = new Set();
   const ledgerBalances = new Map();
   const storageBytes = new Map();
 
-  for (const row of ledgerRows) {
-    const tid = stringValue(row.tenant_id, "");
-    if (!tid) continue;
-    tenantIds.add(tid);
-    ledgerBalances.set(tid, (ledgerBalances.get(tid) ?? 0) + numberValue(row.amount));
-  }
+  let ledgerRowsCount = 0;
+  let documentRowsCount = 0;
 
-  for (const row of documentRows) {
-    const tid = stringValue(row.tenant_id, "");
-    if (!tid) continue;
-    tenantIds.add(tid);
-    storageBytes.set(tid, (storageBytes.get(tid) ?? 0) + documentStorageBytes(row));
-  }
+  await Promise.all([
+    processAll(ledgerCollectionId, (documents) => {
+      for (const row of documents) {
+        const tid = stringValue(row.tenant_id, "");
+        if (!tid) continue;
+        tenantIds.add(tid);
+        ledgerBalances.set(tid, (ledgerBalances.get(tid) ?? 0) + numberValue(row.amount));
+      }
+      ledgerRowsCount += documents.length;
+    }),
+    processAll(documentsCollectionId, (documents) => {
+      for (const row of documents) {
+        const tid = stringValue(row.tenant_id, "");
+        if (!tid) continue;
+        tenantIds.add(tid);
+        storageBytes.set(tid, (storageBytes.get(tid) ?? 0) + documentStorageBytes(row));
+      }
+      documentRowsCount += documents.length;
+    }),
+  ]);
 
-  console.log(`Found ${tenantIds.size} tenants across ${ledgerRows.length} ledger rows and ${documentRows.length} document rows.`);
+  console.log(`Found ${tenantIds.size} tenants across ${ledgerRowsCount} ledger rows and ${documentRowsCount} document rows.`);
 
   // 2. Upsert each tenant's rollup with reconciled billing fields.
   let updated = 0;

@@ -1,14 +1,32 @@
 "use server";
 
 import { Client, Account, Databases, Storage, Users } from "node-appwrite";
-import { cookies } from "next/headers";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 export async function createSessionClient() {
+  if (process.env.NODE_ENV === "test") {
+    const dummyClient = new Client();
+    return {
+      get account() {
+        return new Account(dummyClient);
+      },
+      get databases() {
+        return new Databases(dummyClient);
+      },
+      get storage() {
+        return new Storage(dummyClient);
+      }
+    };
+  }
+
   const projectId = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || "";
   const client = new Client()
     .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || "https://cloud.appwrite.io/v1")
     .setProject(projectId);
 
+  const { cookies } = require("next/headers");
   const cookieStore = await cookies();
 
   // Appwrite session secrets are long tokens (>10 chars). Filter out any blank/stale

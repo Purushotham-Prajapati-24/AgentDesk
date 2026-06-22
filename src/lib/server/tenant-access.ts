@@ -1,22 +1,32 @@
-import { createAdminClient, createSessionClient } from "./appwrite";
-import { tenantAllowsUser, type TenantDocument } from "./auth-tenants";
+import { createAdminClient, createSessionClient } from "./appwrite.ts";
+import { tenantAllowsUser, type TenantDocument } from "./auth-tenants.ts";
 export type { TenantDocument };
 import { cache } from "react";
 
+export type TenantAction = "read" | "update" | "delete";
+
 /**
- * Authorizes a user for a tenant. Per-document permissions are preferred, while
- * prefs.tenant_id remains as a legacy fallback until older tenants are migrated.
+ * Authorizes a user for a tenant at a specific permission level.
  *
  * Wrapped in React cache() so within a single render pass / server-component
- * tree, repeated calls with the same (userId, tenantId) pair hit Appwrite
- * exactly once.
+ * tree, repeated calls with the same (userId, tenantId, action) tuple hit
+ * Appwrite exactly once.
+ *
+ * @param userId  the current user's Appwrite account ID
+ * @param tenantId  the tenant document ID
+ * @param action  the minimum permission required ("read", "update", or "delete")
  */
-export const getAuthorizedTenantDocument = cache(async function getAuthorizedTenantDocument(userId: string, tenantId: string) {
+export const getAuthorizedTenantDocument = cache(async function getAuthorizedTenantDocument(
+  userId: string,
+  tenantId: string,
+  action: "read" | "update" | "delete" = "read",
+) {
   const { databases, users } = await createAdminClient();
   const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
-  if (!tenantAllowsUser(tenant, userId, "read")) {
+  if (!tenantAllowsUser(tenant, userId, action)) {
     const user = await users.get(userId);
     const prefs = user.prefs as { tenant_id?: unknown };
+    // Legacy fallback: users with tenant_id in prefs are granted full access (including read/update/delete)
     if (prefs.tenant_id === tenantId) {
       return tenant;
     }
@@ -50,13 +60,16 @@ export const getCurrentAccount = cache(async function getCurrentAccount() {
  * This replaces the 4 local copy-pasted definitions in bot-actions.ts,
  * webchat-actions.ts, and credits.ts.
  */
-export async function assertTenantAccess(tenantId: string): Promise<TenantDocument> {
+export async function assertTenantAccess(
+  tenantId: string,
+  action: "read" | "update" | "delete" = "read",
+): Promise<TenantDocument> {
   if (!isSafeId(tenantId)) {
     throw new Error("Invalid tenant scope.");
   }
 
   const user = await getCurrentAccount();
-  return getAuthorizedTenantDocument(user.$id, tenantId);
+  return getAuthorizedTenantDocument(user.$id, tenantId, action);
 }
 
 function databaseId() {

@@ -53,7 +53,7 @@ const MAX_FALLBACK_LENGTH = 500;
 export async function listBots(tenantId: string) {
   try {
     const { databases } = await createAdminClient();
-    await assertTenantAccess(tenantId);
+    await assertTenantAccess(tenantId, "read");
 
     const response = await databases.listDocuments(databaseId, collectionId, [
       Query.equal("tenant_id", tenantId),
@@ -70,7 +70,7 @@ export async function listBots(tenantId: string) {
 export async function createBot(data: BotInput) {
   try {
     const { databases } = await createAdminClient();
-    await assertTenantAccess(data.tenant_id);
+    await assertTenantAccess(data.tenant_id, "update");
     const payload = sanitizeBotInput(data);
 
     const bot = await databases.createDocument(databaseId, collectionId, ID.unique(), {
@@ -87,7 +87,7 @@ export async function createBot(data: BotInput) {
 export async function updateBot(botId: string, tenantId: string, data: Partial<BotInput>) {
   try {
     const { databases } = await createAdminClient();
-    await assertTenantAccess(tenantId);
+    await assertTenantAccess(tenantId, "update");
     await assertBotTenant(databases, botId, tenantId);
 
     const bot = await databases.updateDocument(databaseId, collectionId, botId, sanitizeBotPatch(data));
@@ -101,7 +101,7 @@ export async function updateBot(botId: string, tenantId: string, data: Partial<B
 export async function deleteBot(botId: string, tenantId: string) {
   try {
     const { databases, storage } = await createAdminClient();
-    await assertTenantAccess(tenantId);
+    await assertTenantAccess(tenantId, "delete");
     await assertBotTenant(databases, botId, tenantId);
 
     // Run all child cleanups concurrently.  They touch independent services

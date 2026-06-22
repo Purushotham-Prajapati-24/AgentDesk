@@ -60,7 +60,7 @@ export async function listWebChatBots(tenantId: string): Promise<
 > {
   try {
     const { databases } = await createAdminClient();
-    await assertTenantAccess(tenantId);
+    await assertTenantAccess(tenantId, "read");
 
     const [response, configResponse] = await Promise.all([
       databases.listDocuments(databaseId, botsCollectionId, [
@@ -106,7 +106,7 @@ export async function saveWebChatBotConfig({
 }): Promise<{ success: true; config: WebChatConfig } | { success: false; error: string }> {
   try {
     const { databases } = await createAdminClient();
-    await assertTenantAccess(tenantId);
+    await assertTenantAccess(tenantId, "update");
     await assertBotTenant(databases, botId, tenantId);
 
     const parsedConfig = WebChatConfigSchema.parse({
