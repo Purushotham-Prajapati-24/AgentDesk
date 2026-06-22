@@ -33,6 +33,9 @@ export async function loginWithMagicLink(email: string, nextPath?: string) {
   try {
     const headersList = await headers();
     const origin = resolveAppOrigin(headersList);
+    // Defense in depth: callers (login page, AuthAwareCta) already
+    // sanitize `nextPath`, but re-sanitizing here means a future caller
+    // that forgets won't quietly open-redirect.
     const safeNext = sanitizeNextPath(nextPath);
     const verifyUrl = safeNext
       ? `${origin}/verify?next=${encodeURIComponent(safeNext)}`

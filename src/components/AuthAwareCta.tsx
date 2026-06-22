@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/app/auth-actions";
 import {
@@ -71,7 +71,13 @@ export function AuthAwareCta({
   const inFlightRef = useRef(false);
   const isMountedRef = useRef(true);
 
-  const safeDest = sanitizeNextPath(authenticatedHref) ?? DEFAULT_AUTHENTICATED_DESTINATION;
+  // useMemo stabilizes the value so the useCallback below doesn't get
+  // rebuilt on every render. The function is cheap, but the callback
+  // reference matters for downstream effects that depend on it.
+  const safeDest = useMemo(
+    () => sanitizeNextPath(authenticatedHref) ?? DEFAULT_AUTHENTICATED_DESTINATION,
+    [authenticatedHref],
+  );
 
   const handleClick = useCallback(
     async (event: MouseEvent<HTMLButtonElement>) => {

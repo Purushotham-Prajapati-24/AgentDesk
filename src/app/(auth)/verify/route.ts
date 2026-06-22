@@ -42,10 +42,6 @@ export async function POST(request: NextRequest) {
     sanitizeNextPath(stringValue(formData.get("next"))) ?? DEFAULT_AUTHENTICATED_DESTINATION;
 
   if (!userId || !secret) {
-    // 303 See Other: forces the browser to GET /login on the redirect
-    // target. 307 would preserve POST and Next.js page routes only
-    // accept GET, so the user would see a 405 instead of the login
-    // form with the error message.
     return redirectToLogin(request, "invalid_magic_link", 303, nextPath);
   }
 
