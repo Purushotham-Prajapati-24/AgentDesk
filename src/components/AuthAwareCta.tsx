@@ -1,49 +1,14 @@
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { getCurrentUser } from "@/app/auth-actions";
-
-const DEFAULT_AUTHENTICATED_DESTINATION = "/bots";
-const DEFAULT_LOGIN_PATH = "/login";
-
-/**
- * Validates a post-login redirect target.
- *
- * Only same-origin, protocol-relative, or root-relative paths are accepted.
- * Anything else (full URLs, javascript:, data:, etc.) is rejected so an
- * attacker can't use the login redirect as an open-redirect vector.
- */
-function sanitizeNextPath(value: string | null | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  // Must start with "/" and not be a protocol-relative "//host" URL.
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
-    return null;
-  }
-
-  // Reject embedded newlines / control characters (header-splitting guard).
-  if (/[\r\n\t\0]/.test(trimmed)) {
-    return null;
-  }
-
-  return trimmed;
-}
-
-function buildLoginHref(nextPath: string): string {
-  const safeNext = sanitizeNextPath(nextPath);
-  if (!safeNext) {
-    return DEFAULT_LOGIN_PATH;
-  }
-  return `${DEFAULT_LOGIN_PATH}?next=${encodeURIComponent(safeNext)}`;
-}
+import {
+  buildLoginHref,
+  DEFAULT_AUTHENTICATED_DESTINATION,
+  DEFAULT_LOGIN_PATH,
+  sanitizeNextPath,
+} from "@/lib/auth-redirect";
 
 const VISUAL_AUDIT_ENABLED =
   process.env.NODE_ENV === "development" &&
@@ -52,7 +17,13 @@ const VISUAL_AUDIT_ENABLED =
 type AuthAwareCtaProps = {
   /** Where to send authenticated users. Must be a same-origin path. */
   authenticatedHref?: string;
-  /** Where to send unauthenticated users. Defaults to /login. */
+  /**
+   * Where to send unauthenticated users. Defaults to /login.
+   *
+   * When you supply a custom `loginHref`, you opt out of the automatic
+   * `?next=` round-trip — you are responsible for preserving the
+   * destination yourself (e.g. by appending `&next=…` to the URL).
+   */
   loginHref?: string;
   /** Optional aria-label for screen readers. */
   ariaLabel?: string;
@@ -61,10 +32,10 @@ type AuthAwareCtaProps = {
   /** Optional className override while the click is in flight. */
   busyClassName?: string;
   /** Inline style applied to the rendered button. */
-  style?: React.CSSProperties;
+  style?: CSSProperties;
   /** Optional busy-state inline style override. */
-  busyStyle?: React.CSSProperties;
-  children: React.ReactNode;
+  busyStyle?: CSSProperties;
+  children: ReactNode;
 };
 
 /**
@@ -79,8 +50,11 @@ type AuthAwareCtaProps = {
  *   - getCurrentUser() throws / network error         → /login?next=<dest>
  *   - VISUAL_AUDIT mode is enabled (dev only)        → straight to /bots
  *
- * In-flight clicks are blocked (disabled + spinner state) and an isActive
- * ref guards against unmount-during-fetch races.
+ * Concurrency:
+ *   - `inFlightRef` is a synchronous guard so a fast double-click cannot
+ *     fire two `getCurrentUser()` calls before React commits the
+ *     `disabled` state to the DOM.
+ *   - `isMountedRef` prevents state updates after unmount-during-fetch.
  */
 export function AuthAwareCta({
   authenticatedHref = DEFAULT_AUTHENTICATED_DESTINATION,
@@ -94,18 +68,18 @@ export function AuthAwareCta({
 }: AuthAwareCtaProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const inFlightRef = useRef(false);
   const isMountedRef = useRef(true);
 
   const safeDest = sanitizeNextPath(authenticatedHref) ?? DEFAULT_AUTHENTICATED_DESTINATION;
 
   const handleClick = useCallback(
-    async (event: React.MouseEvent<HTMLButtonElement>) => {
+    async (event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
-      if (busy) {
+      if (inFlightRef.current) {
         return;
       }
-
-      isMountedRef.current = true;
+      inFlightRef.current = true;
       setBusy(true);
 
       try {
@@ -134,15 +108,16 @@ export function AuthAwareCta({
         const fallbackHref = loginHref ?? buildLoginHref(safeDest);
         router.push(sanitizeNextPath(fallbackHref) ?? DEFAULT_LOGIN_PATH);
       } finally {
+        inFlightRef.current = false;
         if (isMountedRef.current) {
           setBusy(false);
         }
       }
     },
-    [busy, loginHref, router, safeDest],
+    [loginHref, router, safeDest],
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };

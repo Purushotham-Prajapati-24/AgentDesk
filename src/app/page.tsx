@@ -95,7 +95,7 @@ export default function Home() {
             <AuthAwareCta
               ariaLabel="Enter AgentDesk"
               busyClassName="inline-flex min-h-9 cursor-wait items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#22c55e] to-[#4ade80] px-4 text-xs font-semibold text-white opacity-80 shadow-[0_12px_28px_rgba(34,197,94,0.22)]"
-              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#22c55e] to-[#4ade80] px-4 text-xs font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.22)] transition hover:-translate-y-0.5 hover:from-[#16a34a] hover:to-[#22c55e] active:scale-[0.98] disabled:cursor-wait disabled:opacity-80 disabled:hover:translate-y-0"
+              className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#22c55e] to-[#4ade80] px-4 text-xs font-semibold text-white shadow-[0_12px_28px_rgba(34,197,94,0.22)] transition hover:-translate-y-0.5 hover:from-[#16a34a] hover:to-[#22c55e] active:scale-[0.98]"
             >
               <span>Enter</span>
               <ArrowRight aria-hidden="true" className="h-4 w-4" />
@@ -109,7 +109,7 @@ export default function Home() {
               <AuthAwareCta
                 ariaLabel="Open workspace"
                 busyClassName="inline-flex h-10 w-full cursor-wait items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#1456f0] to-[#0099ff] px-3 text-xs font-semibold text-white opacity-80 shadow-[0_16px_36px_rgba(20,86,240,0.24)] sm:h-12 sm:px-6 sm:text-sm"
-                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#1456f0] to-[#0099ff] px-3 text-xs font-semibold text-white shadow-[0_16px_36px_rgba(20,86,240,0.24)] transition hover:-translate-y-0.5 hover:from-[#114cd6] hover:to-[#38bdf8] active:scale-[0.98] disabled:cursor-wait disabled:opacity-80 disabled:hover:translate-y-0 sm:h-12 sm:px-6 sm:text-sm"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full border border-transparent bg-gradient-to-r from-[#1456f0] to-[#0099ff] px-3 text-xs font-semibold text-white shadow-[0_16px_36px_rgba(20,86,240,0.24)] transition hover:-translate-y-0.5 hover:from-[#114cd6] hover:to-[#38bdf8] active:scale-[0.98] sm:h-12 sm:px-6 sm:text-sm"
               >
                 <span>Open workspace</span>
                 <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
@@ -244,7 +244,7 @@ export default function Home() {
               borderColor: "var(--marketing-inverse)",
               color: "var(--marketing-on-inverse)",
             }}
-            className="marketing-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-6 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-wait disabled:opacity-80 disabled:hover:translate-y-0"
+            className="marketing-cta inline-flex min-h-11 items-center justify-center gap-2 rounded-full border px-6 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98]"
             style={{
               backgroundColor: "var(--marketing-inverse)",
               borderColor: "var(--marketing-inverse)",
