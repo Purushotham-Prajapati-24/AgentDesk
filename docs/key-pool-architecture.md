@@ -9,25 +9,25 @@ graph TD
   Start([Start Request Loop]) --> InitAttempted[Initialize attemptedKeys Set]
   InitAttempted --> GetNextKey{Call pool.next}
   
-  GetNextKey -- Key is null OR already attempted --> FailExhausted[Throw "All keys exhausted" Error]
+  GetNextKey -- "Key is null OR already attempted" --> FailExhausted[Throw All Keys Exhausted Error]
   
-  GetNextKey -- Valid Key returned --> AddAttempted[Add key to attemptedKeys]
+  GetNextKey -- "Valid Key returned" --> AddAttempted[Add key to attemptedKeys]
   
   AddAttempted --> ExecuteRequest[Execute API Request]
   
-  ExecuteRequest -- Success --> ReturnSuccess([Return Result / Stream Success])
+  ExecuteRequest -- "Success" --> ReturnSuccess([Return Result / Stream Success])
   
-  ExecuteRequest -- Error Catch --> LogError[Log masked key index & error message]
+  ExecuteRequest -- "Error Catch" --> LogError[Log masked key index and error message]
   
   LogError --> YieldedCheck{Did stream yield any tokens already?}
   
-  YieldedCheck -- Yes --> ThrowSanitized[Throw Sanitized Upstream Error<br>to avoid leaking raw credentials]
+  YieldedCheck -- "Yes" --> ThrowSanitized[Throw Sanitized Upstream Error]
   
-  YieldedCheck -- No --> InspectStatus{Inspect HTTP Status}
+  YieldedCheck -- "No" --> InspectStatus{Inspect HTTP Status}
   
-  InspectStatus -- "429 (Rate Limit)" --> MarkRateLimited["Call markRateLimited()<br>Cooldown = Retry-After or 65s<br>Save to cooldowns Map"]
-  InspectStatus -- "401 / 403 (Auth Error)" --> MarkDead["Call markDead()<br>Cooldown = 24 hours<br>Save to cooldowns Map"]
-  InspectStatus -- "Other Errors (Network, etc.)" --> MarkGeneric["Call markRateLimited()<br>Cooldown = 10s buffer<br>Save to cooldowns Map"]
+  InspectStatus -- "429 Rate Limit" --> MarkRateLimited[Call markRateLimited / Save cooldown to Map]
+  InspectStatus -- "401/403 Auth Error" --> MarkDead[Call markDead / Save 24h skip to Map]
+  InspectStatus -- "Other Error" --> MarkGeneric[Call markRateLimited / Save 10s cooldown to Map]
   
   MarkRateLimited --> LoopNext[Loop back to pool.next]
   MarkDead --> LoopNext
