@@ -11,9 +11,7 @@ graph TD
   
   GetNextKey -- "Key is null OR already attempted" --> FailExhausted[Throw All Keys Exhausted Error]
   
-  GetNextKey -- "Valid Key returned" --> AddAttempted[Add key to attemptedKeys]
-  
-  AddAttempted --> ExecuteRequest[Execute API Request]
+  GetNextKey -- "Valid Key returned" --> ExecuteRequest[Execute API Request]
   
   ExecuteRequest -- "Success" --> ReturnSuccess([Return Result / Stream Success])
   
@@ -27,11 +25,15 @@ graph TD
   
   InspectStatus -- "429 Rate Limit" --> MarkRateLimited[Call markRateLimited / Save cooldown to Map]
   InspectStatus -- "401/403 Auth Error" --> MarkDead[Call markDead / Save 24h skip to Map]
-  InspectStatus -- "Other Error" --> MarkGeneric[Call markRateLimited / Save 10s cooldown to Map]
+  InspectStatus -- "5xx Upstream Error" --> WaitRetry[Wait 1s / Retry request]
+  InspectStatus -- "Other Generic Error" --> MarkGeneric[Call markRateLimited / Save 10s cooldown to Map]
   
-  MarkRateLimited --> LoopNext[Loop back to pool.next]
-  MarkDead --> LoopNext
-  MarkGeneric --> LoopNext
+  MarkRateLimited --> AddAttemptedKey[Add key to attemptedKeys]
+  MarkDead --> AddAttemptedKey
+  MarkGeneric --> AddAttemptedKey
+  
+  AddAttemptedKey --> LoopNext[Loop back to pool.next]
+  WaitRetry --> LoopNext
   
   LoopNext --> GetNextKey
 ```
