@@ -14,6 +14,7 @@
 /.next/
 /out/
 /build
+/dist
 
 # Workspace package build output (tsup, rollup, esbuild)
 packages/*/dist/
