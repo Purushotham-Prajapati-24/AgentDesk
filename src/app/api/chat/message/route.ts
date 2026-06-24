@@ -386,7 +386,10 @@ async function findSession(
 }
 
 function buildSystemPrompt(bot: BotDocument, contextChunks: string[], fallbackMessage: string) {
+function buildSystemPrompt(bot: BotDocument, contextChunks: string[], fallbackMessage: string) {
   const botName = stringValue(bot.name, "AgentDesk Support");
+  const customInstructions = stringValue(bot.system_prompt, "Answer customer support questions clearly and concisely.");
+
   const customInstructions = stringValue(
     bot.system_prompt,
     "Answer customer support questions clearly and concisely."
