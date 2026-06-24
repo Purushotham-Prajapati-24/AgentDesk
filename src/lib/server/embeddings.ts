@@ -18,12 +18,16 @@ export const EMBEDDING_DIMENSIONS = 768;
 
 export async function createEmbedding(input: string) {
   const attemptedKeys = new Set<string>();
+  let attempts = 0;
   while (true) {
     const key = geminiPool.next();
     if (!key || attemptedKeys.has(key)) {
       throw new Error("All Gemini keys are exhausted or rate-limited for embedding.");
     }
-    attemptedKeys.add(key);
+    attempts++;
+    if (attempts > 10) {
+      throw new Error("Too many transient failures. All Gemini keys failed to execute embedding.");
+    }
 
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=${key}`, {
@@ -63,12 +67,20 @@ export async function createEmbedding(input: string) {
         const retryAfterHeader = err.headers?.get("retry-after") ?? null;
         const retryAfterSecs = parseRetryAfter(retryAfterHeader);
         geminiPool.markRateLimited(key, retryAfterSecs);
+        attemptedKeys.add(key);
         continue;
       } else if (status === 401 || status === 403) {
         geminiPool.markDead(key);
+        attemptedKeys.add(key);
+        continue;
+      } else if (status && status >= 500) {
+        // Upstream transient error (5xx). Do NOT mark key rate-limited.
+        // Wait 1 second and retry (can use same key if it's still available in pool, or next key).
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       } else {
         geminiPool.markRateLimited(key, 10);
+        attemptedKeys.add(key);
         continue;
       }
     }
@@ -81,12 +93,16 @@ export async function createEmbeddings(inputs: string[]) {
   }
 
   const attemptedKeys = new Set<string>();
+  let attempts = 0;
   while (true) {
     const key = geminiPool.next();
     if (!key || attemptedKeys.has(key)) {
       throw new Error("All Gemini keys are exhausted or rate-limited for batch embedding.");
     }
-    attemptedKeys.add(key);
+    attempts++;
+    if (attempts > 10) {
+      throw new Error("Too many transient failures. All Gemini keys failed to execute batch embedding.");
+    }
 
     try {
       const requests = inputs.map((input) => ({
@@ -128,12 +144,20 @@ export async function createEmbeddings(inputs: string[]) {
         const retryAfterHeader = err.headers?.get("retry-after") ?? null;
         const retryAfterSecs = parseRetryAfter(retryAfterHeader);
         geminiPool.markRateLimited(key, retryAfterSecs);
+        attemptedKeys.add(key);
         continue;
       } else if (status === 401 || status === 403) {
         geminiPool.markDead(key);
+        attemptedKeys.add(key);
+        continue;
+      } else if (status && status >= 500) {
+        // Upstream transient error (5xx). Do NOT mark key rate-limited.
+        // Wait 1 second and retry.
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         continue;
       } else {
         geminiPool.markRateLimited(key, 10);
+        attemptedKeys.add(key);
         continue;
       }
     }

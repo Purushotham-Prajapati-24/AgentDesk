@@ -140,12 +140,16 @@ function groqProvider(): Provider {
     available: () => groqPool.available() > 0,
     stream: async function* (messages, signal) {
       const attemptedKeys = new Set<string>();
+      let attempts = 0;
       while (true) {
         const key = groqPool.next();
         if (!key || attemptedKeys.has(key)) {
           throw new Error("All Groq keys are exhausted, rate-limited, or failed.");
         }
-        attemptedKeys.add(key);
+        attempts++;
+        if (attempts > 10) {
+          throw new Error("Too many transient failures. All Groq keys failed to execute stream.");
+        }
 
         let yieldedAny = false;
         try {
@@ -174,12 +178,20 @@ function groqProvider(): Provider {
             const retryAfterHeader = err.headers?.get("retry-after") ?? null;
             const retryAfterSecs = parseRetryAfter(retryAfterHeader);
             groqPool.markRateLimited(key, retryAfterSecs);
+            attemptedKeys.add(key);
             continue;
           } else if (status === 401 || status === 403) {
             groqPool.markDead(key);
+            attemptedKeys.add(key);
+            continue;
+          } else if (status && status >= 500) {
+            // Upstream transient error (5xx). Do NOT mark key rate-limited.
+            // Wait 1 second and retry.
+            await new Promise((resolve) => setTimeout(resolve, 1000));
             continue;
           } else {
             groqPool.markRateLimited(key, 10);
+            attemptedKeys.add(key);
             continue;
           }
         }
@@ -209,12 +221,16 @@ function geminiProvider(): Provider {
     available: () => geminiPool.available() > 0,
     stream: async function* (messages, signal) {
       const attemptedKeys = new Set<string>();
+      let attempts = 0;
       while (true) {
         const key = geminiPool.next();
         if (!key || attemptedKeys.has(key)) {
           throw new Error("All Gemini keys are exhausted, rate-limited, or failed.");
         }
-        attemptedKeys.add(key);
+        attempts++;
+        if (attempts > 10) {
+          throw new Error("Too many transient failures. All Gemini keys failed to execute stream.");
+        }
 
         let yieldedAny = false;
         try {
@@ -237,12 +253,20 @@ function geminiProvider(): Provider {
             const retryAfterHeader = err.headers?.get("retry-after") ?? null;
             const retryAfterSecs = parseRetryAfter(retryAfterHeader);
             geminiPool.markRateLimited(key, retryAfterSecs);
+            attemptedKeys.add(key);
             continue;
           } else if (status === 401 || status === 403) {
             geminiPool.markDead(key);
+            attemptedKeys.add(key);
+            continue;
+          } else if (status && status >= 500) {
+            // Upstream transient error (5xx). Do NOT mark key rate-limited.
+            // Wait 1 second and retry.
+            await new Promise((resolve) => setTimeout(resolve, 1000));
             continue;
           } else {
             geminiPool.markRateLimited(key, 10);
+            attemptedKeys.add(key);
             continue;
           }
         }

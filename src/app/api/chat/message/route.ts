@@ -294,6 +294,7 @@ async function debitCredits(
   await databases.createDocument(databaseId(), ledgerCollectionId(), ID.unique(), {
     tenant_id: tenantId,
     amount: debit,
+    transaction_type: "DEBIT_TOKEN",
     description: `Chat debit for bot ${botId} session ${sessionToken}`,
     created: new Date().toISOString(),
   });
@@ -396,28 +397,8 @@ function buildSystemPrompt(
     "Answer customer support questions clearly and concisely."
   );
 
-  // Injection filter: only block clearly malicious prompt injection attempt phrases
-  // to avoid false positives on legitimate documentation content.
-  function isUnsafe(chunk: string): boolean {
-    const unsafePatterns = [
-      /\bignore\s+(previous|all)\s+instructions\b/i,
-      /\bforget\s+(previous|all)\s+instructions\b/i,
-      /\boverride\s+(system|your)\s+(prompt|instructions)\b/i,
-      /\bjailbreak\b/i,
-    ];
-    const matched = unsafePatterns.some((re) => re.test(chunk));
-    if (matched) {
-      console.warn(
-        `[SECURITY WARNING] Knowledge base chunk dropped due to potentially unsafe instruction-override phrase: "${chunk.slice(0, 100)}..."`
-      );
-    }
-    return matched;
-  }
-
-  const safeChunks = contextChunks.filter((chunk) => !isUnsafe(chunk));
-
-  // If no safe chunks are available, direct the LLM immediately to return the fallback message.
-  if (safeChunks.length === 0) {
+  // If no knowledge chunks are available, direct the LLM immediately to return the fallback message.
+  if (contextChunks.length === 0) {
     return `
 You are ${botName}, a customer support assistant.
 
@@ -427,7 +408,7 @@ Respond exactly with: "${fallbackMessage}"
   }
 
   // 🧱 2. Convert to structured DATA format (not raw text block)
-  const formattedContext = safeChunks
+  const formattedContext = contextChunks
     .map(
       (chunk, i) => `
 [DOCUMENT ${i + 1}]
@@ -476,7 +457,6 @@ RESPONSE RULES
 9. Always format links as [Link Text](URL). Never output raw URLs like 'http://...' or 'https://...'.
 `;
 }
-
 function streamStaticMessage(message: string) {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {

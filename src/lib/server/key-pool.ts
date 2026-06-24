@@ -2,6 +2,11 @@
 // same Next.js process. In serverless environments (e.g., Vercel / AWS Lambda),
 // this is best-effort since cold starts get fresh process instances, but it avoids
 // a third-party state store (like Redis) round-trip on the hot path.
+//
+// Concurrency Note: Key selection via next() is best-effort and does not reserve/lock
+// keys during active in-flight requests. Under high concurrent load, multiple requests
+// may select the same key in the same tick before any request returns a rate limit (429)
+// and updates the Map.
 const cooldowns = new Map<string, number>(); // key → expiry timestamp (ms)
 
 const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 65_000; // 65 s (RPM window + 5 s buffer)
