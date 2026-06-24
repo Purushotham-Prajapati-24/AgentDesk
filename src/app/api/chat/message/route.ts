@@ -294,7 +294,6 @@ async function debitCredits(
   await databases.createDocument(databaseId(), ledgerCollectionId(), ID.unique(), {
     tenant_id: tenantId,
     amount: debit,
-    transaction_type: "DEBIT_TOKEN",
     description: `Chat debit for bot ${botId} session ${sessionToken}`,
     created: new Date().toISOString(),
   });
@@ -397,21 +396,21 @@ function buildSystemPrompt(
     "Answer customer support questions clearly and concisely."
   );
 
-  // 🚨 1. Strong injection filter (removes malicious chunks completely)
+  // Injection filter: only block clearly malicious patterns (anchored regex, not broad substrings)
+  // Broad includes() like "act as" / "system prompt" / "you are a" cause false positives
+  // that silently drop legitimate KB chunks — keeping structural prompt framing as primary defense.
   function isUnsafe(chunk: string): boolean {
-    const text = chunk.toLowerCase();
-
-    return (
-      text.includes("ignore previous instructions") ||
-      text.includes("system prompt") ||
-      text.includes("you are now") ||
-      text.includes("act as") ||
-      text.includes("pretend to be") ||
-      text.includes("override") ||
-      text.includes("disregard") ||
-      text.includes("replace your instructions") ||
-      text.includes("you are a") // common role hijack
-    );
+    return [
+      /\bignore\s+(previous|all|your)\s+instructions\b/i,
+      /\bforget\s+(your|all|previous)\s+(instructions|rules)\b/i,
+      /\bpretend\s+(you\s+are|to\s+be)\b/i,
+      /\byou\s+are\s+now\s+(a|an|the)\b/i,
+      /\bact\s+as\s+(a|an|the|if)\b/i,
+      /\boverride\s+(the\s+)?(system|your)\s+(prompt|instructions|rules)\b/i,
+      /\bdisregard\s+(all|your|previous|the)\b/i,
+      /\bjailbreak\b/i,
+      /\bdan\s*mode\b/i,
+    ].some((re) => re.test(chunk));
   }
 
   const safeChunks = contextChunks.filter((chunk) => !isUnsafe(chunk));
