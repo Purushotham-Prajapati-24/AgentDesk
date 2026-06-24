@@ -398,22 +398,18 @@ function buildSystemPrompt(
   );
 
   // 🚨 1. Strong injection filter (removes malicious chunks completely)
+  // Conservative filter: only high-signal injection phrases, to avoid
+  // discarding legitimate documentation. The untrusted-data framing below
+  // is the primary defense.
   function isUnsafe(chunk: string): boolean {
     const text = chunk.toLowerCase();
-
     return (
       text.includes("ignore previous instructions") ||
-      text.includes("system prompt") ||
-      text.includes("you are now") ||
-      text.includes("act as") ||
-      text.includes("pretend to be") ||
-      text.includes("override") ||
-      text.includes("disregard") ||
+      text.includes("ignore all previous") ||
       text.includes("replace your instructions") ||
-      text.includes("you are a") // common role hijack
+      text.includes("override system prompt")
     );
   }
-
   const safeChunks = contextChunks.filter((chunk) => !isUnsafe(chunk));
 
   // 🧱 2. Convert to structured DATA format (not raw text block)
