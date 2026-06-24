@@ -81,18 +81,21 @@ jobs:
 
       # `if: always()` ensures SARIF still uploads when the scan
       # above fails — i.e. when it actually found something.
-      # CRITICAL: this step needs working-directory set to where
-      # semgrep actually wrote the SARIF. The container WORKDIR is
+      # CRITICAL: this step needs the SARIF path to point at where
+      # semgrep actually wrote it. The container WORKDIR is
       # /src (set by semgrep/semgrep image), but the Run Semgrep step
       # above used working-directory: github.workspace, so it wrote
-      # to /github/workspace/semgrep.sarif. Without this override the
-      # upload silently fails.
+      # to /github/workspace/semgrep.sarif. A bare relative path here
+      # would resolve against /src (container default), so we pass an
+      # absolute path via ${{ github.workspace }}.
+      # Note: working-directory at step level is only valid for `run:`
+      # steps — putting it on a `uses:` step makes the workflow schema
+      # reject the whole file (which is what was happening).
       - name: Upload Semgrep SARIF → Security tab
         if: always()
-        working-directory: ${{ github.workspace }}
         uses: github/codeql-action/upload-sarif@1a818fd5f97ed0ee9a823421bd5b171add01227f # v4.36.2
         with:
-          sarif_file: semgrep.sarif
+          sarif_file: ${{ github.workspace }}/semgrep.sarif
           category: semgrep
 
       # In advisory mode, semgrep exits 0 on findings so the job
