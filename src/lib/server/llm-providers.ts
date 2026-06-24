@@ -1,3 +1,15 @@
+import { KeyPool, parseKeyList, parseRetryAfter } from "./key-pool";
+
+export const geminiPool = new KeyPool(
+  "gemini",
+  parseKeyList(process.env.GEMINI_API_KEYS, process.env.GEMINI_API_KEY),
+);
+
+export const groqPool = new KeyPool(
+  "groq",
+  parseKeyList(process.env.GROQ_API_KEYS, process.env.GROQ_API_KEY),
+);
+
 type ChatMessage = {
   role: "system" | "user";
   content: string;
@@ -125,15 +137,53 @@ function providerOrder() {
 function groqProvider(): Provider {
   return {
     name: "groq",
-    available: () => Boolean(process.env.GROQ_API_KEY),
-    stream: (messages, signal) =>
-      openAiCompatibleStream({
-        url: "https://api.groq.com/openai/v1/chat/completions",
-        apiKey: process.env.GROQ_API_KEY ?? "",
-        model: process.env.GROQ_CHAT_MODEL ?? "llama-3.3-70b-versatile",
-        messages,
-        signal,
-      }),
+    available: () => groqPool.available() > 0,
+    stream: async function* (messages, signal) {
+      const attemptedKeys = new Set<string>();
+      while (true) {
+        const key = groqPool.next();
+        if (!key || attemptedKeys.has(key)) {
+          throw new Error("All Groq keys are exhausted, rate-limited, or failed.");
+        }
+        attemptedKeys.add(key);
+
+        let yieldedAny = false;
+        try {
+          for await (const token of openAiCompatibleStream({
+            url: "https://api.groq.com/openai/v1/chat/completions",
+            apiKey: key,
+            model: process.env.GROQ_CHAT_MODEL ?? "llama-3.3-70b-versatile",
+            messages,
+            signal,
+          })) {
+            yieldedAny = true;
+            yield token;
+          }
+          break; // successfully completed stream
+        } catch (error: any) {
+          console.error(`[groq] Error with key ...${key.slice(-6)}:`, error.message);
+
+          if (yieldedAny) {
+            // Already yielded tokens to the client, cannot retry with another key
+            throw error;
+          }
+
+          const status = error.status;
+          if (status === 429) {
+            const retryAfterHeader = error.headers?.get("retry-after") ?? null;
+            const retryAfterSecs = parseRetryAfter(retryAfterHeader);
+            groqPool.markRateLimited(key, retryAfterSecs);
+            continue;
+          } else if (status === 401 || status === 403) {
+            groqPool.markDead(key);
+            continue;
+          } else {
+            groqPool.markRateLimited(key, 10);
+            continue;
+          }
+        }
+      }
+    },
   };
 }
 
@@ -155,8 +205,47 @@ function openAiCompatibleProvider(): Provider {
 function geminiProvider(): Provider {
   return {
     name: "gemini",
-    available: () => Boolean(process.env.GEMINI_API_KEY),
-    stream: (messages, signal) => geminiStream(messages, signal),
+    available: () => geminiPool.available() > 0,
+    stream: async function* (messages, signal) {
+      const attemptedKeys = new Set<string>();
+      while (true) {
+        const key = geminiPool.next();
+        if (!key || attemptedKeys.has(key)) {
+          throw new Error("All Gemini keys are exhausted, rate-limited, or failed.");
+        }
+        attemptedKeys.add(key);
+
+        let yieldedAny = false;
+        try {
+          for await (const token of geminiStream(key, messages, signal)) {
+            yieldedAny = true;
+            yield token;
+          }
+          break; // successfully completed stream
+        } catch (error: any) {
+          console.error(`[gemini] Error with key ...${key.slice(-6)}:`, error.message);
+
+          if (yieldedAny) {
+            // Already yielded tokens to the client, cannot retry with another key
+            throw error;
+          }
+
+          const status = error.status;
+          if (status === 429) {
+            const retryAfterHeader = error.headers?.get("retry-after") ?? null;
+            const retryAfterSecs = parseRetryAfter(retryAfterHeader);
+            geminiPool.markRateLimited(key, retryAfterSecs);
+            continue;
+          } else if (status === 401 || status === 403) {
+            geminiPool.markDead(key);
+            continue;
+          } else {
+            geminiPool.markRateLimited(key, 10);
+            continue;
+          }
+        }
+      }
+    },
   };
 }
 
@@ -189,14 +278,17 @@ async function* openAiCompatibleStream({
   });
 
   if (!response.ok || !response.body) {
-    throw new Error("Completion request failed.");
+    const errBody = await response.text().catch(() => "(unreadable)");
+    const err = new Error(`Completion request failed. HTTP ${response.status}: ${errBody}`) as any;
+    err.status = response.status;
+    err.headers = response.headers;
+    throw err;
   }
 
   yield* readOpenAiStream(response.body);
 }
 
-async function* geminiStream(messages: ChatMessage[], signal: AbortSignal) {
-  const apiKey = process.env.GEMINI_API_KEY ?? "";
+async function* geminiStream(apiKey: string, messages: ChatMessage[], signal: AbortSignal) {
   const model = process.env.GEMINI_CHAT_MODEL ?? "gemini-2.0-flash";
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`, {
     method: "POST",
@@ -216,7 +308,11 @@ async function* geminiStream(messages: ChatMessage[], signal: AbortSignal) {
   });
 
   if (!response.ok || !response.body) {
-    throw new Error("Gemini completion request failed.");
+    const errBody = await response.text().catch(() => "(unreadable)");
+    const err = new Error(`Gemini completion request failed. HTTP ${response.status}: ${errBody}`) as any;
+    err.status = response.status;
+    err.headers = response.headers;
+    throw err;
   }
 
   const reader = response.body.getReader();
