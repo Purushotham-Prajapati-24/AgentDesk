@@ -39,7 +39,10 @@ export async function createEmbedding(input: string) {
       if (!response.ok) {
         const status = response.status;
         const errBody = await response.text().catch(() => "(unreadable)");
-        const err = new Error(`Embedding request failed. HTTP ${status}: ${errBody}`) as any;
+        const err = new Error(`Embedding request failed. HTTP ${status}: ${errBody}`) as Error & {
+          status: number;
+          headers: Headers;
+        };
         err.status = status;
         err.headers = response.headers;
         throw err;
@@ -52,11 +55,12 @@ export async function createEmbedding(input: string) {
       }
 
       return embedding;
-    } catch (error: any) {
-      console.error(`[embeddings] Error with key ...${key.slice(-6)}:`, error.message);
-      const status = error.status;
+    } catch (error) {
+      const err = error as Error & { status?: number; headers?: Headers };
+      console.error(`[embeddings] Error with key ...${key.slice(-6)}:`, err.message);
+      const status = err.status;
       if (status === 429) {
-        const retryAfterHeader = error.headers?.get("retry-after") ?? null;
+        const retryAfterHeader = err.headers?.get("retry-after") ?? null;
         const retryAfterSecs = parseRetryAfter(retryAfterHeader);
         geminiPool.markRateLimited(key, retryAfterSecs);
         continue;
@@ -100,7 +104,10 @@ export async function createEmbeddings(inputs: string[]) {
       if (!response.ok) {
         const status = response.status;
         const errBody = await response.text().catch(() => "(unreadable)");
-        const err = new Error(`Batch embedding request failed. HTTP ${status}: ${errBody}`) as any;
+        const err = new Error(`Batch embedding request failed. HTTP ${status}: ${errBody}`) as Error & {
+          status: number;
+          headers: Headers;
+        };
         err.status = status;
         err.headers = response.headers;
         throw err;
@@ -113,11 +120,12 @@ export async function createEmbeddings(inputs: string[]) {
       }
 
       return embeddings;
-    } catch (error: any) {
-      console.error(`[batch-embeddings] Error with key ...${key.slice(-6)}:`, error.message);
-      const status = error.status;
+    } catch (error) {
+      const err = error as Error & { status?: number; headers?: Headers };
+      console.error(`[batch-embeddings] Error with key ...${key.slice(-6)}:`, err.message);
+      const status = err.status;
       if (status === 429) {
-        const retryAfterHeader = error.headers?.get("retry-after") ?? null;
+        const retryAfterHeader = err.headers?.get("retry-after") ?? null;
         const retryAfterSecs = parseRetryAfter(retryAfterHeader);
         geminiPool.markRateLimited(key, retryAfterSecs);
         continue;

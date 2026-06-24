@@ -160,17 +160,18 @@ function groqProvider(): Provider {
             yield token;
           }
           break; // successfully completed stream
-        } catch (error: any) {
-          console.error(`[groq] Error with key ...${key.slice(-6)}:`, error.message);
+        } catch (error) {
+          const err = error as Error & { status?: number; headers?: Headers };
+          console.error(`[groq] Error with key ...${key.slice(-6)}:`, err.message);
 
           if (yieldedAny) {
             // Already yielded tokens to the client, cannot retry with another key
             throw error;
           }
 
-          const status = error.status;
+          const status = err.status;
           if (status === 429) {
-            const retryAfterHeader = error.headers?.get("retry-after") ?? null;
+            const retryAfterHeader = err.headers?.get("retry-after") ?? null;
             const retryAfterSecs = parseRetryAfter(retryAfterHeader);
             groqPool.markRateLimited(key, retryAfterSecs);
             continue;
@@ -222,17 +223,18 @@ function geminiProvider(): Provider {
             yield token;
           }
           break; // successfully completed stream
-        } catch (error: any) {
-          console.error(`[gemini] Error with key ...${key.slice(-6)}:`, error.message);
+        } catch (error) {
+          const err = error as Error & { status?: number; headers?: Headers };
+          console.error(`[gemini] Error with key ...${key.slice(-6)}:`, err.message);
 
           if (yieldedAny) {
             // Already yielded tokens to the client, cannot retry with another key
             throw error;
           }
 
-          const status = error.status;
+          const status = err.status;
           if (status === 429) {
-            const retryAfterHeader = error.headers?.get("retry-after") ?? null;
+            const retryAfterHeader = err.headers?.get("retry-after") ?? null;
             const retryAfterSecs = parseRetryAfter(retryAfterHeader);
             geminiPool.markRateLimited(key, retryAfterSecs);
             continue;
@@ -279,7 +281,10 @@ async function* openAiCompatibleStream({
 
   if (!response.ok || !response.body) {
     const errBody = await response.text().catch(() => "(unreadable)");
-    const err = new Error(`Completion request failed. HTTP ${response.status}: ${errBody}`) as any;
+    const err = new Error(`Completion request failed. HTTP ${response.status}: ${errBody}`) as Error & {
+      status: number;
+      headers: Headers;
+    };
     err.status = response.status;
     err.headers = response.headers;
     throw err;
@@ -309,7 +314,10 @@ async function* geminiStream(apiKey: string, messages: ChatMessage[], signal: Ab
 
   if (!response.ok || !response.body) {
     const errBody = await response.text().catch(() => "(unreadable)");
-    const err = new Error(`Gemini completion request failed. HTTP ${response.status}: ${errBody}`) as any;
+    const err = new Error(`Gemini completion request failed. HTTP ${response.status}: ${errBody}`) as Error & {
+      status: number;
+      headers: Headers;
+    };
     err.status = response.status;
     err.headers = response.headers;
     throw err;
