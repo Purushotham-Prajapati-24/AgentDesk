@@ -256,7 +256,7 @@ function streamCompletion({
 
         controller.enqueue(sseDone());
         const finalTokenCount = streamedTokenCount || estimateTokens(completionText) + estimateTokens(message);
-        
+
         // Fire-and-forget the awaits so they do not block stream closure for the client
         void Promise.allSettled([
           Promise.resolve(onComplete(finalTokenCount)),
