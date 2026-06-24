@@ -162,11 +162,11 @@ function groqProvider(): Provider {
           break; // successfully completed stream
         } catch (error) {
           const err = error as Error & { status?: number; headers?: Headers };
-          console.error(`[groq] Error with key ...${key.slice(-6)}:`, err.message);
+          console.error(`[groq] Error with ${groqPool.getKeyIdentifier(key)}:`, err.message);
 
           if (yieldedAny) {
             // Already yielded tokens to the client, cannot retry with another key
-            throw error;
+            throw new Error("Upstream provider temporarily unavailable. Please try again.");
           }
 
           const status = err.status;
@@ -225,11 +225,11 @@ function geminiProvider(): Provider {
           break; // successfully completed stream
         } catch (error) {
           const err = error as Error & { status?: number; headers?: Headers };
-          console.error(`[gemini] Error with key ...${key.slice(-6)}:`, err.message);
+          console.error(`[gemini] Error with ${geminiPool.getKeyIdentifier(key)}:`, err.message);
 
           if (yieldedAny) {
             // Already yielded tokens to the client, cannot retry with another key
-            throw error;
+            throw new Error("Upstream provider temporarily unavailable. Please try again.");
           }
 
           const status = err.status;

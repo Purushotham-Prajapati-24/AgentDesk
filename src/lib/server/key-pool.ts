@@ -1,5 +1,7 @@
 // In-memory cooldown tracking — module-level Map persists across requests in the
-// same Next.js process, so no Redis round-trip is needed on the hot path.
+// same Next.js process. In serverless environments (e.g., Vercel / AWS Lambda),
+// this is best-effort since cold starts get fresh process instances, but it avoids
+// a third-party state store (like Redis) round-trip on the hot path.
 const cooldowns = new Map<string, number>(); // key → expiry timestamp (ms)
 
 const DEFAULT_RATE_LIMIT_COOLDOWN_MS = 65_000; // 65 s (RPM window + 5 s buffer)
@@ -13,6 +15,12 @@ export class KeyPool {
   constructor(name: string, keys: string[]) {
     this.name = name;
     this.keys = [...new Set(keys.filter(Boolean))];
+  }
+
+  /** Exposes a safe identifier for logs without leaking PII key suffixes. */
+  getKeyIdentifier(key: string): string {
+    const idx = this.keys.indexOf(key);
+    return idx !== -1 ? `key #${idx}` : "unknown key";
   }
 
   /**
@@ -40,7 +48,7 @@ export class KeyPool {
     const ms = (retryAfterSeconds ?? DEFAULT_RATE_LIMIT_COOLDOWN_MS / 1000) * 1000;
     cooldowns.set(key, Date.now() + ms);
     console.warn(
-      `[key-pool:${this.name}] key …${key.slice(-6)} rate-limited for ${Math.round(ms / 1000)}s`,
+      `[key-pool:${this.name}] ${this.getKeyIdentifier(key)} rate-limited for ${Math.round(ms / 1000)}s`,
     );
   }
 
@@ -51,7 +59,7 @@ export class KeyPool {
   markDead(key: string): void {
     cooldowns.set(key, Date.now() + DEAD_KEY_COOLDOWN_MS);
     console.error(
-      `[key-pool:${this.name}] key …${key.slice(-6)} marked dead (auth failure)`,
+      `[key-pool:${this.name}] ${this.getKeyIdentifier(key)} marked dead (auth failure)`,
     );
   }
 

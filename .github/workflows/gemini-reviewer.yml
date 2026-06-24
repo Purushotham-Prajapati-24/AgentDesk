@@ -15,16 +15,13 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-          allow-unsafe-pr-checkout: true
 
-      - name: Fetch Base Branch
+      - name: Fetch PR Branch
         run: |
-          git fetch --no-tags --depth=50 origin "${{ github.event.pull_request.base.ref }}"
+          git fetch origin +refs/pull/${{ github.event.pull_request.number }}/head:refs/remotes/origin/pr-${{ github.event.pull_request.number }}
 
       - name: Compute Diff & Truncate
         id: diff
@@ -34,9 +31,10 @@ jobs:
         run: |
           set -euo pipefail
           BASE_REF="origin/${{ github.event.pull_request.base.ref }}"
+          PR_REF="origin/pr-${{ github.event.pull_request.number }}"
           
           # Get name-only diff first to see if anything changed
-          CHANGED=$(git diff --name-only "$BASE_REF...HEAD" || true)
+          CHANGED=$(git diff --name-only "$BASE_REF...$PR_REF" || true)
           if [ -z "$CHANGED" ]; then
             echo "No changes detected."
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -45,7 +43,7 @@ jobs:
           echo "should_run=true" >> "$GITHUB_OUTPUT"
 
           # Get raw diff excluding binary files or lockfiles
-          RAW_DIFF=$(git diff "$BASE_REF...HEAD" -- ':(exclude)*.md' ':(exclude)*-lock.json' ':(exclude)*.lock' || true)
+          RAW_DIFF=$(git diff "$BASE_REF...$PR_REF" -- ':(exclude)*.md' ':(exclude)*-lock.json' ':(exclude)*.lock' || true)
           TOTAL_CHARS=${#RAW_DIFF}
           
           if [ "$TOTAL_CHARS" -gt "$CUTOFF_CHARS" ]; then

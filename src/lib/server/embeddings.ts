@@ -57,7 +57,7 @@ export async function createEmbedding(input: string) {
       return embedding;
     } catch (error) {
       const err = error as Error & { status?: number; headers?: Headers };
-      console.error(`[embeddings] Error with key ...${key.slice(-6)}:`, err.message);
+      console.error(`[embeddings] Error with ${geminiPool.getKeyIdentifier(key)}:`, err.message);
       const status = err.status;
       if (status === 429) {
         const retryAfterHeader = err.headers?.get("retry-after") ?? null;
@@ -122,7 +122,7 @@ export async function createEmbeddings(inputs: string[]) {
       return embeddings;
     } catch (error) {
       const err = error as Error & { status?: number; headers?: Headers };
-      console.error(`[batch-embeddings] Error with key ...${key.slice(-6)}:`, err.message);
+      console.error(`[batch-embeddings] Error with ${geminiPool.getKeyIdentifier(key)}:`, err.message);
       const status = err.status;
       if (status === 429) {
         const retryAfterHeader = err.headers?.get("retry-after") ?? null;
