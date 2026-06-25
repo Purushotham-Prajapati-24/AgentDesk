@@ -5,6 +5,7 @@ import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
+import { getCachedJson, setCachedJson } from "@/lib/server/monitor-cache";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -27,7 +28,84 @@ export type AuthTenant = {
   role: "admin" | "agent";
 };
 
-export async function loginWithMagicLink(email: string, nextPath?: string) {
+async function verifyTurnstileToken(token: string): Promise<boolean> {
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (!secretKey) {
+    return true;
+  }
+
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(token)}`,
+    });
+
+    const outcome = await res.json();
+    return !!outcome.success;
+  } catch (error) {
+    console.error("Turnstile verification error:", error);
+    return false;
+  }
+}
+
+async function isRateLimited(email: string): Promise<{ limited: boolean; reason?: string }> {
+  try {
+    const headersList = await headers();
+    const rawIp = headersList.get("x-forwarded-for") || "unknown-ip";
+    const ip = rawIp.split(",")[0].trim();
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const emailKey = `rate-limit:email:${normalizedEmail}`;
+    const ipKey = `rate-limit:ip:${ip}`;
+
+    // Check email-specific limit: Max 1 link per 2 minutes
+    const isEmailBlocked = await getCachedJson<boolean>(emailKey);
+    if (isEmailBlocked) {
+      return { limited: true, reason: "Please wait 2 minutes before requesting another link." };
+    }
+
+    // Check IP-specific limit: Max 5 requests per 10 minutes
+    const ipCount = (await getCachedJson<number>(ipKey)) || 0;
+    if (ipCount >= 5) {
+      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+    }
+
+    // Record/Increment counts
+    await setCachedJson(emailKey, true, 120); // Block email for 2 mins (120s)
+    await setCachedJson(ipKey, ipCount + 1, 600); // Increment IP attempt, expire in 10 mins (600s)
+
+    return { limited: false };
+  } catch (error) {
+    console.error("Rate limiting check error:", error);
+    return { limited: false };
+  }
+}
+
+export async function loginWithMagicLink(email: string, captchaToken?: string, nextPath?: string) {
+  // Validate email format and length before any other operations
+  if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email address format." };
+  }
+
+  // A. Rate limiting validation
+  const rateLimitResult = await isRateLimited(email);
+  if (rateLimitResult.limited) {
+    return { success: false, error: rateLimitResult.reason };
+  }
+
+  // B. Turnstile verification
+  const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  if (secretKey) {
+    if (!captchaToken) {
+      return { success: false, error: "Security check is missing. Please complete the captcha." };
+    }
+    const isHuman = await verifyTurnstileToken(captchaToken);
+    if (!isHuman) {
+      return { success: false, error: "Security check failed. Please try again." };
+    }
+  }
+
   const { account } = await createAdminClient();
 
   try {

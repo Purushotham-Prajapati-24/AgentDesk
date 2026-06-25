@@ -9,6 +9,8 @@ import { loginWithMagicLink } from "@/app/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { InteractiveRobotSpline } from "@/components/ui/interactive-3d-robot";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { useTheme } from "@/context/ThemeContext";
 
 const ROBOT_SCENE_URL = "https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode";
 
@@ -21,21 +23,29 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
+  const { resolvedTheme } = useTheme();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const queryMessage = getQueryMessage(searchParams.get("error"));
   const visibleMessage = message ?? queryMessage;
   const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken) {
+      setMessage({ type: "error", text: "Please complete the security verification." });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
     try {
-      const result = await loginWithMagicLink(email, nextPath ?? undefined);
+      const result = await loginWithMagicLink(email, turnstileToken ?? undefined, nextPath ?? undefined);
       if (!result.success) {
         throw new Error(result.error);
       }
@@ -90,13 +100,30 @@ function LoginContent() {
               type="email"
               autoComplete="email"
               required
-              placeholder="operator@company.com"
+              placeholder="Enter you email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               label="Email address"
               hint="We send a one-time link. No password storage, no shared console account."
             />
           </div>
+
+          {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+            <div className="mt-5 flex justify-center">
+              <div className="w-full max-w-[340px] overflow-hidden rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-1.5 shadow-sm transition-all duration-300 hover:border-[var(--sky)]/50">
+                <Turnstile
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                  options={{
+                    theme: resolvedTheme,
+                    size: "flexible",
+                  }}
+                  onSuccess={(token: string) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken(null)}
+                  onError={() => setTurnstileToken(null)}
+                />
+              </div>
+            </div>
+          )}
 
           {visibleMessage ? (
             <div

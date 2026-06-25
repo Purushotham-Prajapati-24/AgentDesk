@@ -24,6 +24,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.5.3",
     "@mozilla/readability": "^0.6.0",
     "@qdrant/js-client-rest": "^1.18.0",
     "@splinetool/react-spline": "^4.1.0",
