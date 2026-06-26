@@ -5,7 +5,7 @@ import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
-import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig } from "@/lib/server/rate-limit";
+import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, isValidIp, getClientIp } from "@/lib/server/rate-limit";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -28,40 +28,9 @@ export type AuthTenant = {
   role: "admin" | "agent";
 };
 
-async function getClientIp(): Promise<string> {
-  const headersList = await headers();
-  const rawIp = headersList.get("cf-connecting-ip") ||
-                headersList.get("x-real-ip") ||
-                headersList.get("x-forwarded-for") ||
-                "";
-  
-  if (!rawIp) {
-    return process.env.NODE_ENV === "production" ? "unknown-ip" : "127.0.0.1";
-  }
-
-  // Treat comma-separated lists (e.g. from multiple proxies) by taking the first IP (leftmost)
-  const ip = rawIp.split(",")[0].trim();
-
-  // Validate IPv4 or IPv6 address format to prevent injection attacks and fragmentation
-  if (!/^[0-9a-fA-F:.]{2,45}$/.test(ip)) {
-    return process.env.NODE_ENV === "production" ? "unknown-ip" : "127.0.0.1";
-  }
-
-  return ip;
-}
-
-
-export async function loginWithMagicLink(email: string, captchaToken?: string, nextPath?: string) {
-  // Validate email format and length before any other operations
-  if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { success: false, error: "Invalid email address format." };
-  }
-
   // Resolve client IP
-  const ip = await getClientIp();
-  if (ip === "unknown-ip") {
-    return { success: false, error: "Unable to verify client identity. Connection security check failed." };
-  }
+  const headersList = await headers();
+  const ip = await getClientIp(headersList);
 
   // A. Turnstile verification (Primary gatekeeper)
   if (isCaptchaRequired()) {

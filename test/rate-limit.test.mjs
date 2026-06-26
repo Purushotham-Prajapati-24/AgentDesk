@@ -5,6 +5,8 @@ import {
   verifyTurnstileToken,
   isCaptchaRequired,
   validateTurnstileConfig,
+  __setIncrementFnForTests,
+  getClientIp,
 } from "../src/lib/server/rate-limit.ts";
 import { __clearMonitorMemoryCacheForTests } from "../src/lib/server/monitor-cache.ts";
 
@@ -50,21 +52,19 @@ test("isRateLimited blocks after 5 requests from the same IP with different emai
 
 
 test("isRateLimited fails open on cache errors", async () => {
-  const originalFetch = globalThis.fetch;
-  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
-  process.env.UPSTASH_REDIS_REST_TOKEN = "token";
   __clearMonitorMemoryCacheForTests();
-  globalThis.fetch = async () => {
-    throw new Error("redis offline");
-  };
+  // Stub incrementFn to throw an error, forcing isRateLimited into its catch block
+  __setIncrementFnForTests(async () => {
+    throw new Error("cache connection failed");
+  });
 
   try {
     const res = await isRateLimited("test@example.com", "1.2.3.4");
     assert.deepEqual(res, { limited: false }); // Fails open!
   } finally {
-    globalThis.fetch = originalFetch;
-    delete process.env.UPSTASH_REDIS_REST_URL;
-    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    // Restore default increment implementation
+    const { incrementCacheKey } = await import("../src/lib/server/monitor-cache.ts");
+    __setIncrementFnForTests(incrementCacheKey);
   }
 });
 
@@ -76,9 +76,9 @@ test("verifyTurnstileToken consistency and environment checks", async () => {
   delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   assert.equal(await verifyTurnstileToken("token", "1.2.3.4"), true);
 
-  // Scenario B: Production environment with missing keys -> returns false (fail-closed)
+  // Scenario B: Production environment with missing keys -> returns true (disabled/bypass)
   process.env.NODE_ENV = "production";
-  assert.equal(await verifyTurnstileToken("token", "1.2.3.4"), false);
+  assert.equal(await verifyTurnstileToken("token", "1.2.3.4"), true);
 
   // Scenario C: Misconfiguration (one key missing) -> returns false (fail-closed)
   process.env.NODE_ENV = "development";
@@ -162,12 +162,12 @@ test("isCaptchaRequired and validateTurnstileConfig helpers", async () => {
     assert.equal(isCaptchaRequired(), true);
     assert.deepEqual(validateTurnstileConfig(), { valid: true, siteKeySet: true, secretKeySet: true });
 
-    // Case 4: Production environment, missing keys
+    // Case 4: Production environment, missing keys (disabled)
     process.env.NODE_ENV = "production";
     delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
     delete process.env.TURNSTILE_SECRET_KEY;
-    assert.equal(isCaptchaRequired(), true);
-    assert.deepEqual(validateTurnstileConfig(), { valid: false, siteKeySet: false, secretKeySet: false });
+    assert.equal(isCaptchaRequired(), false);
+    assert.deepEqual(validateTurnstileConfig(), { valid: true, siteKeySet: false, secretKeySet: false });
 
     // Case 5: Production environment, fully configured
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "site";
@@ -186,26 +186,110 @@ test("isCaptchaRequired and validateTurnstileConfig helpers", async () => {
 
 test("IP validation format checks in rate-limiting and turnstile", async () => {
   const originalEnv = process.env.NODE_ENV;
+  const origSite = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const origSecret = process.env.TURNSTILE_SECRET_KEY;
+
   process.env.NODE_ENV = "production";
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "site_key";
+  process.env.TURNSTILE_SECRET_KEY = "secret_key";
+  __clearMonitorMemoryCacheForTests();
   
-  // Invalid IP should block/fail immediately in isRateLimited and verifyTurnstileToken
-  const invalidIps = ["invalid-ip", "1.2.3.4;DROP TABLE", "rate-limit:ip:123", "2001:db8::1<script>"];
-  for (const badIp of invalidIps) {
-    const rateLimitRes = await isRateLimited("test@example.com", badIp);
-    assert.equal(rateLimitRes.limited, true);
-    assert.match(rateLimitRes.reason, /Too many login attempts/);
+  try {
+    // Invalid IP should block/fail immediately in isRateLimited and verifyTurnstileToken
+    const invalidIps = ["invalid-ip", "1.2.3.4;DROP TABLE", "rate-limit:ip:123", "2001:db8::1<script>"];
+    for (const badIp of invalidIps) {
+      const rateLimitRes = await isRateLimited("test@example.com", badIp);
+      assert.equal(rateLimitRes.limited, true);
+      assert.match(rateLimitRes.reason, /Too many login attempts/);
 
-    const tokenRes = await verifyTurnstileToken("token", badIp);
-    assert.equal(tokenRes, false);
+      const tokenRes = await verifyTurnstileToken("token", badIp);
+      assert.equal(tokenRes, false);
+    }
+
+    // Valid IPs should pass IP checks
+    const validIps = ["1.2.3.4", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "::1", "127.0.0.1"];
+    for (let i = 0; i < validIps.length; i++) {
+      const goodIp = validIps[i];
+      // Use a different email for each to prevent hitting the email rate limit
+      const rateLimitRes = await isRateLimited(`another${i}@example.com`, goodIp);
+      assert.equal(rateLimitRes.limited, false);
+    }
+  } finally {
+    process.env.NODE_ENV = originalEnv;
+    if (origSite) process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = origSite;
+    else delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    if (origSecret) process.env.TURNSTILE_SECRET_KEY = origSecret;
+    else delete process.env.TURNSTILE_SECRET_KEY;
   }
-
-  // Valid IPs should pass IP checks
-  const validIps = ["1.2.3.4", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", "::1", "127.0.0.1"];
-  for (const goodIp of validIps) {
-    const rateLimitRes = await isRateLimited("another@example.com", goodIp);
-    assert.equal(rateLimitRes.limited, false);
-  }
-
-  process.env.NODE_ENV = originalEnv;
 });
+
+test("getClientIp returns correct IP from headers and respects configurations", async () => {
+  const originalEnv = process.env.NODE_ENV;
+  const originalTrustedHeader = process.env.TRUSTED_PROXY_HEADER;
+  const originalTrustXff = process.env.TRUST_X_FORWARDED_FOR;
+
+  try {
+    // 1. Dev fallback on missing headers
+    process.env.NODE_ENV = "development";
+    delete process.env.TRUSTED_PROXY_HEADER;
+    delete process.env.TRUST_X_FORWARDED_FOR;
+    let headers = new Headers();
+    assert.equal(await getClientIp(headers), "127.0.0.1");
+
+    // 2. Production fallback on missing headers
+    process.env.NODE_ENV = "production";
+    assert.equal(await getClientIp(headers), "unknown-ip");
+
+    // 3. cf-connecting-ip precedence
+    headers = new Headers();
+    headers.set("cf-connecting-ip", "2.3.4.5");
+    headers.set("x-real-ip", "3.4.5.6");
+    assert.equal(await getClientIp(headers), "2.3.4.5");
+
+    // 4. x-real-ip fallback if no cf-connecting-ip
+    headers = new Headers();
+    headers.set("x-real-ip", "3.4.5.6");
+    assert.equal(await getClientIp(headers), "3.4.5.6");
+
+    // 5. Custom TRUSTED_PROXY_HEADER configuration
+    process.env.TRUSTED_PROXY_HEADER = "x-my-trusted-ip";
+    headers = new Headers();
+    headers.set("x-my-trusted-ip", "4.5.6.7");
+    headers.set("cf-connecting-ip", "2.3.4.5"); // Should be ignored
+    assert.equal(await getClientIp(headers), "4.5.6.7");
+
+    // 6. Custom comma-separated TRUSTED_PROXY_HEADER takes rightmost IP
+    headers = new Headers();
+    headers.set("x-my-trusted-ip", "10.0.0.1, 192.168.1.1, 5.6.7.8");
+    assert.equal(await getClientIp(headers), "5.6.7.8");
+    delete process.env.TRUSTED_PROXY_HEADER;
+
+    // 7. TRUST_X_FORWARDED_FOR fallback
+    process.env.TRUST_X_FORWARDED_FOR = "true";
+    headers = new Headers();
+    headers.set("x-forwarded-for", "9.9.9.9, 8.8.8.8");
+    assert.equal(await getClientIp(headers), "8.8.8.8");
+
+    // 8. TRUST_X_FORWARDED_FOR = false (default) ignores XFF
+    delete process.env.TRUST_X_FORWARDED_FOR;
+    assert.equal(await getClientIp(headers), "unknown-ip");
+
+    // 9. Invalid IP format in production falls back to unknown-ip
+    headers = new Headers();
+    headers.set("cf-connecting-ip", "invalid-ip-string");
+    assert.equal(await getClientIp(headers), "unknown-ip");
+
+    // 10. Invalid IP format in dev falls back to 127.0.0.1
+    process.env.NODE_ENV = "development";
+    assert.equal(await getClientIp(headers), "127.0.0.1");
+
+  } finally {
+    process.env.NODE_ENV = originalEnv;
+    if (originalTrustedHeader) process.env.TRUSTED_PROXY_HEADER = originalTrustedHeader;
+    else delete process.env.TRUSTED_PROXY_HEADER;
+    if (originalTrustXff) process.env.TRUST_X_FORWARDED_FOR = originalTrustXff;
+    else delete process.env.TRUST_X_FORWARDED_FOR;
+  }
+});
+
 

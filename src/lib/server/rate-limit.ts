@@ -1,28 +1,83 @@
-import { incrementCacheKey } from "./monitor-cache.ts";
+import { incrementCacheKey as defaultIncrement } from "./monitor-cache.ts";
+import { isIP } from "node:net";
+
+let incrementFn = defaultIncrement;
+
+export function __setIncrementFnForTests(fn: typeof defaultIncrement) {
+  incrementFn = fn;
+}
+
+export function isValidIp(ip: string): boolean {
+  return isIP(ip) !== 0;
+}
+
+export async function getClientIp(headersList: Headers): Promise<string> {
+  let ip = "";
+
+  // 1. Check custom trusted proxy header if configured
+  const trustedHeader = process.env.TRUSTED_PROXY_HEADER;
+  if (trustedHeader) {
+    const rawHeader = headersList.get(trustedHeader) || "";
+    if (rawHeader) {
+      const parts = rawHeader.split(",");
+      ip = parts[parts.length - 1].trim();
+    }
+  }
+
+  // 2. Check standard cloud-provider proxy headers (cf-connecting-ip, x-real-ip)
+  if (!ip) {
+    ip = headersList.get("cf-connecting-ip") || headersList.get("x-real-ip") || "";
+  }
+
+  // 3. Fallback to X-Forwarded-For if explicitly trusted
+  if (!ip) {
+    const xff = headersList.get("x-forwarded-for") || "";
+    if (xff) {
+      if (process.env.TRUST_X_FORWARDED_FOR === "true") {
+        const parts = xff.split(",");
+        ip = parts[parts.length - 1].trim();
+      } else {
+        console.warn("[getClientIp] X-Forwarded-For header present but TRUST_X_FORWARDED_FOR is not enabled. Ignoring untrusted header.");
+      }
+    }
+  }
+
+  // 4. Handle missing IP and validation
+  if (!ip) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn("[getClientIp] No trusted proxy headers detected (cf-connecting-ip, x-real-ip) and no TRUSTED_PROXY_HEADER or TRUST_X_FORWARDED_FOR is configured. Falling back to 'unknown-ip' (IP-based rate limiting will be bypassed).");
+      return "unknown-ip";
+    }
+    return "127.0.0.1";
+  }
+
+  // Validate IPv4 or IPv6 address format to prevent injection attacks and fragmentation
+  if (!isValidIp(ip)) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn(`[getClientIp] Invalid IP address format: "${ip}". Falling back to 'unknown-ip'.`);
+      return "unknown-ip";
+    }
+    return "127.0.0.1";
+  }
+
+  return ip;
+}
 
 export function isCaptchaRequired(): boolean {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  return !!(siteKey || secretKey || process.env.NODE_ENV === "production");
+  return !!(siteKey || secretKey);
 }
 
 export function validateTurnstileConfig(): { valid: boolean; siteKeySet: boolean; secretKeySet: boolean } {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  const isProd = process.env.NODE_ENV === "production";
   
-  if (isProd) {
-    // In production, both keys must be present
-    return {
-      valid: !!(siteKey && secretKey),
-      siteKeySet: !!siteKey,
-      secretKeySet: !!secretKey,
-    };
-  }
+  // Configuration is valid if both keys are present (enabled) or both are missing (disabled)
+  const valid = !((siteKey && !secretKey) || (!siteKey && secretKey));
   
-  // In development/test, they must either be both present or both missing
   return {
-    valid: !((siteKey && !secretKey) || (!siteKey && secretKey)),
+    valid,
     siteKeySet: !!siteKey,
     secretKeySet: !!secretKey,
   };
@@ -33,8 +88,8 @@ export async function verifyTurnstileToken(token: string, ip: string): Promise<b
     return true;
   }
 
-  // Validate IP format
-  if (!/^[0-9a-fA-F:.]{2,45}$/.test(ip)) {
+  // Validate IP format if connection IP is resolved
+  if (ip !== "unknown-ip" && !isValidIp(ip)) {
     console.error(`[Turnstile] Invalid IP address format: ${ip}`);
     return false; // Fail-closed
   }
@@ -48,14 +103,18 @@ export async function verifyTurnstileToken(token: string, ip: string): Promise<b
   }
 
   try {
+    const bodyParams = new URLSearchParams({
+      secret: process.env.TURNSTILE_SECRET_KEY ?? "",
+      response: token,
+    });
+    if (ip !== "unknown-ip") {
+      bodyParams.append("remoteip", ip);
+    }
+
     const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        secret: process.env.TURNSTILE_SECRET_KEY ?? "",
-        response: token,
-        remoteip: ip,
-      }),
+      body: bodyParams,
     });
 
     if (!res.ok) {
@@ -88,25 +147,27 @@ export async function isRateLimited(email: string, ip: string): Promise<{ limite
     const emailKey = `rate-limit:email:${normalizedEmail}`;
     const ipKey = `rate-limit:ip:${ip}`;
 
-    // Validate IP format to prevent injection attacks and fragmentation
-    if (!/^[0-9a-fA-F:.]{2,45}$/.test(ip)) {
-      console.error(`[Rate Limiter] Invalid IP address format: ${ip}`);
-      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
-    }
-
     // Note: IP rate limit is checked and incremented first to protect the email retry budget
     // from being consumed by requests that are already blocked by IP limits (e.g. email DoS defense).
     // Expiration TTL uses a fixed window (starts at the first increment, subsequent increments
     // do not extend the lockout window). This prevents perpetual lockout on repeated attempts.
     
-    // Check/Increment IP limit: Max 5 requests per 10 minutes (600s)
-    const ipCount = await incrementCacheKey(ipKey, 600);
-    if (ipCount > 5) {
-      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+    // Check/Increment IP limit if Connection IP is resolved
+    if (ip !== "unknown-ip") {
+      // Validate IP format to prevent injection attacks and fragmentation
+      if (!isValidIp(ip)) {
+        console.error(`[Rate Limiter] Invalid IP address format: ${ip}`);
+        return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+      }
+
+      const ipCount = await incrementFn(ipKey, 600);
+      if (ipCount > 5) {
+        return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+      }
     }
 
     // Check/Increment email limit: Max 4 requests per 10 minutes (600s)
-    const emailCount = await incrementCacheKey(emailKey, 600);
+    const emailCount = await incrementFn(emailKey, 600);
     if (emailCount > 4) {
       return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
     }
