@@ -57,15 +57,15 @@ export async function isRateLimited(email: string, ip: string): Promise<{ limite
     const emailKey = `rate-limit:email:${normalizedEmail}`;
     const ipKey = `rate-limit:ip:${ip}`;
 
-    // Check/Increment email limit: Max 4 requests per 10 minutes (600s)
-    const emailCount = await incrementCacheKey(emailKey, 600);
-    if (emailCount > 4) {
-      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
-    }
-
     // Check/Increment IP limit: Max 5 requests per 10 minutes (600s)
     const ipCount = await incrementCacheKey(ipKey, 600);
     if (ipCount > 5) {
+      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+    }
+
+    // Check/Increment email limit: Max 4 requests per 10 minutes (600s)
+    const emailCount = await incrementCacheKey(emailKey, 600);
+    if (emailCount > 4) {
       return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
     }
 

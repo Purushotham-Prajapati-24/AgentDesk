@@ -38,6 +38,7 @@ function LoginContent() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (configError) return;
 
     if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken) {
       setMessage({ type: "error", text: "Please complete the security verification." });
@@ -148,7 +149,7 @@ function LoginContent() {
 
           <button
             className="marketing-cta mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-5 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-            disabled={loading}
+            disabled={loading || !!configError}
             style={{
               backgroundColor: "var(--marketing-inverse)",
               borderColor: "var(--marketing-inverse)",

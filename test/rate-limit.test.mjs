@@ -23,6 +23,27 @@ test("isRateLimited permits up to 4 email requests and 5 IP requests in 10 mins"
   assert.match(res.reason, /Too many login attempts/);
 });
 
+test("isRateLimited blocks after 5 requests from the same IP with different emails", async () => {
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  __clearMonitorMemoryCacheForTests();
+
+  const ip = "1.2.3.4";
+
+  // 5 requests with different emails should pass (IP count: 1 to 5)
+  assert.deepEqual(await isRateLimited("e1@example.com", ip), { limited: false });
+  assert.deepEqual(await isRateLimited("e2@example.com", ip), { limited: false });
+  assert.deepEqual(await isRateLimited("e3@example.com", ip), { limited: false });
+  assert.deepEqual(await isRateLimited("e4@example.com", ip), { limited: false });
+  assert.deepEqual(await isRateLimited("e5@example.com", ip), { limited: false });
+
+  // 6th request from same IP should fail on IP rate limit
+  const res = await isRateLimited("e6@example.com", ip);
+  assert.equal(res.limited, true);
+  assert.match(res.reason, /Too many login attempts/);
+});
+
+
 test("isRateLimited fails open on cache errors", async () => {
   const originalFetch = globalThis.fetch;
   process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";

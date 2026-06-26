@@ -61,7 +61,7 @@ export async function incrementCacheKey(key: string, ttlSeconds: number): Promis
   const ttl = Math.max(1, Math.floor(ttlSeconds));
   if (hasRedisConfig()) {
     try {
-      const script = "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c;";
+      const script = "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1])) end; return c;";
       return await redisCommand<number>(["EVAL", script, 1, key, ttl]);
     } catch (error) {
       console.warn("[monitor-cache] Redis atomic INCR failed; falling back to memory.", error);
