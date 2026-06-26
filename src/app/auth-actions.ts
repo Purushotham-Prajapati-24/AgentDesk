@@ -5,7 +5,7 @@ import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
-import { isRateLimited, verifyTurnstileToken } from "@/lib/server/rate-limit";
+import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig } from "@/lib/server/rate-limit";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -36,11 +36,18 @@ async function getClientIp(): Promise<string> {
                 "";
   
   if (!rawIp) {
-    return "unknown-ip";
+    return process.env.NODE_ENV === "production" ? "unknown-ip" : "127.0.0.1";
   }
 
   // Treat comma-separated lists (e.g. from multiple proxies) by taking the first IP (leftmost)
-  return rawIp.split(",")[0].trim();
+  const ip = rawIp.split(",")[0].trim();
+
+  // Validate IPv4 or IPv6 address format to prevent injection attacks and fragmentation
+  if (!/^[0-9a-fA-F:.]{2,45}$/.test(ip)) {
+    return process.env.NODE_ENV === "production" ? "unknown-ip" : "127.0.0.1";
+  }
+
+  return ip;
 }
 
 
@@ -57,11 +64,15 @@ export async function loginWithMagicLink(email: string, captchaToken?: string, n
   }
 
   // A. Turnstile verification (Primary gatekeeper)
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  const isCaptchaRequired = !!(siteKey || secretKey || process.env.NODE_ENV === "production");
+  if (isCaptchaRequired()) {
+    const config = validateTurnstileConfig();
+    if (!config.valid) {
+      console.error(
+        `[Turnstile] Misconfigured Turnstile environment variables. Site Key: ${config.siteKeySet ? "set" : "missing"}, Secret Key: ${config.secretKeySet ? "set" : "missing"}`
+      );
+      return { success: false, error: "Security check is misconfigured. Please contact support." };
+    }
 
-  if (isCaptchaRequired) {
     if (!captchaToken) {
       return { success: false, error: "Security check is missing. Please complete the captcha." };
     }
