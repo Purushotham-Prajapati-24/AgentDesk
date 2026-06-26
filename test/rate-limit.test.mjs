@@ -5,7 +5,6 @@ import {
   verifyTurnstileToken,
   isCaptchaRequired,
   validateTurnstileConfig,
-  __setIncrementFnForTests,
   getClientIp,
 } from "../src/lib/server/rate-limit.ts";
 import { __clearMonitorMemoryCacheForTests } from "../src/lib/server/monitor-cache.ts";
@@ -53,19 +52,13 @@ test("isRateLimited blocks after 5 requests from the same IP with different emai
 
 test("isRateLimited fails open on cache errors", async () => {
   __clearMonitorMemoryCacheForTests();
-  // Stub incrementFn to throw an error, forcing isRateLimited into its catch block
-  __setIncrementFnForTests(async () => {
+  // Pass increment override directly to avoid parallel test execution contamination
+  const stubIncrement = async () => {
     throw new Error("cache connection failed");
-  });
+  };
 
-  try {
-    const res = await isRateLimited("test@example.com", "1.2.3.4");
-    assert.deepEqual(res, { limited: false }); // Fails open!
-  } finally {
-    // Restore default increment implementation
-    const { incrementCacheKey } = await import("../src/lib/server/monitor-cache.ts");
-    __setIncrementFnForTests(incrementCacheKey);
-  }
+  const res = await isRateLimited("test@example.com", "1.2.3.4", stubIncrement);
+  assert.deepEqual(res, { limited: false }); // Fails open!
 });
 
 test("verifyTurnstileToken consistency and environment checks", async () => {
@@ -76,9 +69,9 @@ test("verifyTurnstileToken consistency and environment checks", async () => {
   delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   assert.equal(await verifyTurnstileToken("token", "1.2.3.4"), true);
 
-  // Scenario B: Production environment with missing keys -> returns true (disabled/bypass)
+  // Scenario B: Production environment with missing keys -> returns false (fails closed)
   process.env.NODE_ENV = "production";
-  assert.equal(await verifyTurnstileToken("token", "1.2.3.4"), true);
+  assert.equal(await verifyTurnstileToken("token", "1.2.3.4"), false);
 
   // Scenario C: Misconfiguration (one key missing) -> returns false (fail-closed)
   process.env.NODE_ENV = "development";
@@ -162,12 +155,12 @@ test("isCaptchaRequired and validateTurnstileConfig helpers", async () => {
     assert.equal(isCaptchaRequired(), true);
     assert.deepEqual(validateTurnstileConfig(), { valid: true, siteKeySet: true, secretKeySet: true });
 
-    // Case 4: Production environment, missing keys (disabled)
+    // Case 4: Production environment, missing keys (fails closed)
     process.env.NODE_ENV = "production";
     delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
     delete process.env.TURNSTILE_SECRET_KEY;
-    assert.equal(isCaptchaRequired(), false);
-    assert.deepEqual(validateTurnstileConfig(), { valid: true, siteKeySet: false, secretKeySet: false });
+    assert.equal(isCaptchaRequired(), true);
+    assert.deepEqual(validateTurnstileConfig(), { valid: false, siteKeySet: false, secretKeySet: false });
 
     // Case 5: Production environment, fully configured
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "site";

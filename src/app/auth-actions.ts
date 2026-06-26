@@ -1,12 +1,12 @@
 "use server";
 
-import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { resolveAppOrigin } from "@/lib/server/app-origin";
-import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
-import { sanitizeNextPath } from "@/lib/auth-redirect";
-import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, getClientIp } from "@/lib/server/rate-limit";
-import { cookies, headers } from "next/headers";
+import { createAdminClient, createSessionClient } from "../lib/server/appwrite.ts";
+import { resolveAppOrigin } from "../lib/server/app-origin.ts";
+import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "../lib/server/auth-tenants.ts";
+import { getAuthorizedTenantDocument } from "../lib/server/tenant-access.ts";
+import { sanitizeNextPath } from "../lib/auth-redirect.ts";
+import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, getClientIp } from "../lib/server/rate-limit.ts";
+import { getHeaders, getCookies } from "../lib/server/headers-wrapper.ts";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
 export type AuthUser = {
@@ -34,7 +34,7 @@ export async function loginWithMagicLink(email: string, captchaToken?: string, n
   }
 
   // Resolve client IP
-  const headersList = await headers();
+  const headersList = await getHeaders();
   const ip = await getClientIp(headersList);
 
   // A. Turnstile verification (Primary gatekeeper)
@@ -65,7 +65,7 @@ export async function loginWithMagicLink(email: string, captchaToken?: string, n
   const { account } = await createAdminClient();
 
   try {
-    const headersList = await headers();
+    const headersList = await getHeaders();
     const origin = resolveAppOrigin(headersList);
     // Defense in depth: callers (login page, AuthAwareCta) already
     // sanitize `nextPath`, but re-sanitizing here means a future caller
@@ -91,7 +91,7 @@ export async function verifyMagicLink(userId: string, secret: string) {
   
   try {
     const session = await account.createSession({ userId, secret });
-    const jar = await cookies();
+    const jar = await getCookies();
 
     // Purge any stale/blank session cookie before writing the new one.
     // Without this, browsers with a leftover blank cookie will have two
@@ -166,7 +166,7 @@ export async function logoutSession() {
 }
 
 async function clearSessionCookie() {
-  const jar = await cookies();
+  const jar = await getCookies();
   // Belt-and-suspenders: delete + expire to handle both HttpOnly and any
   // client-visible duplicates that may have been created by old code.
   jar.delete("session");

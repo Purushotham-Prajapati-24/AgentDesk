@@ -71,8 +71,14 @@ export async function incrementCacheKey(key: string, ttlSeconds: number): Promis
   const entry = memoryCache.get(key);
   let newVal = 1;
   if (entry && entry.expiresAt > Date.now()) {
-    newVal = (Number(entry.value) || 0) + 1;
-    entry.value = newVal;
+    const current = Number(entry.value);
+    newVal = Number.isFinite(current) ? current + 1 : 1;
+    // In-memory cache stores references. To prevent side-effects and maintain consistency with external caches (like Redis),
+    // we update the cache by setting a new entry object rather than mutating the existing one in place.
+    memoryCache.set(key, {
+      value: newVal,
+      expiresAt: entry.expiresAt,
+    });
   } else {
     memoryCache.set(key, {
       value: 1,

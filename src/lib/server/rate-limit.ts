@@ -20,6 +20,8 @@ export async function getClientIp(headersList: Headers): Promise<string> {
     const rawHeader = headersList.get(trustedHeader) || "";
     if (rawHeader) {
       const parts = rawHeader.split(",");
+      // Extract the rightmost IP address. This is the most secure and reliable choice
+      // because it represents the address appended by the immediate upstream proxy.
       ip = parts[parts.length - 1].trim();
     }
   }
@@ -35,6 +37,8 @@ export async function getClientIp(headersList: Headers): Promise<string> {
     if (xff) {
       if (process.env.TRUST_X_FORWARDED_FOR === "true") {
         const parts = xff.split(",");
+        // Extract the rightmost IP address. This is the most secure and reliable choice
+        // because it represents the address appended by the immediate upstream proxy.
         ip = parts[parts.length - 1].trim();
       } else {
         console.warn("[getClientIp] X-Forwarded-For header present but TRUST_X_FORWARDED_FOR is not enabled. Ignoring untrusted header.");
@@ -63,9 +67,17 @@ export async function getClientIp(headersList: Headers): Promise<string> {
   return ip;
 }
 
+export const RATE_LIMIT_WINDOW_SECONDS = 600; // 10 minutes
+
 export function isCaptchaRequired(): boolean {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
+  
+  // In production, CAPTCHA is always required.
+  if (process.env.NODE_ENV === "production") {
+    return true;
+  }
+  
   return !!(siteKey || secretKey);
 }
 
@@ -73,13 +85,19 @@ export function validateTurnstileConfig(): { valid: boolean; siteKeySet: boolean
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   
-  // Configuration is valid if both keys are present (enabled) or both are missing (disabled)
-  const valid = !((siteKey && !secretKey) || (!siteKey && secretKey));
+  const siteKeySet = !!siteKey;
+  const secretKeySet = !!secretKey;
+  
+  // In production, both keys must be present.
+  // In non-production, they must either be both present or both missing.
+  const valid = process.env.NODE_ENV === "production"
+    ? (siteKeySet && secretKeySet)
+    : (!siteKeySet && !secretKeySet) || (siteKeySet && secretKeySet);
   
   return {
     valid,
-    siteKeySet: !!siteKey,
-    secretKeySet: !!secretKey,
+    siteKeySet,
+    secretKeySet,
   };
 }
 
@@ -141,11 +159,19 @@ export async function verifyTurnstileToken(token: string, ip: string): Promise<b
   }
 }
 
-export async function isRateLimited(email: string, ip: string): Promise<{ limited: boolean; reason?: string }> {
+export async function isRateLimited(
+  email: string,
+  ip: string,
+  incrementOverride?: typeof defaultIncrement
+): Promise<{ limited: boolean; reason?: string }> {
   try {
     const normalizedEmail = email.toLowerCase().trim();
     const emailKey = `rate-limit:email:${normalizedEmail}`;
     const ipKey = `rate-limit:ip:${ip}`;
+    const activeIncrement = incrementOverride || incrementFn;
+
+    const windowMinutes = Math.ceil(RATE_LIMIT_WINDOW_SECONDS / 60);
+    const limitReason = `Too many login attempts. Please try again in ${windowMinutes} minutes.`;
 
     // Note: IP rate limit is checked and incremented first to protect the email retry budget
     // from being consumed by requests that are already blocked by IP limits (e.g. email DoS defense).
@@ -157,19 +183,19 @@ export async function isRateLimited(email: string, ip: string): Promise<{ limite
       // Validate IP format to prevent injection attacks and fragmentation
       if (!isValidIp(ip)) {
         console.error(`[Rate Limiter] Invalid IP address format: ${ip}`);
-        return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+        return { limited: true, reason: limitReason };
       }
 
-      const ipCount = await incrementFn(ipKey, 600);
+      const ipCount = await activeIncrement(ipKey, RATE_LIMIT_WINDOW_SECONDS);
       if (ipCount > 5) {
-        return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+        return { limited: true, reason: limitReason };
       }
     }
 
-    // Check/Increment email limit: Max 4 requests per 10 minutes (600s)
-    const emailCount = await incrementFn(emailKey, 600);
+    // Check/Increment email limit: Max 4 requests per 10 minutes
+    const emailCount = await activeIncrement(emailKey, RATE_LIMIT_WINDOW_SECONDS);
     if (emailCount > 4) {
-      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
+      return { limited: true, reason: limitReason };
     }
 
     return { limited: false };

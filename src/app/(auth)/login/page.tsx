@@ -36,6 +36,12 @@ function LoginContent() {
   const visibleMessage = configError ?? message ?? queryMessage;
   const nextPath = sanitizeNextPath(searchParams.get("next"));
 
+  const turnstileOptions = React.useMemo(() => ({
+    theme: (resolvedTheme === "dark" ? "dark" : "light") as "dark" | "light",
+    size: "flexible" as const,
+    action: "login",
+  }), [resolvedTheme]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (configError) return;
@@ -117,11 +123,7 @@ function LoginContent() {
               <div className="w-full max-w-[340px] overflow-hidden rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-1.5 shadow-sm transition-all duration-300 hover:border-[var(--sky)]/50">
                 <Turnstile
                   siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                  options={{
-                    theme: resolvedTheme === "dark" ? "dark" : "light",
-                    size: "flexible",
-                    action: "login",
-                  }}
+                  options={turnstileOptions}
                   onSuccess={(token: string) => setTurnstileToken(token)}
                   onExpire={() => setTurnstileToken(null)}
                   onError={() => {
