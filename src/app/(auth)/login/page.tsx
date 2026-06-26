@@ -30,7 +30,10 @@ function LoginContent() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const queryMessage = getQueryMessage(searchParams.get("error"));
-  const visibleMessage = message ?? queryMessage;
+  const configError = process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+    ? { type: "error" as const, text: "Security verification is misconfigured (missing CAPTCHA site key). Please contact support." }
+    : null;
+  const visibleMessage = configError ?? message ?? queryMessage;
   const nextPath = sanitizeNextPath(searchParams.get("next"));
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -120,7 +123,13 @@ function LoginContent() {
                   }}
                   onSuccess={(token: string) => setTurnstileToken(token)}
                   onExpire={() => setTurnstileToken(null)}
-                  onError={() => setTurnstileToken(null)}
+                  onError={() => {
+                    setTurnstileToken(null);
+                    setMessage({
+                      type: "error",
+                      text: "Security check failed to load. Please check your connection or disable ad-blockers.",
+                    });
+                  }}
                 />
               </div>
             </div>
