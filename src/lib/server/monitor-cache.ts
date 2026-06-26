@@ -57,6 +57,35 @@ export async function setCachedJson(key: string, value: unknown, ttlSeconds: num
   pruneMemoryCache();
 }
 
+export async function incrementCacheKey(key: string, ttlSeconds: number): Promise<number> {
+  const ttl = Math.max(1, Math.floor(ttlSeconds));
+  if (hasRedisConfig()) {
+    try {
+      const newVal = await redisCommand<number>(["INCR", key]);
+      if (newVal === 1) {
+        await redisCommand(["EXPIRE", key, ttl]);
+      }
+      return newVal;
+    } catch (error) {
+      console.warn("[monitor-cache] Redis INCR failed; falling back to memory.", error);
+    }
+  }
+
+  const entry = memoryCache.get(key);
+  let newVal = 1;
+  if (entry && entry.expiresAt > Date.now()) {
+    newVal = (Number(entry.value) || 0) + 1;
+    entry.value = newVal;
+  } else {
+    memoryCache.set(key, {
+      value: 1,
+      expiresAt: Date.now() + ttl * 1000,
+    });
+  }
+  pruneMemoryCache();
+  return newVal;
+}
+
 export async function deleteCachedPrefix(prefix: string) {
   if (hasRedisConfig()) {
     try {

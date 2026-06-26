@@ -5,7 +5,7 @@ import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
-import { getCachedJson, setCachedJson } from "@/lib/server/monitor-cache";
+import { incrementCacheKey } from "@/lib/server/monitor-cache";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -28,57 +28,95 @@ export type AuthTenant = {
   role: "admin" | "agent";
 };
 
-async function verifyTurnstileToken(token: string): Promise<boolean> {
+async function getClientIp(): Promise<string> {
+  const headersList = await headers();
+  const rawIp = headersList.get("cf-connecting-ip") ||
+                headersList.get("x-real-ip") ||
+                headersList.get("x-forwarded-for") ||
+                "";
+  
+  if (!rawIp) {
+    return "unknown-ip";
+  }
+
+  // Treat comma-separated lists (e.g. from multiple proxies) by taking the first IP (leftmost)
+  return rawIp.split(",")[0].trim();
+}
+
+async function verifyTurnstileToken(token: string, ip: string): Promise<boolean> {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (!secretKey) {
-    return true;
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  // Enforce configuration consistency
+  if (siteKey || secretKey) {
+    if (!siteKey || !secretKey) {
+      console.error(
+        `[Turnstile] Misconfigured Turnstile environment variables. Site Key: ${siteKey ? "set" : "missing"}, Secret Key: ${secretKey ? "set" : "missing"}`
+      );
+      return false; // Fail-closed
+    }
+  } else {
+    // Both keys are missing. Fail-closed in production, allow bypass in local dev
+    if (process.env.NODE_ENV === "production") {
+      console.error("[Turnstile] CAPTCHA keys are missing in production environment.");
+      return false; // Fail-closed
+    }
+    return true; // Pass in local development if not configured
   }
 
   try {
     const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(token)}`,
+      body: new URLSearchParams({
+        secret: secretKey,
+        response: token,
+        remoteip: ip,
+      }),
     });
 
     const outcome = await res.json();
-    return !!outcome.success;
+    
+    if (!outcome.success) {
+      console.warn("[Turnstile] Verification failed. Error codes:", outcome["error-codes"]);
+      return false;
+    }
+
+    if (outcome.action !== "login") {
+      console.warn(`[Turnstile] Action mismatch. Expected 'login', got '${outcome.action}'`);
+      return false;
+    }
+
+    return true;
   } catch (error) {
     console.error("Turnstile verification error:", error);
-    return false;
+    return false; // Fail-closed
   }
 }
 
-async function isRateLimited(email: string): Promise<{ limited: boolean; reason?: string }> {
+async function isRateLimited(email: string, ip: string): Promise<{ limited: boolean; reason?: string }> {
   try {
-    const headersList = await headers();
-    const rawIp = headersList.get("x-forwarded-for") || "unknown-ip";
-    const ip = rawIp.split(",")[0].trim();
-
     const normalizedEmail = email.toLowerCase().trim();
     const emailKey = `rate-limit:email:${normalizedEmail}`;
     const ipKey = `rate-limit:ip:${ip}`;
 
-    // Check email-specific limit: Max 1 link per 2 minutes
-    const isEmailBlocked = await getCachedJson<boolean>(emailKey);
-    if (isEmailBlocked) {
+    // Check/Increment email limit: Max 1 request per 2 minutes (120s)
+    const emailCount = await incrementCacheKey(emailKey, 120);
+    if (emailCount > 1) {
       return { limited: true, reason: "Please wait 2 minutes before requesting another link." };
     }
 
-    // Check IP-specific limit: Max 5 requests per 10 minutes
-    const ipCount = (await getCachedJson<number>(ipKey)) || 0;
-    if (ipCount >= 5) {
+    // Check/Increment IP limit: Max 5 requests per 10 minutes (600s)
+    const ipCount = await incrementCacheKey(ipKey, 600);
+    if (ipCount > 5) {
       return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
     }
-
-    // Record/Increment counts
-    await setCachedJson(emailKey, true, 120); // Block email for 2 mins (120s)
-    await setCachedJson(ipKey, ipCount + 1, 600); // Increment IP attempt, expire in 10 mins (600s)
 
     return { limited: false };
   } catch (error) {
     console.error("Rate limiting check error:", error);
-    return { limited: false };
+    // Fail-closed
+    return { limited: true, reason: "Login temporarily unavailable. Please try again shortly." };
   }
 }
 
@@ -88,19 +126,28 @@ export async function loginWithMagicLink(email: string, captchaToken?: string, n
     return { success: false, error: "Invalid email address format." };
   }
 
+  // Resolve client IP
+  const ip = await getClientIp();
+  if (ip === "unknown-ip") {
+    return { success: false, error: "Unable to verify client identity. Connection security check failed." };
+  }
+
   // A. Rate limiting validation
-  const rateLimitResult = await isRateLimited(email);
+  const rateLimitResult = await isRateLimited(email, ip);
   if (rateLimitResult.limited) {
     return { success: false, error: rateLimitResult.reason };
   }
 
   // B. Turnstile verification
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
-  if (secretKey) {
+  const isCaptchaRequired = !!(siteKey || secretKey || process.env.NODE_ENV === "production");
+
+  if (isCaptchaRequired) {
     if (!captchaToken) {
       return { success: false, error: "Security check is missing. Please complete the captcha." };
     }
-    const isHuman = await verifyTurnstileToken(captchaToken);
+    const isHuman = await verifyTurnstileToken(captchaToken, ip);
     if (!isHuman) {
       return { success: false, error: "Security check failed. Please try again." };
     }

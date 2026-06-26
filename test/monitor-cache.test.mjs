@@ -5,6 +5,7 @@ import {
   deleteCachedPrefix,
   getCachedJson,
   setCachedJson,
+  incrementCacheKey,
 } from "../src/lib/server/monitor-cache.ts";
 
 test("monitor cache memory fallback returns and expires JSON values", async () => {
@@ -53,3 +54,45 @@ test("monitor cache treats Redis failures as cache misses and skipped writes", a
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
   }
 });
+
+test("monitor cache memory fallback increments cache key and respects TTL", async () => {
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  __clearMonitorMemoryCacheForTests();
+
+  const key = "rate-limit:test-incr";
+  const count1 = await incrementCacheKey(key, 1);
+  assert.equal(count1, 1);
+
+  const count2 = await incrementCacheKey(key, 1);
+  assert.equal(count2, 2);
+
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  const count3 = await incrementCacheKey(key, 1);
+  assert.equal(count3, 1);
+});
+
+test("monitor cache treats Redis failure on INCR as fallback to memory", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  process.env.UPSTASH_REDIS_REST_URL = "https://redis.invalid";
+  process.env.UPSTASH_REDIS_REST_TOKEN = "token";
+  globalThis.fetch = async () => {
+    throw new Error("network unavailable");
+  };
+  console.warn = () => {};
+
+  __clearMonitorMemoryCacheForTests();
+
+  try {
+    const key = "rate-limit:test-incr-redis-fail";
+    const count1 = await incrementCacheKey(key, 30);
+    assert.equal(count1, 1); // Should fallback to memory and succeed
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  }
+});
+

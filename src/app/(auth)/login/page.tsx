@@ -100,7 +100,7 @@ function LoginContent() {
               type="email"
               autoComplete="email"
               required
-              placeholder="Enter you email"
+              placeholder="Enter your email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               label="Email address"
@@ -114,8 +114,9 @@ function LoginContent() {
                 <Turnstile
                   siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                   options={{
-                    theme: resolvedTheme,
+                    theme: resolvedTheme === "dark" ? "dark" : "light",
                     size: "flexible",
+                    action: "login",
                   }}
                   onSuccess={(token: string) => setTurnstileToken(token)}
                   onExpire={() => setTurnstileToken(null)}
