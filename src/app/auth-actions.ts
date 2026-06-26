@@ -5,7 +5,7 @@ import { resolveAppOrigin } from "@/lib/server/app-origin";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
 import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
-import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, isValidIp, getClientIp } from "@/lib/server/rate-limit";
+import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, getClientIp } from "@/lib/server/rate-limit";
 import { cookies, headers } from "next/headers";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -27,6 +27,11 @@ export type AuthTenant = {
   balance: number;
   role: "admin" | "agent";
 };
+export async function loginWithMagicLink(email: string, captchaToken?: string, nextPath?: string) {
+  // Validate email format and length before any other operations
+  if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email address format." };
+  }
 
   // Resolve client IP
   const headersList = await headers();
