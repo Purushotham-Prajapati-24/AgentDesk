@@ -100,10 +100,10 @@ async function isRateLimited(email: string, ip: string): Promise<{ limited: bool
     const emailKey = `rate-limit:email:${normalizedEmail}`;
     const ipKey = `rate-limit:ip:${ip}`;
 
-    // Check/Increment email limit: Max 1 request per 2 minutes (120s)
-    const emailCount = await incrementCacheKey(emailKey, 120);
-    if (emailCount > 1) {
-      return { limited: true, reason: "Please wait 2 minutes before requesting another link." };
+    // Check/Increment email limit: Max 4 requests per 10 minutes (600s)
+    const emailCount = await incrementCacheKey(emailKey, 600);
+    if (emailCount > 4) {
+      return { limited: true, reason: "Too many login attempts. Please try again in 10 minutes." };
     }
 
     // Check/Increment IP limit: Max 5 requests per 10 minutes (600s)
@@ -114,9 +114,8 @@ async function isRateLimited(email: string, ip: string): Promise<{ limited: bool
 
     return { limited: false };
   } catch (error) {
-    console.error("Rate limiting check error:", error);
-    // Fail-closed
-    return { limited: true, reason: "Login temporarily unavailable. Please try again shortly." };
+    console.error("Rate limiting check error (failing open):", error);
+    return { limited: false };
   }
 }
 
@@ -132,13 +131,7 @@ export async function loginWithMagicLink(email: string, captchaToken?: string, n
     return { success: false, error: "Unable to verify client identity. Connection security check failed." };
   }
 
-  // A. Rate limiting validation
-  const rateLimitResult = await isRateLimited(email, ip);
-  if (rateLimitResult.limited) {
-    return { success: false, error: rateLimitResult.reason };
-  }
-
-  // B. Turnstile verification
+  // A. Turnstile verification (Primary gatekeeper)
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
   const isCaptchaRequired = !!(siteKey || secretKey || process.env.NODE_ENV === "production");
@@ -151,6 +144,12 @@ export async function loginWithMagicLink(email: string, captchaToken?: string, n
     if (!isHuman) {
       return { success: false, error: "Security check failed. Please try again." };
     }
+  }
+
+  // B. Rate limiting validation (Defense-in-depth, run only if captcha passed)
+  const rateLimitResult = await isRateLimited(email, ip);
+  if (rateLimitResult.limited) {
+    return { success: false, error: rateLimitResult.reason };
   }
 
   const { account } = await createAdminClient();
