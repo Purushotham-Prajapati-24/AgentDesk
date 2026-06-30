@@ -10,8 +10,7 @@ const mockHeadersWrapper = {
     set: () => {},
   }),
 };
-mock.module("file:///D:/Hackathon/AI_Support_Agent/src/lib/server/headers-wrapper.ts", { namedExports: mockHeadersWrapper });
-mock.module("file:///d:/Hackathon/AI_Support_Agent/src/lib/server/headers-wrapper.ts", { namedExports: mockHeadersWrapper });
+mock.module(new URL("../src/lib/server/headers-wrapper.ts", import.meta.url).href, { namedExports: mockHeadersWrapper });
 
 // 2. Mock Appwrite client
 let lastCreatedToken = null;
@@ -26,8 +25,7 @@ const mockAppwrite = {
   }),
   createSessionClient: async () => ({})
 };
-mock.module("file:///D:/Hackathon/AI_Support_Agent/src/lib/server/appwrite.ts", { namedExports: mockAppwrite });
-mock.module("file:///d:/Hackathon/AI_Support_Agent/src/lib/server/appwrite.ts", { namedExports: mockAppwrite });
+mock.module(new URL("../src/lib/server/appwrite.ts", import.meta.url).href, { namedExports: mockAppwrite });
 
 // Import the real rate limit module for helper checks
 import * as rateLimit from "../src/lib/server/rate-limit.ts";
