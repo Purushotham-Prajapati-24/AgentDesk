@@ -30,6 +30,7 @@ function LoginContent() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [captchaKey, setCaptchaKey] = useState(0);
+  const [captchaLoadFailed, setCaptchaLoadFailed] = useState(false);
 
   const queryMessage = getQueryMessage(searchParams.get("error"));
   const configError = process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
@@ -46,6 +47,7 @@ function LoginContent() {
 
   const handleTurnstileSuccess = useCallback((token: string) => {
     setTurnstileToken(token);
+    setCaptchaLoadFailed(false);
   }, []);
 
   const handleTurnstileExpire = useCallback(() => {
@@ -54,6 +56,7 @@ function LoginContent() {
 
   const handleTurnstileError = useCallback(() => {
     setTurnstileToken(null);
+    setCaptchaLoadFailed(true);
     setMessage({
       type: "error",
       text: "Security check failed to load. Please check your connection or disable ad-blockers.",
@@ -65,7 +68,7 @@ function LoginContent() {
     if (configError) return;
 
     if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken) {
-      if (message?.text.includes("failed to load")) {
+      if (captchaLoadFailed) {
         return;
       }
       setMessage({ type: "error", text: "Please complete the security verification." });
@@ -82,17 +85,19 @@ function LoginContent() {
       });
       if (!result.success) {
         setTurnstileToken(null);
+        setCaptchaLoadFailed(false);
         setCaptchaKey((prev) => prev + 1);
         throw new Error(result.error);
       }
       setMessage({ type: "success", text: "Magic link dispatched. Check your inbox." });
     } catch (error: unknown) {
       setTurnstileToken(null);
+      setCaptchaLoadFailed(false);
       setCaptchaKey((prev) => prev + 1);
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to send magic link." });
     }
     setLoading(false);
-  }, [configError, turnstileToken, message, email, nextPath]);
+  }, [configError, turnstileToken, captchaLoadFailed, email, nextPath]);
 
   return (
     <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">

@@ -32,8 +32,9 @@ export async function getClientIp(headersList: Headers): Promise<string> {
     if (xff) {
       if (process.env.TRUST_X_FORWARDED_FOR === "true") {
         const parts = xff.split(",");
-        // Extract the rightmost IP address. This is the most secure and reliable choice
-        // because it represents the address appended by the immediate upstream proxy.
+        // Extract the rightmost IP address. This represents the address appended by the immediate upstream proxy (e.g. Cloudflare edge).
+        // Trust-Chain Assumption: We trust our immediate upstream load balancer/edge proxy to append the correct client IP.
+        // Reading leftmost IP is vulnerable to spoofing, as clients can send arbitrary x-forwarded-for values.
         ip = parts[parts.length - 1].trim();
       } else {
         console.warn("[getClientIp] X-Forwarded-For header present but TRUST_X_FORWARDED_FOR is not enabled. Ignoring untrusted header.");
@@ -155,41 +156,55 @@ export async function verifyTurnstileToken(token: string, ip: string): Promise<b
   }
 }
 
-export async function isRateLimited(
-  email: string,
+export async function checkIpRateLimit(
   ip: string,
+  incrementOverride?: typeof defaultIncrement
+): Promise<{ limited: boolean; reason?: string }> {
+  const windowMinutes = Math.ceil(RATE_LIMIT_WINDOW_SECONDS / 60);
+  const limitReason = `Too many login attempts. Please try again in ${windowMinutes} minutes.`;
+
+  if (process.env.NODE_ENV === "production" && ip === "unknown-ip") {
+    console.error("[Rate Limiter] Rejecting request in production because client IP is unresolvable.");
+    return { limited: true, reason: "Security check failed: Client IP could not be resolved." };
+  }
+
+  if (ip === "unknown-ip") {
+    return { limited: false };
+  }
+
+  try {
+    if (!isValidIp(ip)) {
+      console.error(`[Rate Limiter] Invalid IP address format: ${ip}`);
+      return { limited: true, reason: limitReason };
+    }
+
+    const ipKey = `rate-limit:ip:${ip}`;
+    const activeIncrement = incrementOverride || defaultIncrement;
+    const ipCount = await activeIncrement(ipKey, RATE_LIMIT_WINDOW_SECONDS);
+    if (ipCount > 5) {
+      console.warn(`[Rate Limiter] IP rate limit exceeded for IP: ${ip}`);
+      return { limited: true, reason: limitReason };
+    }
+
+    return { limited: false };
+  } catch (error) {
+    console.error("IP rate limiting check error (failing open):", error);
+    return { limited: false };
+  }
+}
+
+export async function checkEmailRateLimit(
+  email: string,
   incrementOverride?: typeof defaultIncrement
 ): Promise<{ limited: boolean; reason?: string }> {
   try {
     const normalizedEmail = email.toLowerCase().trim();
     const emailKey = `rate-limit:email:${normalizedEmail}`;
-    const ipKey = `rate-limit:ip:${ip}`;
     const activeIncrement = incrementOverride || defaultIncrement;
 
     const windowMinutes = Math.ceil(RATE_LIMIT_WINDOW_SECONDS / 60);
     const limitReason = `Too many login attempts. Please try again in ${windowMinutes} minutes.`;
 
-    // Note: IP rate limit is checked and incremented first to protect the email retry budget
-    // from being consumed by requests that are already blocked by IP limits (e.g. email DoS defense).
-    // Expiration TTL uses a fixed window (starts at the first increment, subsequent increments
-    // do not extend the lockout window). This prevents perpetual lockout on repeated attempts.
-    
-    // Check/Increment IP limit if Connection IP is resolved
-    if (ip !== "unknown-ip") {
-      // Validate IP format to prevent injection attacks and fragmentation
-      if (!isValidIp(ip)) {
-        console.error(`[Rate Limiter] Invalid IP address format: ${ip}`);
-        return { limited: true, reason: limitReason };
-      }
-
-      const ipCount = await activeIncrement(ipKey, RATE_LIMIT_WINDOW_SECONDS);
-      if (ipCount > 5) {
-        console.warn(`[Rate Limiter] IP rate limit exceeded for IP: ${ip}`);
-        return { limited: true, reason: limitReason };
-      }
-    }
-
-    // Check/Increment email limit: Max 4 requests per 10 minutes
     const emailCount = await activeIncrement(emailKey, RATE_LIMIT_WINDOW_SECONDS);
     if (emailCount > 4) {
       console.warn(`[Rate Limiter] Email rate limit exceeded for email: ${normalizedEmail}`);
@@ -198,7 +213,19 @@ export async function isRateLimited(
 
     return { limited: false };
   } catch (error) {
-    console.error("Rate limiting check error (failing open):", error);
+    console.error("Email rate limiting check error (failing open):", error);
     return { limited: false };
   }
+}
+
+export async function isRateLimited(
+  email: string,
+  ip: string,
+  incrementOverride?: typeof defaultIncrement
+): Promise<{ limited: boolean; reason?: string }> {
+  const ipResult = await checkIpRateLimit(ip, incrementOverride);
+  if (ipResult.limited) {
+    return ipResult;
+  }
+  return checkEmailRateLimit(email, incrementOverride);
 }

@@ -14,8 +14,9 @@ function restoreEnv(originalEnv) {
 }
 
 // 1. Mock headers wrapper
+let mockHeaders = new Headers({ "cf-connecting-ip": "1.2.3.4" });
 const mockHeadersWrapper = {
-  getHeaders: async () => new Headers({ "x-forwarded-for": "1.2.3.4" }),
+  getHeaders: async () => mockHeaders,
   getCookies: async () => ({
     delete: () => {},
     set: () => {},
@@ -179,5 +180,48 @@ test("loginWithMagicLink: successfully dispatches magic link on valid input", as
   } finally {
     restoreEnv(originalEnv);
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("loginWithMagicLink: rejects unknown-ip in production", async () => {
+  const originalEnv = {
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+  };
+  mockHeaders = new Headers({}); // empty headers -> unknown-ip
+
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    delete process.env.TURNSTILE_SECRET_KEY;
+
+    const res = await loginWithMagicLink("test@example.com");
+    assert.deepStrictEqual(res, { success: false, error: "Security check failed: Client IP could not be resolved." });
+  } finally {
+    mockHeaders = new Headers({ "x-forwarded-for": "1.2.3.4" });
+    restoreEnv(originalEnv);
+  }
+});
+
+test("loginWithMagicLink: supports legacy positional signature", async () => {
+  const originalEnv = {
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  };
+  lastCreatedToken = null;
+
+  try {
+    process.env.NODE_ENV = "development";
+    process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
+
+    // Call with positional arguments: (email, captchaToken, nextPath)
+    const res = await loginWithMagicLink("legacy@example.com", "fake_captcha", "/legacy-next");
+    assert.deepStrictEqual(res, { success: true });
+    assert.ok(lastCreatedToken);
+    assert.strictEqual(lastCreatedToken.email, "legacy@example.com");
+    assert.match(lastCreatedToken.url, /\/verify\?next=%2Flegacy-next/);
+  } finally {
+    restoreEnv(originalEnv);
   }
 });

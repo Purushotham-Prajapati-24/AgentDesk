@@ -5,7 +5,7 @@ import { resolveAppOrigin } from "../lib/server/app-origin.ts";
 import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "../lib/server/auth-tenants.ts";
 import { getAuthorizedTenantDocument } from "../lib/server/tenant-access.ts";
 import { sanitizeNextPath } from "../lib/auth-redirect.ts";
-import { isRateLimited, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, getClientIp } from "../lib/server/rate-limit.ts";
+import { checkIpRateLimit, checkEmailRateLimit, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, getClientIp } from "../lib/server/rate-limit.ts";
 import { getHeaders, getCookies } from "../lib/server/headers-wrapper.ts";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
@@ -29,10 +29,21 @@ export type AuthTenant = {
 };
 export async function loginWithMagicLink(
   email: string,
-  options?: { captchaToken?: string; nextPath?: string }
+  options?: string | { captchaToken?: string; nextPath?: string },
+  legacyNextPath?: string
 ) {
-  const captchaToken = options?.captchaToken;
-  const nextPath = options?.nextPath;
+  let captchaToken: string | undefined;
+  let nextPath: string | undefined;
+
+  if (typeof options === "string") {
+    // Legacy signature compatibility: loginWithMagicLink(email, captchaToken, nextPath)
+    captchaToken = options;
+    nextPath = legacyNextPath;
+  } else if (options && typeof options === "object") {
+    // Options object signature: loginWithMagicLink(email, { captchaToken, nextPath })
+    captchaToken = options.captchaToken;
+    nextPath = options.nextPath;
+  }
 
   // Validate email format and length before any other operations
   if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -43,7 +54,13 @@ export async function loginWithMagicLink(
   const headersList = await getHeaders();
   const ip = await getClientIp(headersList);
 
-  // A. Turnstile verification (Primary gatekeeper)
+  // A. IP Rate Limiting check (Primary shield before CAPTCHA verification to prevent CAPTCHA/email-budget DoS)
+  const ipLimitResult = await checkIpRateLimit(ip);
+  if (ipLimitResult.limited) {
+    return { success: false, error: ipLimitResult.reason };
+  }
+
+  // B. Turnstile verification (Secondary gatekeeper, protects email dispatch)
   if (isCaptchaRequired()) {
     const config = validateTurnstileConfig();
     if (!config.valid) {
@@ -62,10 +79,10 @@ export async function loginWithMagicLink(
     }
   }
 
-  // B. Rate limiting validation (Defense-in-depth, run only if captcha passed)
-  const rateLimitResult = await isRateLimited(email, ip);
-  if (rateLimitResult.limited) {
-    return { success: false, error: rateLimitResult.reason };
+  // C. Email Rate Limiting check (Run only if CAPTCHA passed)
+  const emailLimitResult = await checkEmailRateLimit(email);
+  if (emailLimitResult.limited) {
+    return { success: false, error: emailLimitResult.reason };
   }
 
   const { account } = await createAdminClient();

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isRateLimited,
+  checkIpRateLimit,
+  checkEmailRateLimit,
   verifyTurnstileToken,
   isCaptchaRequired,
   validateTurnstileConfig,
@@ -311,6 +313,45 @@ test("getClientIp returns correct IP from headers and respects configurations", 
     process.env.NODE_ENV = "development";
     assert.strictEqual(await getClientIp(headers), "127.0.0.1");
 
+  } finally {
+    restoreEnv(originalEnv);
+  }
+});
+
+test("checkIpRateLimit and checkEmailRateLimit separate functionality", async () => {
+  const originalEnv = {
+    NODE_ENV: process.env.NODE_ENV,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+  };
+  delete process.env.UPSTASH_REDIS_REST_URL;
+  delete process.env.UPSTASH_REDIS_REST_TOKEN;
+  __clearMonitorMemoryCacheForTests();
+
+  try {
+    // 1. checkIpRateLimit works independently
+    const ipRes1 = await checkIpRateLimit("1.1.1.1");
+    assert.deepStrictEqual(ipRes1, { limited: false });
+
+    // 2. checkIpRateLimit rejects unknown-ip in production
+    process.env.NODE_ENV = "production";
+    const ipResUnknownProd = await checkIpRateLimit("unknown-ip");
+    assert.strictEqual(ipResUnknownProd.limited, true);
+    assert.match(ipResUnknownProd.reason, /Client IP could not be resolved/);
+
+    // 3. checkIpRateLimit allows unknown-ip in development
+    process.env.NODE_ENV = "development";
+    const ipResUnknownDev = await checkIpRateLimit("unknown-ip");
+    assert.deepStrictEqual(ipResUnknownDev, { limited: false });
+
+    // 4. checkEmailRateLimit works independently and limits
+    __clearMonitorMemoryCacheForTests();
+    for (let i = 0; i < 4; i++) {
+      const emailRes = await checkEmailRateLimit("user@test.com");
+      assert.deepStrictEqual(emailRes, { limited: false });
+    }
+    const emailResBlocked = await checkEmailRateLimit("user@test.com");
+    assert.strictEqual(emailResBlocked.limited, true);
   } finally {
     restoreEnv(originalEnv);
   }
