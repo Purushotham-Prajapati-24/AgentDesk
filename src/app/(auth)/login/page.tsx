@@ -33,9 +33,11 @@ function LoginContent() {
   const [captchaLoadFailed, setCaptchaLoadFailed] = useState(false);
 
   const queryMessage = getQueryMessage(searchParams.get("error"));
-  const configError = process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-    ? { type: "error" as const, text: "Security verification is misconfigured (missing CAPTCHA site key). Please contact support." }
-    : null;
+  const configError = React.useMemo(() => {
+    return process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      ? { type: "error" as const, text: "Security verification is misconfigured (missing CAPTCHA site key). Please contact support." }
+      : null;
+  }, []);
   const visibleMessage = configError ?? message ?? queryMessage;
   const nextPath = sanitizeNextPath(searchParams.get("next"));
 

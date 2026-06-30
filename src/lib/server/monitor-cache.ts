@@ -149,8 +149,17 @@ async function* scanKeys(pattern: string) {
   } while (cursor !== "0");
 }
 
+let lastPrunedAt = 0;
+const PRUNE_INTERVAL_MS = 60000; // 1 minute
+
 function pruneMemoryCache() {
   const now = Date.now();
+  // Throttle pruning to avoid loop overhead on hot-paths, unless we exceed max entries.
+  if (now - lastPrunedAt < PRUNE_INTERVAL_MS && memoryCache.size <= MAX_MEMORY_CACHE_ENTRIES) {
+    return;
+  }
+  lastPrunedAt = now;
+
   for (const [key, entry] of memoryCache) {
     if (entry.expiresAt <= now) {
       memoryCache.delete(key);

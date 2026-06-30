@@ -189,18 +189,26 @@ test("loginWithMagicLink: rejects unknown-ip in production", async () => {
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
   };
+  const originalFetch = globalThis.fetch;
   mockHeaders = new Headers({}); // empty headers -> unknown-ip
 
   try {
     process.env.NODE_ENV = "production";
-    delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-    delete process.env.TURNSTILE_SECRET_KEY;
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "site_key";
+    process.env.TURNSTILE_SECRET_KEY = "secret_key";
 
-    const res = await loginWithMagicLink("test@example.com");
+    // Mock fetch for Turnstile verification to return success: true
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ success: true, action: "login" }),
+    });
+
+    const res = await loginWithMagicLink("test@example.com", { captchaToken: "valid_token" });
     assert.deepStrictEqual(res, { success: false, error: "Security check failed: Client IP could not be resolved." });
   } finally {
-    mockHeaders = new Headers({ "x-forwarded-for": "1.2.3.4" });
+    mockHeaders = new Headers({ "cf-connecting-ip": "1.2.3.4" });
     restoreEnv(originalEnv);
+    globalThis.fetch = originalFetch;
   }
 });
 

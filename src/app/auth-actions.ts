@@ -54,13 +54,7 @@ export async function loginWithMagicLink(
   const headersList = await getHeaders();
   const ip = await getClientIp(headersList);
 
-  // A. IP Rate Limiting check (Primary shield before CAPTCHA verification to prevent CAPTCHA/email-budget DoS)
-  const ipLimitResult = await checkIpRateLimit(ip);
-  if (ipLimitResult.limited) {
-    return { success: false, error: ipLimitResult.reason };
-  }
-
-  // B. Turnstile verification (Secondary gatekeeper, protects email dispatch)
+  // A. Turnstile verification (Primary gatekeeper)
   if (isCaptchaRequired()) {
     const config = validateTurnstileConfig();
     if (!config.valid) {
@@ -79,6 +73,12 @@ export async function loginWithMagicLink(
     }
   }
 
+  // B. IP Rate Limiting check (Secondary shield, run only if CAPTCHA passed to protect shared NAT/VPN users from blockout DoS)
+  const ipLimitResult = await checkIpRateLimit(ip);
+  if (ipLimitResult.limited) {
+    return { success: false, error: ipLimitResult.reason };
+  }
+
   // C. Email Rate Limiting check (Run only if CAPTCHA passed)
   const emailLimitResult = await checkEmailRateLimit(email);
   if (emailLimitResult.limited) {
@@ -88,7 +88,6 @@ export async function loginWithMagicLink(
   const { account } = await createAdminClient();
 
   try {
-    const headersList = await getHeaders();
     const origin = resolveAppOrigin(headersList);
     // Defense in depth: callers (login page, AuthAwareCta) already
     // sanitize `nextPath`, but re-sanitizing here means a future caller

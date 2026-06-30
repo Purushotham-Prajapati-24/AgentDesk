@@ -9,7 +9,9 @@ export function isValidIp(ip: string): boolean {
 export async function getClientIp(headersList: Headers): Promise<string> {
   let ip = "";
 
-  // 1. Check custom trusted proxy header if configured
+  // 1. Check custom trusted proxy header if configured.
+  // Security/Trust Chain Assumption: If a custom trusted proxy header is configured, the deployment configuration
+  // must guarantee that this header is stripped or overwritten at the edge proxy to prevent client-side spoofing.
   const trustedHeader = process.env.TRUSTED_PROXY_HEADER;
   if (trustedHeader) {
     const rawHeader = headersList.get(trustedHeader) || "";
