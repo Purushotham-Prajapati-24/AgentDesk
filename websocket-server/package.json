@@ -16,5 +16,8 @@
     "redis": "^5.12.1",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5"
+  },
+  "overrides": {
+    "ws": "^8.21.0"
   }
 }

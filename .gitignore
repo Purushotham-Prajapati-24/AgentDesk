@@ -98,3 +98,4 @@ plan.md
 
 # Local Git worktrees — never commit these
 .worktrees/
+scratch/comments.json
