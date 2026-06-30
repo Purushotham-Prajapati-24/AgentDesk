@@ -18,12 +18,13 @@
     "qdrant:hybrid": "node --env-file=.env.local scripts/create-qdrant-hybrid.mjs",
     "setup:ingestion": "node --env-file=.env.local scripts/setup-ingestion-schema.mjs",
     "start": "next start",
-    "test": "node --experimental-strip-types --test test/*.test.mjs",
+    "test": "node --experimental-strip-types --experimental-test-module-mocks --test test/*.test.mjs",
     "test:sdk": "vitest run",
     "typecheck": "npm run typecheck -w @agentdeskbot/core && npm run typecheck -w @agentdeskbot/react -w @agentdeskbot/vue",
     "lint": "eslint"
   },
   "dependencies": {
+    "@marsidev/react-turnstile": "^1.5.3",
     "@mozilla/readability": "^0.6.0",
     "@qdrant/js-client-rest": "^1.18.0",
     "@splinetool/react-spline": "^4.1.0",

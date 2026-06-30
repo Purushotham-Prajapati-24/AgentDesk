@@ -57,6 +57,38 @@ export async function setCachedJson(key: string, value: unknown, ttlSeconds: num
   pruneMemoryCache();
 }
 
+export async function incrementCacheKey(key: string, ttlSeconds: number): Promise<number> {
+  const ttl = Math.max(1, Math.floor(ttlSeconds));
+  if (hasRedisConfig()) {
+    try {
+      const script = "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1])) end; return c;";
+      return await redisCommand<number>(["EVAL", script, 1, key, ttl]);
+    } catch (error) {
+      console.warn("[monitor-cache] Redis atomic INCR failed; falling back to memory.", error);
+    }
+  }
+
+  const entry = memoryCache.get(key);
+  let newVal = 1;
+  if (entry && entry.expiresAt > Date.now()) {
+    const current = Number(entry.value);
+    newVal = Number.isFinite(current) ? current + 1 : 1;
+    // In-memory cache stores references. To prevent side-effects and maintain consistency with external caches (like Redis),
+    // we update the cache by setting a new entry object rather than mutating the existing one in place.
+    memoryCache.set(key, {
+      value: newVal,
+      expiresAt: entry.expiresAt,
+    });
+  } else {
+    memoryCache.set(key, {
+      value: 1,
+      expiresAt: Date.now() + ttl * 1000,
+    });
+  }
+  pruneMemoryCache();
+  return newVal;
+}
+
 export async function deleteCachedPrefix(prefix: string) {
   if (hasRedisConfig()) {
     try {
@@ -117,8 +149,17 @@ async function* scanKeys(pattern: string) {
   } while (cursor !== "0");
 }
 
+let lastPrunedAt = 0;
+const PRUNE_INTERVAL_MS = 60000; // 1 minute
+
 function pruneMemoryCache() {
   const now = Date.now();
+  // Throttle pruning to avoid loop overhead on hot-paths, unless we exceed max entries.
+  if (now - lastPrunedAt < PRUNE_INTERVAL_MS && memoryCache.size <= MAX_MEMORY_CACHE_ENTRIES) {
+    return;
+  }
+  lastPrunedAt = now;
+
   for (const [key, entry] of memoryCache) {
     if (entry.expiresAt <= now) {
       memoryCache.delete(key);

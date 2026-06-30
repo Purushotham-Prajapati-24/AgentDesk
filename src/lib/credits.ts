@@ -33,10 +33,6 @@ type LedgerDocument = Models.Document & {
   created?: unknown;
 };
 
-type TenantCreditsDocument = Models.Document & {
-  credits?: unknown;
-};
-
 type TenantRollupDocument = Models.Document & {
   tenant_id?: unknown;
   credit_balance?: unknown;
@@ -406,10 +402,6 @@ function ledgerCollectionId() {
   // NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID explicitly, so the fallback only
   // affects local development where both reader and writer use the same value.
   return process.env.NEXT_PUBLIC_APPWRITE_LEDGER_COLLECTION_ID ?? "ledger";
-}
-
-function tenantsCollectionId() {
-  return process.env.NEXT_PUBLIC_APPWRITE_TENANTS_COLLECTION_ID ?? process.env.APPWRITE_TENANTS_COLLECTION_ID ?? "tenants";
 }
 
 function sessionsCollectionId() {

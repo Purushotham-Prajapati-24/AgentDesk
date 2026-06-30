@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, Radio, ShieldCheck } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -9,6 +9,8 @@ import { loginWithMagicLink } from "@/app/auth-actions";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { InteractiveRobotSpline } from "@/components/ui/interactive-3d-robot";
 import { sanitizeNextPath } from "@/lib/auth-redirect";
+import { Turnstile } from "@marsidev/react-turnstile";
+import { useTheme } from "@/context/ThemeContext";
 
 const ROBOT_SCENE_URL = "https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode";
 
@@ -21,30 +23,83 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
+  const { resolvedTheme } = useTheme();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+  const [captchaLoadFailed, setCaptchaLoadFailed] = useState(false);
+
   const queryMessage = getQueryMessage(searchParams.get("error"));
-  const visibleMessage = message ?? queryMessage;
+  const configError = React.useMemo(() => {
+    return process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+      ? { type: "error" as const, text: "Security verification is misconfigured (missing CAPTCHA site key). Please contact support." }
+      : null;
+  }, []);
+  const visibleMessage = configError ?? message ?? queryMessage;
   const nextPath = sanitizeNextPath(searchParams.get("next"));
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const turnstileOptions = React.useMemo(() => ({
+    theme: (resolvedTheme === "dark" ? "dark" : "light") as "dark" | "light",
+    size: "flexible" as const,
+    action: "login",
+  }), [resolvedTheme]);
+
+  const handleTurnstileSuccess = useCallback((token: string) => {
+    setTurnstileToken(token);
+    setCaptchaLoadFailed(false);
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setTurnstileToken(null);
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken(null);
+    setCaptchaLoadFailed(true);
+    setMessage({
+      type: "error",
+      text: "Security check failed to load. Please check your connection or disable ad-blockers.",
+    });
+  }, []);
+
+  const handleSubmit = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
+    if (configError) return;
+
+    if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken) {
+      if (captchaLoadFailed) {
+        return;
+      }
+      setMessage({ type: "error", text: "Please complete the security verification." });
+      return;
+    }
+
     setLoading(true);
     setMessage(null);
 
     try {
-      const result = await loginWithMagicLink(email, nextPath ?? undefined);
+      const result = await loginWithMagicLink(email, {
+        captchaToken: turnstileToken ?? undefined,
+        nextPath: nextPath ?? undefined,
+      });
       if (!result.success) {
+        setTurnstileToken(null);
+        setCaptchaLoadFailed(false);
+        setCaptchaKey((prev) => prev + 1);
         throw new Error(result.error);
       }
       setMessage({ type: "success", text: "Magic link dispatched. Check your inbox." });
     } catch (error: unknown) {
+      setTurnstileToken(null);
+      setCaptchaLoadFailed(false);
+      setCaptchaKey((prev) => prev + 1);
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to send magic link." });
     }
     setLoading(false);
-  };
+  }, [configError, turnstileToken, captchaLoadFailed, email, nextPath]);
 
   return (
     <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
@@ -95,8 +150,24 @@ function LoginContent() {
               onChange={(event) => setEmail(event.target.value)}
               label="Email address"
               hint="We send a one-time link. No password storage, no shared console account."
+              disabled={loading || !!configError}
             />
           </div>
+
+          {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+            <div className="mt-5 flex justify-center">
+              <div className="w-full max-w-[340px] overflow-hidden rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-1.5 shadow-sm transition-all duration-300 hover:border-[var(--sky)]/50">
+                <Turnstile
+                  key={captchaKey}
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                  options={turnstileOptions}
+                  onSuccess={handleTurnstileSuccess}
+                  onExpire={handleTurnstileExpire}
+                  onError={handleTurnstileError}
+                />
+              </div>
+            </div>
+          )}
 
           {visibleMessage ? (
             <div
@@ -111,7 +182,7 @@ function LoginContent() {
 
           <button
             className="marketing-cta mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-5 text-sm font-semibold transition hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-            disabled={loading}
+            disabled={loading || !!configError}
             style={{
               backgroundColor: "var(--marketing-inverse)",
               borderColor: "var(--marketing-inverse)",

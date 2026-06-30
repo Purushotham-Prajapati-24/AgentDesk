@@ -1,11 +1,12 @@
 "use server";
 
-import { createAdminClient, createSessionClient } from "@/lib/server/appwrite";
-import { resolveAppOrigin } from "@/lib/server/app-origin";
-import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "@/lib/server/auth-tenants";
-import { getAuthorizedTenantDocument } from "@/lib/server/tenant-access";
-import { sanitizeNextPath } from "@/lib/auth-redirect";
-import { cookies, headers } from "next/headers";
+import { createAdminClient, createSessionClient } from "../lib/server/appwrite.ts";
+import { resolveAppOrigin } from "../lib/server/app-origin.ts";
+import { mapTenantDocument, normalizeTenantRole, tenantRoleForUser } from "../lib/server/auth-tenants.ts";
+import { getAuthorizedTenantDocument } from "../lib/server/tenant-access.ts";
+import { sanitizeNextPath } from "../lib/auth-redirect.ts";
+import { checkIpRateLimit, checkEmailRateLimit, verifyTurnstileToken, isCaptchaRequired, validateTurnstileConfig, getClientIp } from "../lib/server/rate-limit.ts";
+import { getHeaders, getCookies } from "../lib/server/headers-wrapper.ts";
 import { ID, Permission, Role, type Models } from "node-appwrite";
 
 export type AuthUser = {
@@ -26,12 +27,67 @@ export type AuthTenant = {
   balance: number;
   role: "admin" | "agent";
 };
+export async function loginWithMagicLink(
+  email: string,
+  options?: string | { captchaToken?: string; nextPath?: string },
+  legacyNextPath?: string
+) {
+  let captchaToken: string | undefined;
+  let nextPath: string | undefined;
 
-export async function loginWithMagicLink(email: string, nextPath?: string) {
+  if (typeof options === "string") {
+    // Legacy signature compatibility: loginWithMagicLink(email, captchaToken, nextPath)
+    captchaToken = options;
+    nextPath = legacyNextPath;
+  } else if (options && typeof options === "object") {
+    // Options object signature: loginWithMagicLink(email, { captchaToken, nextPath })
+    captchaToken = options.captchaToken;
+    nextPath = options.nextPath;
+  }
+
+  // Validate email format and length before any other operations
+  if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email address format." };
+  }
+
+  // Resolve client IP
+  const headersList = await getHeaders();
+  const ip = await getClientIp(headersList);
+
+  // A. Turnstile verification (Primary gatekeeper)
+  if (isCaptchaRequired()) {
+    const config = validateTurnstileConfig();
+    if (!config.valid) {
+      console.error(
+        `[Turnstile] Misconfigured Turnstile environment variables. Site Key: ${config.siteKeySet ? "set" : "missing"}, Secret Key: ${config.secretKeySet ? "set" : "missing"}`
+      );
+      return { success: false, error: "Security check is misconfigured. Please contact support." };
+    }
+
+    if (!captchaToken) {
+      return { success: false, error: "Security check is missing. Please complete the captcha." };
+    }
+    const isHuman = await verifyTurnstileToken(captchaToken, ip);
+    if (!isHuman) {
+      return { success: false, error: "Security check failed. Please try again." };
+    }
+  }
+
+  // B. IP Rate Limiting check (Secondary shield, run only if CAPTCHA passed to protect shared NAT/VPN users from blockout DoS)
+  const ipLimitResult = await checkIpRateLimit(ip);
+  if (ipLimitResult.limited) {
+    return { success: false, error: ipLimitResult.reason };
+  }
+
+  // C. Email Rate Limiting check (Run only if CAPTCHA passed)
+  const emailLimitResult = await checkEmailRateLimit(email);
+  if (emailLimitResult.limited) {
+    return { success: false, error: emailLimitResult.reason };
+  }
+
   const { account } = await createAdminClient();
 
   try {
-    const headersList = await headers();
     const origin = resolveAppOrigin(headersList);
     // Defense in depth: callers (login page, AuthAwareCta) already
     // sanitize `nextPath`, but re-sanitizing here means a future caller
@@ -57,7 +113,7 @@ export async function verifyMagicLink(userId: string, secret: string) {
   
   try {
     const session = await account.createSession({ userId, secret });
-    const jar = await cookies();
+    const jar = await getCookies();
 
     // Purge any stale/blank session cookie before writing the new one.
     // Without this, browsers with a leftover blank cookie will have two
@@ -132,7 +188,7 @@ export async function logoutSession() {
 }
 
 async function clearSessionCookie() {
-  const jar = await cookies();
+  const jar = await getCookies();
   // Belt-and-suspenders: delete + expire to handle both HttpOnly and any
   // client-visible duplicates that may have been created by old code.
   jar.delete("session");
