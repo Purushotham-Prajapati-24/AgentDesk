@@ -169,7 +169,7 @@ test("loginWithMagicLink: successfully dispatches magic link on valid input", as
 
     globalThis.fetch = async () => ({
       ok: true,
-      json: async () => ({ success: true, action: "login" }),
+      json: async () => ({ success: true, action: "login", hostname: "example.com" }),
     });
 
     const res = await loginWithMagicLink("user@example.com", { captchaToken: "valid_token", nextPath: "/dashboard" });
@@ -188,6 +188,7 @@ test("loginWithMagicLink: rejects unknown-ip in production", async () => {
     NODE_ENV: process.env.NODE_ENV,
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   };
   const originalFetch = globalThis.fetch;
   mockHeaders = new Headers({}); // empty headers -> unknown-ip
@@ -196,11 +197,12 @@ test("loginWithMagicLink: rejects unknown-ip in production", async () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "site_key";
     process.env.TURNSTILE_SECRET_KEY = "secret_key";
+    process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
 
     // Mock fetch for Turnstile verification to return success: true
     globalThis.fetch = async () => ({
       ok: true,
-      json: async () => ({ success: true, action: "login" }),
+      json: async () => ({ success: true, action: "login", hostname: "example.com" }),
     });
 
     const res = await loginWithMagicLink("test@example.com", { captchaToken: "valid_token" });

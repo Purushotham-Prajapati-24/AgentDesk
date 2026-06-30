@@ -357,4 +357,48 @@ test("checkIpRateLimit and checkEmailRateLimit separate functionality", async ()
   }
 });
 
+test("verifyTurnstileToken hostname validation", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = {
+    TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NODE_ENV: process.env.NODE_ENV,
+  };
+
+  process.env.TURNSTILE_SECRET_KEY = "secret_key";
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = "site_key";
+  process.env.NEXT_PUBLIC_APP_URL = "https://agentdesk.test";
+  process.env.NODE_ENV = "production";
+
+  try {
+    // 1. Hostname matches NEXT_PUBLIC_APP_URL
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ success: true, action: "login", hostname: "agentdesk.test" }),
+    });
+    assert.strictEqual(await verifyTurnstileToken("token", "1.2.3.4"), true);
+
+    // 2. Hostname mismatch
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ success: true, action: "login", hostname: "malicious.test" }),
+    });
+    assert.strictEqual(await verifyTurnstileToken("token", "1.2.3.4"), false);
+
+    // 3. Missing NEXT_PUBLIC_APP_URL in production -> fails closed
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({ success: true, action: "login", hostname: "agentdesk.test" }),
+    });
+    assert.strictEqual(await verifyTurnstileToken("token", "1.2.3.4"), false);
+
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv(originalEnv);
+  }
+});
+
+
 

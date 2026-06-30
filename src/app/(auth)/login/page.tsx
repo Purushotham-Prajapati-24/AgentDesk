@@ -150,6 +150,7 @@ function LoginContent() {
               onChange={(event) => setEmail(event.target.value)}
               label="Email address"
               hint="We send a one-time link. No password storage, no shared console account."
+              disabled={loading || !!configError}
             />
           </div>
 

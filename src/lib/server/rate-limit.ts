@@ -151,6 +151,24 @@ export async function verifyTurnstileToken(token: string, ip: string): Promise<b
       return false;
     }
 
+    // Validate hostname to prevent token replay attacks across different domains
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (appUrl) {
+      try {
+        const expectedHostname = new URL(appUrl).hostname;
+        if (outcome.hostname !== expectedHostname) {
+          console.warn(`[Turnstile] Hostname mismatch. Expected '${expectedHostname}', got '${outcome.hostname}'`);
+          return false;
+        }
+      } catch (err) {
+        console.error(`[Turnstile] Invalid NEXT_PUBLIC_APP_URL configured: ${appUrl}`, err);
+        return false;
+      }
+    } else if (process.env.NODE_ENV === "production") {
+      console.error("[Turnstile] NEXT_PUBLIC_APP_URL is not configured in production.");
+      return false;
+    }
+
     return true;
   } catch (error) {
     console.error("Turnstile verification error:", error);
