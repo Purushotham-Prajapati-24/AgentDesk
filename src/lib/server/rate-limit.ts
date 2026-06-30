@@ -1,14 +1,9 @@
 import { incrementCacheKey as defaultIncrement } from "./monitor-cache.ts";
-import { isIP } from "node:net";
-
-let incrementFn = defaultIncrement;
-
-export function __setIncrementFnForTests(fn: typeof defaultIncrement) {
-  incrementFn = fn;
-}
 
 export function isValidIp(ip: string): boolean {
-  return isIP(ip) !== 0;
+  const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{1,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
+  return ipv4Regex.test(ip) || ipv6Regex.test(ip);
 }
 
 export async function getClientIp(headersList: Headers): Promise<string> {
@@ -133,6 +128,7 @@ export async function verifyTurnstileToken(token: string, ip: string): Promise<b
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: bodyParams,
+      signal: AbortSignal.timeout(5000),
     });
 
     if (!res.ok) {
@@ -168,7 +164,7 @@ export async function isRateLimited(
     const normalizedEmail = email.toLowerCase().trim();
     const emailKey = `rate-limit:email:${normalizedEmail}`;
     const ipKey = `rate-limit:ip:${ip}`;
-    const activeIncrement = incrementOverride || incrementFn;
+    const activeIncrement = incrementOverride || defaultIncrement;
 
     const windowMinutes = Math.ceil(RATE_LIMIT_WINDOW_SECONDS / 60);
     const limitReason = `Too many login attempts. Please try again in ${windowMinutes} minutes.`;
@@ -188,6 +184,7 @@ export async function isRateLimited(
 
       const ipCount = await activeIncrement(ipKey, RATE_LIMIT_WINDOW_SECONDS);
       if (ipCount > 5) {
+        console.warn(`[Rate Limiter] IP rate limit exceeded for IP: ${ip}`);
         return { limited: true, reason: limitReason };
       }
     }
@@ -195,6 +192,7 @@ export async function isRateLimited(
     // Check/Increment email limit: Max 4 requests per 10 minutes
     const emailCount = await activeIncrement(emailKey, RATE_LIMIT_WINDOW_SECONDS);
     if (emailCount > 4) {
+      console.warn(`[Rate Limiter] Email rate limit exceeded for email: ${normalizedEmail}`);
       return { limited: true, reason: limitReason };
     }
 

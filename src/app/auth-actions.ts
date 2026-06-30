@@ -27,7 +27,13 @@ export type AuthTenant = {
   balance: number;
   role: "admin" | "agent";
 };
-export async function loginWithMagicLink(email: string, captchaToken?: string, nextPath?: string) {
+export async function loginWithMagicLink(
+  email: string,
+  options?: { captchaToken?: string; nextPath?: string }
+) {
+  const captchaToken = options?.captchaToken;
+  const nextPath = options?.nextPath;
+
   // Validate email format and length before any other operations
   if (!email || typeof email !== "string" || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { success: false, error: "Invalid email address format." };

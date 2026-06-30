@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState } from "react";
+import React, { Suspense, useCallback, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, Radio, ShieldCheck } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -29,6 +29,8 @@ function LoginContent() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
+
   const queryMessage = getQueryMessage(searchParams.get("error"));
   const configError = process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
     ? { type: "error" as const, text: "Security verification is misconfigured (missing CAPTCHA site key). Please contact support." }
@@ -42,11 +44,30 @@ function LoginContent() {
     action: "login",
   }), [resolvedTheme]);
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleTurnstileSuccess = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setTurnstileToken(null);
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken(null);
+    setMessage({
+      type: "error",
+      text: "Security check failed to load. Please check your connection or disable ad-blockers.",
+    });
+  }, []);
+
+  const handleSubmit = useCallback(async (event: React.FormEvent) => {
     event.preventDefault();
     if (configError) return;
 
     if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken) {
+      if (message?.text.includes("failed to load")) {
+        return;
+      }
       setMessage({ type: "error", text: "Please complete the security verification." });
       return;
     }
@@ -55,16 +76,23 @@ function LoginContent() {
     setMessage(null);
 
     try {
-      const result = await loginWithMagicLink(email, turnstileToken ?? undefined, nextPath ?? undefined);
+      const result = await loginWithMagicLink(email, {
+        captchaToken: turnstileToken ?? undefined,
+        nextPath: nextPath ?? undefined,
+      });
       if (!result.success) {
+        setTurnstileToken(null);
+        setCaptchaKey((prev) => prev + 1);
         throw new Error(result.error);
       }
       setMessage({ type: "success", text: "Magic link dispatched. Check your inbox." });
     } catch (error: unknown) {
+      setTurnstileToken(null);
+      setCaptchaKey((prev) => prev + 1);
       setMessage({ type: "error", text: error instanceof Error ? error.message : "Failed to send magic link." });
     }
     setLoading(false);
-  };
+  }, [configError, turnstileToken, message, email, nextPath]);
 
   return (
     <main className="cream-lane marketing-lane grid min-h-screen overflow-hidden lg:grid-cols-[minmax(0,1fr)_500px]">
@@ -110,7 +138,7 @@ function LoginContent() {
               type="email"
               autoComplete="email"
               required
-              placeholder="Enter your email"
+              placeholder="operator@company.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               label="Email address"
@@ -122,17 +150,12 @@ function LoginContent() {
             <div className="mt-5 flex justify-center">
               <div className="w-full max-w-[340px] overflow-hidden rounded-xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-1.5 shadow-sm transition-all duration-300 hover:border-[var(--sky)]/50">
                 <Turnstile
+                  key={captchaKey}
                   siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                   options={turnstileOptions}
-                  onSuccess={(token: string) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken(null)}
-                  onError={() => {
-                    setTurnstileToken(null);
-                    setMessage({
-                      type: "error",
-                      text: "Security check failed to load. Please check your connection or disable ad-blockers.",
-                    });
-                  }}
+                  onSuccess={handleTurnstileSuccess}
+                  onExpire={handleTurnstileExpire}
+                  onError={handleTurnstileError}
                 />
               </div>
             </div>
