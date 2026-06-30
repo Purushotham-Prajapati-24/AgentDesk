@@ -171,7 +171,18 @@ export function postSetMode(botId: string, mode: WidgetMode): void {
 
   try {
     if (windowRef.parent && windowRef.parent !== windowRef) {
-      windowRef.parent.postMessage(payload, '*');
+      let parentOrigin = '*';
+      if (typeof document !== 'undefined' && document.referrer) {
+        try {
+          const refUrl = new URL(document.referrer);
+          if (refUrl.protocol === 'http:' || refUrl.protocol === 'https:') {
+            parentOrigin = refUrl.origin;
+          }
+        } catch {
+          // ignore
+        }
+      }
+      windowRef.parent.postMessage(payload, parentOrigin);
     }
   } catch {
     // cross-origin parent — accept that we can't reach it
