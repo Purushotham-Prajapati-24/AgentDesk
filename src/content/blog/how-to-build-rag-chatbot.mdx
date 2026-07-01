@@ -1,0 +1,259 @@
+export const frontmatter = {
+  tldr:
+    "Building a RAG chatbot takes seven steps: pick an embedding model, set up a vector database, chunk your documents, embed and store them, build the retrieval prompt, wire up the chat loop, and add a confidence-based fallback. This guide walks through each with code and architecture choices. If you'd rather skip the build, AgentDesk ships this entire stack managed — upload documents, paste a snippet, done.",
+  faqs: [
+    {
+      question: "How long does it take to build a RAG chatbot?",
+      answer:
+        "From scratch, a minimum-viable RAG chatbot takes 1–3 days if you're comfortable with Python/TypeScript and vector databases. A production-ready system with confidence thresholds, human handoff, monitoring, and tenant isolation takes weeks. Using a managed platform like AgentDesk, you can have a live RAG chatbot in under 30 minutes — upload documents, configure the widget, paste a snippet.",
+    },
+    {
+      question: "What embedding model should I use for a RAG chatbot?",
+      answer:
+        "For most use cases, OpenAI's text-embedding-3-small offers the best quality-to-cost ratio. For self-hosted or privacy-sensitive setups, all-MiniLM-L6-v2 (via sentence-transformers) is a solid open-source choice. The key requirement is that you use the same model for indexing documents and embedding queries — mixing models breaks retrieval.",
+    },
+    {
+      question: "Which vector database is best for RAG?",
+      answer:
+        "Qdrant, Pinecone, Weaviate, and pgvector all work well. Qdrant is popular for self-hosting and offers hybrid (keyword + vector) search. Pinecone is fully managed. pgvector is great if you're already on PostgreSQL. AgentDesk uses Qdrant for its hybrid search support and per-tenant collection isolation.",
+    },
+    {
+      question: "How do I chunk documents for a RAG chatbot?",
+      answer:
+        "Use recursive text splitting — break documents by headers first, then paragraphs, then sentences, targeting 500–1000 tokens per chunk with 50–100 tokens of overlap. Avoid splitting mid-sentence. Libraries like LangChain's RecursiveCharacterTextSplitter or LlamaIndex's SentenceSplitter handle this. Tables and code blocks should be chunked as units, not split.",
+    },
+    {
+      question: "How do I prevent hallucination in a RAG chatbot?",
+      answer:
+        "Three defenses: (1) set a similarity threshold so the bot only answers when retrieval returns relevant context, (2) instruct the model in the system prompt to say 'I don't know' if the context doesn't contain the answer, and (3) add human handoff as a fallback when confidence is low. No single technique eliminates hallucination — the safety net is escalation.",
+    },
+  ],
+};
+
+import { HowToSteps } from "@/components/content/ContentLayout";
+
+Building a **RAG chatbot** (retrieval-augmented generation chatbot) from scratch is one of the highest-leverage projects a support or engineering team can take on. The architecture is well-understood, the components are commodity, and the payoff — accurate, source-grounded answers at scale — is immediate.
+
+This is a practical, end-to-end guide. We'll walk through each component, the choices you'll make, and the code to wire it together. By the end you'll have a working RAG chatbot and a clear picture of where to harden it for production.
+
+<HowToSteps
+  path="/blog/how-to-build-rag-chatbot"
+  steps={[
+    {
+      name: "Choose an embedding model",
+      text: "Pick a model that converts text into vectors. text-embedding-3-small (OpenAI) for quality-to-cost; all-MiniLM-L6-v2 for self-hosted. The same model must index documents and embed queries — never mix.",
+    },
+    {
+      name: "Set up a vector database",
+      text: "Provision Qdrant, Pinecone, Weaviate, or pgvector. Create a collection with the vector size matching your embedding model (e.g., 1536 for text-embedding-3-small).",
+    },
+    {
+      name: "Chunk your documents",
+      text: "Split source documents into 500–1000-token chunks with overlap using a recursive text splitter. Preserve tables and code blocks as atomic units.",
+    },
+    {
+      name: "Embed and store the chunks",
+      text: "Run each chunk through the embedding model and upsert the vector + metadata (source, page, tenant) into the vector database.",
+    },
+    {
+      name: "Build the retrieval prompt",
+      text: "On each query, embed it, search for the top-k similar chunks, and inject them into the system prompt: 'Answer using only the following context.'",
+    },
+    {
+      name: "Wire up the chat loop",
+      text: "Connect the retrieval + generation pipeline to a chat interface. Store conversation history for multi-turn context.",
+    },
+    {
+      name: "Add a confidence fallback",
+      text: "Set a similarity threshold; if retrieval scores are below it, return 'I don't know' or escalate to a human. This is your hallucination safety net.",
+    },
+  ]}
+/>
+
+## Prerequisites
+
+Before you start, you'll need:
+
+- **Documents to ingest** — help articles, policy PDFs, product manuals, FAQs. The chatbot is only as good as this corpus.
+- **A vector database** — Qdrant (self-hostable), Pinecone (managed), Weaviate, or pgvector if you're on Postgres.
+- **An embedding model** — OpenAI's `text-embedding-3-small`, or an open-source alternative like `all-MiniLM-L6-v2`.
+- **A generation LLM** — any model that follows system prompts (GPT-4o, Claude, Llama, etc.).
+- **A language runtime** — Python (most common for RAG) or TypeScript/Node.js.
+
+## Step 1 — Choose an embedding model
+
+The embedding model converts text into a fixed-length vector. This vector is what the database searches against. The critical rule: **use the same model for indexing and querying.** Mixing models produces garbage results.
+
+| Model | Dimensions | Hosted | Best for |
+| --- | --- | --- | --- |
+| `text-embedding-3-small` | 1536 | OpenAI API | Default choice, best quality-to-cost |
+| `text-embedding-3-large` | 3072 | OpenAI API | Higher accuracy, higher cost |
+| `all-MiniLM-L6-v2` | 384 | Self-hosted | Privacy-sensitive, low-resource |
+| `bge-large-en-v1.5` | 1024 | Self-hosted | Strong open-source quality |
+
+```python
+from openai import OpenAI
+client = OpenAI()
+
+def embed(text: str) -> list[float]:
+    response = client.embeddings.create(
+        input=text,
+        model="text-embedding-3-small"
+    )
+    return response.data[0].embedding
+```
+
+## Step 2 — Set up a vector database
+
+Create a collection whose vector size matches your embedding model's output dimensions.
+
+```python
+from qdrant_client import QdrantClient
+from qdrant_client.models import Distance, VectorParams
+
+client = QdrantClient(url="http://localhost:6333")
+
+client.create_collection(
+    collection_name="support_docs",
+    vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+)
+```
+
+**Tenant isolation tip:** store a `tenant_id` payload field on every point and filter by it at query time. This prevents cross-tenant retrieval — a hard requirement for B2B support. AgentDesk does this with a separate Qdrant collection per tenant.
+
+## Step 3 — Chunk your documents
+
+Chunking is the most underrated step. Bad chunking produces bad retrieval regardless of model quality.
+
+Use **recursive text splitting**: break by headers first, then paragraphs, then sentences, targeting 500–1000 tokens per chunk with 50–100 tokens of overlap. Preserve tables and code as atomic units — never split a table mid-row.
+
+```python
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=800,
+    chunk_overlap=100,
+    separators=["\n\n", "\n", ". ", " ", ""]
+)
+
+chunks = splitter.split_text(document_text)
+```
+
+## Step 4 — Embed and store the chunks
+
+Run each chunk through the embedding model and upsert into the vector database with metadata.
+
+```python
+points = []
+for i, chunk in enumerate(chunks):
+    vector = embed(chunk)
+    points.append({
+        "id": f"doc_{doc_id}_chunk_{i}",
+        "vector": vector,
+        "payload": {
+            "text": chunk,
+            "source": doc_filename,
+            "page": page_number,
+            "tenant_id": tenant_id,
+        }
+    })
+
+client.upsert(collection_name="support_docs", points=points)
+```
+
+## Step 5 — Build the retrieval prompt
+
+On each query: embed the question, search for the top-k similar chunks (filtered by tenant), and construct a system prompt that grounds the answer in the retrieved context.
+
+```python
+def retrieve(query: str, tenant_id: str, k: int = 5):
+    query_vector = embed(query)
+    results = client.search(
+        collection_name="support_docs",
+        query_vector=query_vector,
+        query_filter={"must": [{"key": "tenant_id", "match": {"value": tenant_id}}]},
+        limit=k
+    )
+    return [hit.payload["text"] for hit in results]
+
+def build_prompt(query: str, context_chunks: list[str]) -> str:
+    context = "\n\n".join(context_chunks)
+    return f"""Answer the user's question using only the following context.
+If the context doesn't contain the answer, say "I don't know" and suggest escalating to a human.
+
+Context:
+{context}
+
+Question: {query}"""
+```
+
+## Step 6 — Wire up the chat loop
+
+Connect the retrieval + generation pipeline to a chat interface. Store conversation history for multi-turn context.
+
+```python
+def chat(query: str, tenant_id: str):
+    chunks = retrieve(query, tenant_id)
+    prompt = build_prompt(query, chunks)
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content
+```
+
+## Step 7 — Add a confidence fallback
+
+This is what separates a toy from a production system. Check the similarity scores from retrieval; if they're below a threshold, don't answer — escalate.
+
+```python
+def chat_with_fallback(query: str, tenant_id: str):
+    results = retrieve_with_scores(query, tenant_id)
+    top_score = results[0].score if results else 0
+
+    if top_score < 0.70:
+        return escalate_to_human(query, tenant_id, reason="low_confidence")
+
+    chunks = [r.payload["text"] for r in results]
+    return generate(query, chunks)
+```
+
+AgentDesk builds this in as a first-class feature — [human handoff](/features/human-handoff) triggers automatically on low confidence, sentiment shifts, and policy keywords. The transcript and session token transfer to the operator inbox with zero context loss.
+
+## Production considerations
+
+The MVP above works. Production requires more:
+
+- **Hybrid search.** Combine vector similarity with keyword (BM25) search. Pure-vector retrieval misses exact-match queries (order numbers, SKUs). Qdrant and Weaviate support this natively.
+- **Reranking.** After retrieving top-20 chunks, rerank with a cross-encoder (e.g., Cohere Rerank) and keep the top-5. Improves precision materially.
+- **Observability.** Log every query, retrieved chunks, similarity scores, and the generated answer. You can't fix what you can't see.
+- **Source citation.** Return the source document and chunk with every answer. Customers and operators need to verify.
+- **Rate limiting and abuse prevention.** Public chatbots get spammed. Add per-IP and per-session limits.
+- **Tenant isolation.** If you serve multiple customers, enforce strict per-tenant retrieval filtering. A leak here is a data breach.
+
+## When to build vs buy
+
+**Build if:** you have unique constraints (on-premise, custom compliance, exotic data sources), engineering capacity, and a long-term commitment to maintaining the pipeline.
+
+**Buy if:** you want to ship in days not weeks, you'd rather focus on your knowledge base than infra, and you need tenant isolation, monitoring, and handoff out of the box.
+
+AgentDesk exists for the "buy" case — the entire stack above (chunking, embeddings, Qdrant, retrieval, generation, handoff, monitoring) is managed. You upload documents and paste a widget snippet. [See the quickstart](/docs/quickstart) or [explore the platform](/ai-support-agent).
+
+## Common pitfalls
+
+- **Garbage in, garbage out.** The #1 cause of bad RAG is bad source documents. If your help articles are outdated or contradictory, the chatbot will surface that. Invest in your knowledge base first.
+- **Chunking too small or too large.** Chunks under 200 tokens lose context; chunks over 2000 tokens dilute relevance. 500–1000 is the sweet spot for most content.
+- **No fallback.** A RAG chatbot without a confidence threshold *will* hallucinate on out-of-scope questions. Always have an escalation path.
+- **Ignoring hybrid search.** Pure-vector retrieval fails on exact identifiers. Add keyword search.
+- **Not measuring.** If you aren't logging retrieval scores and tracking escalation rates, you're flying blind.
+
+## Next steps
+
+1. **Read the architecture deep dive** — [What is a RAG chatbot?](/blog/what-is-rag-chatbot) covers the theory and why RAG beats fine-tuning for support.
+2. **Set up escalation** — [When to escalate from AI to human](/blog/when-to-escalate-ai-to-human) covers the triggers and thresholds.
+3. **Compare tools** — [Best AI support agent tools in 2026](/blog/best-ai-support-tools-2026) ranks the platforms including build-vs-buy options.
+4. **Skip the build** — [AgentDesk](/ai-support-agent) gives you this entire stack managed, with human handoff built in.

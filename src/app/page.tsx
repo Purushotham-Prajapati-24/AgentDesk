@@ -88,6 +88,11 @@ export default function Home() {
           <div className="hidden items-center gap-7 text-sm font-medium text-[var(--marketing-muted)] md:flex">
             <a href="#modules">Modules</a>
             <a href="#proof">Proof</a>
+            <a href="#resources">Resources</a>
+            <Link href="/ai-support-agent">AI Support Agent</Link>
+            <Link href="/features/human-handoff">Features</Link>
+            <Link href="/alternatives/chatbase">Alternatives</Link>
+            <Link href="/blog">Blog</Link>
             <Link href="/docs">Docs</Link>
           </div>
           <div className="flex items-center gap-2">
@@ -223,6 +228,79 @@ export default function Home() {
                   <p className="mt-4 text-sm leading-6 text-[var(--marketing-muted)]">{description}</p>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="resources" className="marketing-dark-band border-y border-[var(--marketing-border)] bg-[var(--marketing-bg)] px-4 py-16 text-[var(--marketing-ink)] sm:px-6 lg:px-8 lg:py-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="font-mono text-xs font-semibold uppercase text-[#22c5a5]">Resources</p>
+              <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.04em] text-[var(--marketing-ink)] sm:text-5xl">
+                Learn, compare, and ship.
+              </h2>
+            </div>
+            <p className="max-w-md text-base font-medium leading-7 text-[var(--marketing-muted)]">
+              Deep dives on RAG architecture, human handoff strategy, head-to-head comparisons with Chatbase and DocsBot, and step-by-step deployment guides.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              {
+                title: "What is an AI Support Agent?",
+                description: "How RAG grounds every answer in your documents and why human handoff is the differentiator.",
+                href: "/ai-support-agent",
+                tag: "Pillar",
+              },
+              {
+                title: "Human Handoff Feature",
+                description: "When the AI pauses automation, transfers full context, and a live operator replies inline.",
+                href: "/features/human-handoff",
+                tag: "Feature",
+              },
+              {
+                title: "AI Support Agent Blog",
+                description: "RAG chatbots, escalation triggers, hybrid support models, and tool comparisons — all in one place.",
+                href: "/blog",
+                tag: "Blog",
+              },
+              {
+                title: "Chatbase vs AgentDesk",
+                description: "RAG quality, human handoff depth, embed options, and pricing — side by side.",
+                href: "/alternatives/chatbase",
+                tag: "Compare",
+              },
+              {
+                title: "DocsBot vs AgentDesk",
+                description: "Retrieval quality, developer experience, and when DocsBot is actually the better pick.",
+                href: "/alternatives/docsbot",
+                tag: "Compare",
+              },
+              {
+                title: "Developer Documentation",
+                description: "Quickstart, embed snippets, React SDK, API reference, and handoff endpoints.",
+                href: "/docs",
+                tag: "Docs",
+              },
+            ].map(({ title, description, href, tag }) => (
+              <Link
+                className="marketing-dark-surface group flex min-h-48 flex-col rounded-2xl border border-[var(--marketing-border)] bg-[var(--marketing-surface)] p-6 text-[var(--marketing-ink)] transition hover:-translate-y-1 hover:border-[var(--marketing-ink)] hover:bg-[var(--marketing-bg)] hover:shadow-[0_16px_40px_rgba(10,10,10,0.08)]"
+                href={href}
+                key={title}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="rounded-full border border-[var(--marketing-chip-border)] bg-[var(--marketing-chip)] px-3 py-1 text-xs font-semibold text-[var(--marketing-muted)]">{tag}</span>
+                  <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--marketing-inverse)] text-[var(--marketing-on-inverse)] transition group-hover:bg-[#22c5a5] group-hover:text-white">
+                    <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                  </span>
+                </div>
+                <div className="mt-auto pt-12">
+                  <h3 className="text-xl font-semibold tracking-[-0.02em] text-[var(--marketing-ink)]">{title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-[var(--marketing-muted)]">{description}</p>
+                </div>
+              </Link>
             ))}
           </div>
         </div>

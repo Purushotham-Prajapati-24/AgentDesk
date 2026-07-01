@@ -1,0 +1,122 @@
+export const frontmatter = {
+  category: "deploy",
+};
+
+The AgentDesk widget can be embedded on any website or app shell. This guide covers every install path — **script tag**, **iframe**, **React/Next.js**, and **Vue** — with the snippets and trade-offs for each.
+
+New to AgentDesk? Start with the [quickstart](/docs/quickstart) first.
+
+## Script install — floating launcher
+
+Best for: any marketing site, help center, or static HTML page.
+
+Paste the script once, directly before the closing `</body>` tag. Replace the Bot ID and theme token with the values from your WebChat deploy settings.
+
+```html
+<body>
+  <main>...</main>
+
+  <script
+    src="https://agentdeskbot.vercel.app/widget.js"
+    data-bot-id="YOUR_BOT_ID"
+    data-theme="webchat-v1"
+    data-mode="launcher"
+    async
+  ></script>
+</body>
+```
+
+Load the public page and confirm the launcher does not cover sticky buttons or cookie banners.
+
+## Iframe install — inline panel
+
+Best for: support pages where the chat should be visible immediately.
+
+Place the iframe inside the exact help-page section where customers expect support. Give the iframe a stable height; 640px is a good desktop starting point. Use a full-width responsive wrapper on mobile.
+
+```html
+<section class="support-chat">
+  <iframe
+    src="https://agentdeskbot.vercel.app/embed/YOUR_BOT_ID?theme=webchat-v1"
+    title="AgentDesk Support"
+    style="width: 100%; height: 640px; border: 0;"
+  ></iframe>
+</section>
+```
+
+## React / Next.js install
+
+Best for: app shells where the launcher should persist across routes.
+
+Create a small widget component instead of repeating the snippet on every page. Render it once near the root layout or authenticated app shell. Use only public values in the client bundle: Bot ID, theme token, and mode.
+
+```jsx
+import Script from "next/script";
+
+export function SupportWidget() {
+  return (
+    <Script
+      src="https://agentdeskbot.vercel.app/widget.js"
+      strategy="afterInteractive"
+      data-bot-id="YOUR_BOT_ID"
+      data-theme="webchat-v1"
+      data-mode="launcher"
+    />
+  );
+}
+```
+
+For the typed React component and SSR-safe Next.js subpath, see the [React SDK reference](/docs/react-sdk).
+
+## Vue install
+
+Best for: Vue apps that need the standard launcher without a framework package.
+
+Create a small component for the widget script. Mount it once in the main layout or root app component. Append the script in `onMounted` so it only runs in the browser.
+
+```vue
+<script setup>
+import { onMounted } from "vue";
+
+onMounted(() => {
+  const script = document.createElement("script");
+  script.src = "https://agentdeskbot.vercel.app/widget.js";
+  script.async = true;
+  script.dataset.botId = "YOUR_BOT_ID";
+  script.dataset.theme = "webchat-v1";
+  script.dataset.mode = "launcher";
+  document.body.appendChild(script);
+});
+</script>
+```
+
+## Programmatic controls
+
+The launcher script registers one custom element named `agentdesk-widget`. The current public methods are `toggle()` and `sendMessage(text)`.
+
+```html
+<button onclick="toggleSupport()">Support Chat</button>
+<button onclick="askShipping()">Ask about shipping</button>
+
+<script>
+function getWidget() {
+  return document.querySelector("agentdesk-widget");
+}
+
+function toggleSupport() {
+  getWidget()?.toggle();
+}
+
+function askShipping() {
+  getWidget()?.sendMessage("Can you explain the shipping policy?");
+}
+</script>
+```
+
+> **Current method surface:** Avoid documenting separate `open` or `close` calls until they exist on the custom element. Use `toggle` for launcher visibility today.
+
+## Related docs
+
+- **[Quickstart](/docs/quickstart)** — the five-step end-to-end setup.
+- **[React SDK](/docs/react-sdk)** — typed component and SSR-safe subpath.
+- **[API reference](/docs/api-reference)** — widget config and chat endpoints.

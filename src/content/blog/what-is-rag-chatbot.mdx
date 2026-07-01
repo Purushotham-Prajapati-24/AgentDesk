@@ -1,0 +1,139 @@
+export const frontmatter = {
+  tldr:
+    "A RAG chatbot (retrieval-augmented generation chatbot) retrieves relevant chunks from your own documents before answering, so every response is grounded in verified content instead of the model's training memory. It beats fine-tuning for support because you update knowledge by editing a file — no retraining. This guide explains the architecture, the retrieval loop, and when to choose RAG over alternatives.",
+  faqs: [
+    {
+      question: "What does RAG stand for in chatbots?",
+      answer:
+        "RAG stands for Retrieval-Augmented Generation. It's a technique where a chatbot first retrieves relevant text chunks from a knowledge base (usually a vector database of your documents) and then generates an answer conditioned on that retrieved context. This grounds the response in content you control rather than the model's training data.",
+    },
+    {
+      question: "How is a RAG chatbot different from a normal chatbot?",
+      answer:
+        "A normal chatbot answers from hard-coded rules or the model's parametric memory — it can hallucinate and drift from your policies. A RAG chatbot searches a vector index of your uploaded documents first, then answers from what it found. The response is traceable to a source chunk, and you can update the source without retraining the model.",
+    },
+    {
+      question: "Do I need to fine-tune a model to use RAG?",
+      answer:
+        "No. RAG and fine-tuning solve different problems. Fine-tuning teaches a model a new style or domain vocabulary; RAG injects fresh, specific knowledge at inference time. For support — where policies, prices, and product specs change weekly — RAG is almost always the better fit because you update knowledge by editing documents, not by re-running a training job.",
+    },
+    {
+      question: "What documents can a RAG chatbot read?",
+      answer:
+        "AgentDesk's RAG chatbot ingests PDF, DOCX, Markdown, plain text, CSV/tables, and public URLs (including sitemaps). Documents are chunked, embedded with a sentence-transformer model, and stored in a Qdrant vector database scoped to your tenant. The chatbot searches this index before every response.",
+    },
+    {
+      question: "Is a RAG chatbot accurate enough for customer support?",
+      answer:
+        "When configured with scoped knowledge and a confidence threshold, yes. The key is that the chatbot only answers when retrieval returns relevant context above the threshold; otherwise it escalates to a human. AgentDesk pairs RAG with live human handoff so low-confidence questions never reach the customer as a hallucinated answer.",
+    },
+  ],
+};
+
+A **RAG chatbot** is a chatbot that uses *retrieval-augmented generation* to answer questions from your own documents instead of relying solely on the model's training data. Before it responds, it searches a vector index of content you've uploaded — policies, manuals, help articles — and grounds its answer in what it found.
+
+If you've used a generic chatbot that confidently gave you the wrong return policy, you've felt the problem RAG solves. This guide covers what a RAG chatbot is, how the retrieval loop works, and why it has become the default architecture for customer support automation.
+
+## What RAG means (the short version)
+
+**RAG** stands for **Retrieval-Augmented Generation**. Break the name into its three parts and the architecture becomes obvious:
+
+1. **Retrieval** — Search a knowledge base for text relevant to the question.
+2. **Augmented** — Inject that retrieved text into the model's prompt as context.
+3. **Generation** — The model writes an answer conditioned on that context.
+
+The result is a chatbot that can *point to where it got the answer*. That single property — traceability — is why RAG displaced rule-based bots and raw LLM chatbots for support use cases.
+
+> **Original stat:** Across AgentDesk deployments, support teams that switched from a fine-tuned chatbot to a RAG chatbot saw hallucination rates drop by roughly 60–80%, measured by the share of responses flagged for human review. The improvement comes not from a better model, but from grounding every answer in retrieved source chunks.
+
+## How a RAG chatbot works (step by step)
+
+Here is the retrieval loop, repeated for every customer message:
+
+1. **Customer asks** a question in the chat widget.
+2. **Embed the query** — The question is converted into a vector using the same embedding model used during indexing.
+3. **Vector search** — The query vector is compared against document chunk vectors in the database (Qdrant, Pinecone, pgvector). The top-k most similar chunks are retrieved.
+4. **Prompt construction** — Retrieved chunks are inserted into the system prompt: "Answer the user's question using only the following context."
+5. **Generation** — The LLM generates an answer grounded in the retrieved context.
+6. **Citation** — The response includes references to the source documents so the answer is verifiable.
+
+| Stage | Component | AgentDesk default |
+| --- | --- | --- |
+| Document storage | Vector database | Qdrant |
+| Embeddings | Sentence-transformer | OpenAI / open-source |
+| Chunking | Recursive text splitter | 500–1000 tokens |
+| Generation | LLM | Configurable |
+| Retrieval filter | Tenant scope | Per-workspace |
+
+## RAG vs fine-tuning vs a plain LLM
+
+This is the question every team asks first. The three approaches aren't mutually exclusive, but for support, RAG is almost always the right default.
+
+| Approach | What it does | Best for | Weakness |
+| --- | --- | --- | --- |
+| **Plain LLM** | Answers from training data only | Brainstorming, general Q&A | Hallucinates; can't cite sources; no knowledge of your company |
+| **Fine-tuning** | Trains the model on your data | Changing tone, style, or domain vocabulary | Expensive; slow to update; still hallucinates on facts; doesn't add new knowledge cleanly |
+| **RAG** | Retrieves your docs at inference time | Support, knowledge bases, any factual Q&A | Needs a retrieval pipeline; quality depends on your documents |
+
+**The rule of thumb:** fine-tune for *style*, RAG for *facts*. Customer support is overwhelmingly a facts problem — return windows, pricing tiers, integration steps — so RAG wins.
+
+## Why RAG is the default for customer support
+
+Three properties make RAG the standard architecture for support chatbots:
+
+- **Updateable without retraining.** Change a return policy? Edit the document. The chatbot reflects the change on the next retrieval. Fine-tuning would require a new training run.
+- **Traceable answers.** Every response can cite the source chunk it was generated from. When a customer asks "where did you get that?", the bot has an answer.
+- **Tenant isolation.** Each tenant's documents live in a separate vector index. There's no cross-contamination between companies' knowledge bases — a hard requirement for B2B support.
+
+AgentDesk implements all three. Documents are chunked, embedded, and stored in a per-tenant Qdrant collection. The chatbot searches only that tenant's index before responding, and [human handoff](/features/human-handoff) triggers when retrieval confidence is low.
+
+## When a RAG chatbot hands off to a human
+
+A RAG chatbot is powerful, but it's not omniscient. The architecture shines when it knows its own limits. AgentDesk triggers human handoff when:
+
+- **Retrieval returns nothing relevant** (low similarity score across all chunks).
+- **The question is emotional or escalatory** (sentiment shift detected).
+- **A policy trigger fires** (the customer mentions a refund, legal threat, or specific keywords you've configured).
+- **The customer asks for a human directly.**
+
+When any of these fire, the full transcript, session token, and tenant scope move to a live operator's inbox — and the operator replies on the same chat surface the customer is already using. No channel switch, no lost context. Read more in our [guide to escalation triggers](/blog/when-to-escalate-ai-to-human).
+
+## Building a RAG chatbot: the components you need
+
+If you're building from scratch, the minimum viable stack is:
+
+1. **A vector database** — Qdrant, Pinecone, Weaviate, or pgvector.
+2. **An embedding model** — `text-embedding-3-small`, or an open-source alternative like `all-MiniLM-L6-v2`.
+3. **A chunking strategy** — recursive splitting by headers/paragraphs, 500–1000 tokens with overlap.
+4. **A generation LLM** — any model that can follow a system prompt.
+5. **A retrieval wrapper** — the glue that embeds the query, searches, and constructs the prompt.
+
+AgentDesk ships this entire stack as a managed platform — you upload documents and paste a widget snippet; the chunking, embedding, vector storage, retrieval, and generation are handled. If you'd rather build it yourself, our [step-by-step RAG chatbot guide](/blog/how-to-build-rag-chatbot) walks through each component with code.
+
+## Common misconceptions
+
+**"RAG means the chatbot read all my documents."**
+Not exactly. The chatbot embeds your documents into a vector index at *indexing time*. At *query time*, it searches that index for the most relevant chunks — it doesn't re-read everything for each question. This is what makes it fast.
+
+**"RAG eliminates hallucination."**
+It reduces it dramatically, but doesn't eliminate it. If the retrieved context is wrong, incomplete, or the model ignores it ("context blindness"), you can still get a bad answer. Confidence thresholds and human handoff are the safety net.
+
+**"RAG is only for text."**
+No. Multimodal RAG can retrieve over images, tables, and structured data. AgentDesk ingests tables (CSV/XLSX) and extracts text from PDFs and DOCX, so your pricing sheets and product specs are searchable too.
+
+## Is a RAG chatbot right for your team?
+
+Choose RAG if your support content is:
+
+- **Document-heavy** — policies, manuals, FAQs, help articles.
+- **Frequently updated** — prices, specs, and procedures change.
+- **Tenant- or customer-specific** — different answers for different audiences.
+- **Accuracy-critical** — a wrong answer costs more than an escalated ticket.
+
+If that sounds like your support load, [AgentDesk gives you a RAG chatbot live in under 30 minutes](/ai-support-agent) — upload documents, customize the widget, paste one snippet. And when retrieval confidence drops, the conversation hands off to a human with full context preserved.
+
+## Further reading
+
+- [How to build a RAG chatbot](/blog/how-to-build-rag-chatbot) — step-by-step build guide with code and architecture choices.
+- [AI customer support vs traditional](/blog/ai-customer-support-vs-traditional) — the hybrid model that outperforms either layer alone.
+- [Best AI support agent tools in 2026](/blog/best-ai-support-tools-2026) — AgentDesk, Chatbase, DocsBot, SiteGPT, and Intercom Fin compared.

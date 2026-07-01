@@ -1,0 +1,82 @@
+export const frontmatter = {
+  category: "api",
+};
+
+The **human handoff API** is the contract that moves a customer session from the AI agent into the live operator inbox. When handoff triggers, the session token, full transcript, and tenant scope are preserved so the operator can continue the conversation without the customer repeating themselves.
+
+This is the technical reference. For the product-level explanation of when and why handoff fires, read the [human handoff feature page](/features/human-handoff) and the [escalation triggers guide](/blog/when-to-escalate-ai-to-human).
+
+## How a handoff flows
+
+A handoff has three stages:
+
+1. **Trigger** — the AI agent (or a configured rule) decides the conversation needs a human. Triggers include low retrieval confidence, sentiment shift, policy keywords, or a direct customer request.
+2. **Token mint** — the widget requests a handoff token from `/api/handoff/token`, which authorizes the operator inbox to join the session over the real-time service.
+3. **Live takeover** — the operator opens the conversation from the inbox, sees the full transcript and trigger reason, and replies. Replies are delivered back to the customer's widget over the same WebSocket connection that powers the chat.
+
+## Mint a handoff token
+
+Authorizes the operator inbox to join a customer session.
+
+```http
+POST /api/handoff/token
+```
+
+### Request body
+
+```json
+{
+  "bot_id": "6a160c5a00212e6e9da0",
+  "tenant_id": "tenant-demo",
+  "session_token": "ad_8aef2_3a",
+  "reason": "low_confidence"
+}
+```
+
+The `reason` field is logged so operators and analytics can see *why* the handoff happened. Supported reasons: `low_confidence`, `sentiment`, `policy_keyword`, `direct_request`, `manual`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "handoff_token": "ho_9c41_b2",
+    "session_token": "ad_8aef2_3a",
+    "expires_at": "2026-07-01T12:45:00Z"
+  }
+}
+```
+
+**Auth:** Public widget session (the `session_token` is issued by the widget runtime).
+
+## Real-time message contract
+
+Operator replies and customer messages flow over a single Socket.IO connection scoped to the session. The contract:
+
+- The widget emits customer activity to the real-time service.
+- The operator inbox subscribes to the session channel.
+- Operator replies arrive back in the widget as operator messages.
+- Messages are tenant-scoped: they are associated with the bot and tenant from the widget config response.
+
+There is no channel switch for the customer — they stay in the widget they started in. Read the product-level walkthrough on the [human handoff feature page](/features/human-handoff).
+
+## Trigger reasons reference
+
+| Reason | Description | Typical source |
+| --- | --- | --- |
+| `low_confidence` | Retrieval similarity fell below the configured threshold. | AI agent |
+| `sentiment` | Customer sentiment dropped for consecutive messages. | Sentiment detector |
+| `policy_keyword` | A configured keyword (refund, legal, cancellation) was matched. | Keyword trigger |
+| `direct_request` | The customer explicitly asked for a human. | Widget affordance |
+| `manual` | An operator or admin forced the handoff. | Dashboard action |
+
+## Local testing
+
+Run the WebSocket service with the project WebSocket command when testing live inbox behavior locally. The handoff token and session token are scoped to the same bot ID used in WebChat configuration.
+
+## Related docs
+
+- **[Human handoff feature](/features/human-handoff)** — the product walkthrough and operator inbox.
+- **[API reference](/docs/api-reference)** — chat, config, and ingestion endpoints.
+- **[Quickstart](/docs/quickstart)** — end-to-end AgentDesk setup.

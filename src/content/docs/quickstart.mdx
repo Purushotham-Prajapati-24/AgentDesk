@@ -1,0 +1,66 @@
+export const frontmatter = {
+  category: "start",
+};
+
+The **AgentDesk quickstart** is the shortest path from an empty agent to a working, embedded support widget. Five steps, under 30 minutes, no build step required on the host site.
+
+If you prefer to skim the embed options first, jump to the [embed widget guide](/docs/embed-widget). For the React/Next.js SDK specifically, see the [React SDK reference](/docs/react-sdk).
+
+## Prerequisites
+
+- An AgentDesk account (the [free tier](/ai-support-agent) is enough to complete this guide).
+- At least one document, URL, or help article to use as knowledge.
+- A website where you can paste a script tag (or a React/Vue app where you can install a package).
+
+## Step 1 — Create or select an agent
+
+Use the **Agents** area of the dashboard to create a tenant-scoped bot. Each bot has its own knowledge base, widget configuration, and conversation store. Keep the **Bot ID** available — you'll use it in the embed snippet.
+
+## Step 2 — Add source material
+
+Upload documents or ingest URLs so the model can answer from retrieved support context instead of generic memory. AgentDesk accepts:
+
+- PDF, DOCX, Markdown, and plain text files.
+- CSV/XLSX tables.
+- Public URLs and sitemaps (crawled automatically).
+
+Documents are chunked, embedded, and stored in a Qdrant vector database scoped to your tenant. Use the same agent ID in WebChat that you used during upload — retrieval is per-agent.
+
+## Step 3 — Customize the WebChat surface
+
+From the WebChat workspace, configure:
+
+- **Bot identity** — name, avatar, customer-facing description.
+- **Bot appearance** — header colors, input styling, launcher icon, custom CSS.
+- **Deploy settings** — environment, version tag, rollout strategy.
+- **Feature toggles** — voice, transcript export, file uploads, **human handoff**, source citation.
+
+## Step 4 — Deploy one snippet
+
+Choose your install path:
+
+```html
+<!-- Script install — floating launcher -->
+<script
+  src="https://agentdeskbot.vercel.app/widget.js"
+  data-bot-id="YOUR_BOT_ID"
+  data-theme="webchat-v1"
+  data-mode="launcher"
+  async
+></script>
+```
+
+For iframe, React, or Vue installs, see the [embed widget guide](/docs/embed-widget).
+
+## Step 5 — Open the live preview
+
+Verify the saved agent name, greeting, theme, header, message input, launcher, and handoff behavior before shipping.
+
+> **Local testing tip:** Serve local HTML test pages over HTTP. Browser security rules can block widget script behavior when a page is opened directly from disk (`file://`).
+
+## Next steps
+
+- **[Embed widget](/docs/embed-widget)** — every install path (script, iframe, React, Vue).
+- **[React SDK](/docs/react-sdk)** — SSR-safe component for Next.js App Router.
+- **[API reference](/docs/api-reference)** — chat, config, and ingestion endpoints.
+- **[Human handoff API](/docs/handoff-api)** — the escalation contract for live operator takeover.

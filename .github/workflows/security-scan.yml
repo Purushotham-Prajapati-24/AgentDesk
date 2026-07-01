@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - SEO
     # Skip changeset noise only. docs/** and **.md were intentionally
     # removed from the ignore list: a .md change can carry a leaked
     # secret (changelog example, doc snippet), so any push that could
@@ -14,6 +15,7 @@ on:
   pull_request:
     branches:
       - master
+      - SEO
 
 # Cancel-in-progress is INTENTIONALLY DISABLED on this security workflow.
 # If a force-push lands mid-scan, a `cancel-in-progress: true` setup

@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AuthLayout({
+export default function EmbedLayout({
   children,
 }: {
   children: React.ReactNode;

@@ -1,0 +1,165 @@
+export const frontmatter = {
+  tldr:
+    "The best AI support agent tools in 2026 are AgentDesk (best for human handoff + open-source), Chatbase (best for fast deployment), DocsBot (best for document-heavy teams), SiteGPT (best for non-technical site owners), and Intercom Fin (best for enterprise Intercom users). We compared them on RAG quality, handoff depth, embed flexibility, and total cost. AgentDesk wins on the handoff + tenant isolation combination that the others treat as secondary.",
+  faqs: [
+    {
+      question: "What is the best AI support agent tool in 2026?",
+      answer:
+        "It depends on your priorities. AgentDesk is best for teams that need human handoff with preserved context and tenant isolation. Chatbase is best for fast, simple deployment. DocsBot is strong for document-heavy teams. SiteGPT suits non-technical site owners. Intercom Fin is the choice if you're already on Intercom and want native integration. For most SMB and mid-market teams, AgentDesk offers the best combination of RAG quality, handoff, and price.",
+    },
+    {
+      question: "How much does an AI support agent cost?",
+      answer:
+        "Pricing ranges widely. AgentDesk has a free tier plus usage credits (pay per resolved ticket). Chatbase starts at $19/month. DocsBot starts at $49/month. SiteGPT starts at $49/month. Intercom Fin charges $0.99 per resolution. The real cost comparison is total cost of ownership — including the time to set up, maintain the knowledge base, and handle escalations.",
+    },
+    {
+      question: "Which AI support tool has the best human handoff?",
+      answer:
+        "AgentDesk. Its human handoff pauses automation, transfers the full transcript and session token to a live operator inbox, and lets the operator reply on the same chat surface the customer is using. Chatbase and DocsBot offer limited handoff via integrations; SiteGPT has no native inbox; Intercom Fin routes through Intercom's workflow (powerful but expensive).",
+    },
+    {
+      question: "Are AI support agent tools better than Intercom Fin?",
+      answer:
+        "For teams not already on Intercom, yes — alternatives like AgentDesk, Chatbase, and DocsBot are dramatically cheaper and faster to deploy. Intercom Fin costs $0.99 per resolution and assumes you're on the Intercom platform. For teams already deeply integrated with Intercom, Fin's native workflow may justify the premium. For everyone else, the alternatives win on cost and flexibility.",
+    },
+    {
+      question: "Can I switch from Chatbase or DocsBot to AgentDesk?",
+      answer:
+        "Yes. The migration is straightforward: export your knowledge base documents from your current provider, upload them to AgentDesk, configure the widget, and paste the new snippet. AgentDesk's tenant isolation and document ingestion (PDF, DOCX, Markdown, URLs) make the content transfer simple. See our Chatbase and DocsBot alternative pages for step-by-step migration guides.",
+    },
+  ],
+};
+
+The AI support agent market consolidated in 2025–2026 around a handful of platforms that each carved out a niche. If you're evaluating tools right now, the field is small enough to compare directly — and the differences between them are now sharp enough to matter.
+
+We compared the five leading platforms on the dimensions that actually affect a support team: RAG grounding quality, human handoff depth, embed flexibility, pricing, and total cost of ownership. Here's how they stack up.
+
+## The shortlist
+
+| Tool | Best for | Starting price | Human handoff | RAG | Embed options |
+| --- | --- | --- | --- | --- | --- |
+| **AgentDesk** | Handoff + open-source + tenant isolation | Free tier + usage credits | Native (full context) | Qdrant + hybrid | Script, iframe, React, Vue |
+| **Chatbase** | Fast, simple deployment | $19/mo | Limited (via integrations) | Good | Script, iframe |
+| **DocsBot** | Document-heavy teams | $49/mo | No native inbox | Strong | Script, iframe |
+| **SiteGPT** | Non-technical site owners | $49/mo | None | Moderate | Script, iframe |
+| **Intercom Fin** | Enterprise Intercom users | $0.99/resolution | Via Intercom workflow | Strong | Intercom widget |
+
+> **How we evaluated:** RAG quality = retrieval accuracy + grounding (does it cite sources, does it hallucinate). Handoff depth = does the operator get the full transcript and session context, or just a forwarded message? Embed flexibility = how many ways can you install the widget. Pricing = real total cost at scale, not just the entry tier.
+
+## 1. AgentDesk — best for human handoff + open-source
+
+AgentDesk is the platform built around the premise that an AI support agent is valuable *because it knows when to stop*. Where competitors optimize for deflection (the percentage of tickets the bot closes alone), AgentDesk optimizes for the handoff — the moment the bot escalates to a human with full context preserved.
+
+**Strengths:**
+- **Native human handoff.** When the bot escalates, the full transcript, session token, and tenant scope move to a live operator inbox. The operator replies on the same chat surface — no channel switch, no context loss.
+- **Tenant isolation.** Each tenant's documents, widget config, and conversations are scoped separately. No cross-tenant retrieval. Critical for B2B and agencies.
+- **Embed flexibility.** Script (any site), iframe (inline panel), React/Next.js SDK, Vue SDK — four install paths.
+- **Open-source repository.** You can inspect, self-host, or extend the codebase. No vendor lock-in.
+- **Hybrid search.** Qdrant powers both vector and keyword retrieval, so exact-match queries (order numbers, SKUs) work alongside semantic search.
+
+**Weaknesses:**
+- Newer ecosystem — fewer pre-built integrations than Chatbase.
+- Documentation is still maturing (we're fixing that — see the [developer docs](/docs)).
+
+**Best for:** Teams that need credible escalation, B2B/agency setups requiring tenant isolation, and developers who want an open, inspectable platform.
+
+[Explore AgentDesk →](/ai-support-agent)
+
+## 2. Chatbase — best for fast, simple deployment
+
+Chatbase is the market leader by volume. If you want a chatbot live on your site in 10 minutes with minimal configuration, Chatbase delivers.
+
+**Strengths:**
+- Fastest time-to-live in the category.
+- Large library of integrations (Slack, Zapier, Notion, etc.).
+- Polished dashboard — non-technical users can configure it.
+- Strong brand recognition and comparison content (they own the "Chatbase alternative" SERP).
+
+**Weaknesses:**
+- Human handoff is limited and routed through third-party integrations, not a native inbox.
+- No tenant isolation — multi-tenant setups require workarounds.
+- Closed-source; no self-host option.
+
+**Best for:** Small teams that want a chatbot live today and don't need complex escalation. [Chatbase vs AgentDesk comparison →](/alternatives/chatbase)
+
+## 3. DocsBot — best for document-heavy teams
+
+DocsBot positioned itself around "train AI on your docs" and has strong retrieval quality when the knowledge base is well-structured.
+
+**Strengths:**
+- Excellent document ingestion and chunking.
+- Strong retrieval accuracy on technical content.
+- Good developer documentation.
+
+**Weaknesses:**
+- No native operator inbox — handoff is a gap.
+- Slower to ship AI-citation features (Perplexity, ChatGPT visibility).
+- Marketing content is thin relative to Chatbase.
+
+**Best for:** Internal knowledge bases and dev-tooling teams whose primary need is document Q&A. [DocsBot vs AgentDesk comparison →](/alternatives/docsbot)
+
+## 4. SiteGPT — best for non-technical site owners
+
+SiteGPT targets website owners who want a chatbot without touching code. The setup is wizard-driven and the positioning is vertical (real estate, SaaS, agencies).
+
+**Strengths:**
+- Easiest no-code setup in the category.
+- Vertical landing pages for specific industries.
+- Good for site owners who never want to see a script tag.
+
+**Weaknesses:**
+- Generic positioning — weak technical differentiation.
+- No human handoff.
+- Limited embed options (script and iframe only).
+- Weakest technical SEO of the top five.
+
+**Best for:** Non-technical site owners in vertical markets who want a "set and forget" chatbot. [SiteGPT vs AgentDesk comparison →](/alternatives/sitegpt)
+
+## 5. Intercom Fin — best for enterprise Intercom users
+
+Fin is Intercom's AI agent. If you're already on Intercom, Fin is the path of least resistance — it's native to the workflow you already use.
+
+**Strengths:**
+- Deepest integration with an existing support stack (for Intercom customers).
+- Strong retrieval quality backed by Intercom's engineering.
+- Enterprise-grade compliance and support.
+
+**Weaknesses:**
+- $0.99 per resolution pricing is the highest in the category — it scales expensively.
+- Assumes you're on Intercom. If you're not, the switching cost is enormous.
+- No script/iframe embed for non-Intercom surfaces.
+
+**Best for:** Existing Intercom customers who want AI without leaving the platform. For everyone else, the alternatives are dramatically cheaper.
+
+## How to choose
+
+Use this decision tree:
+
+1. **Already on Intercom and happy with it?** → Intercom Fin. The integration premium is worth it.
+2. **Need credible human handoff with context preservation?** → AgentDesk. It's the only one built around this.
+3. **Want live in 10 minutes, no code, simple use case?** → Chatbase.
+4. **Internal knowledge base, document Q&A focus?** → DocsBot.
+5. **Non-technical site owner, vertical market?** → SiteGPT.
+6. **Multi-tenant or B2B with isolation requirements?** → AgentDesk. Tenant isolation is a first-class feature, not a workaround.
+
+## The cost comparison that matters
+
+Entry-tier pricing is misleading. What matters is total cost at your volume:
+
+| Volume | AgentDesk | Chatbase | DocsBot | SiteGPT | Intercom Fin |
+| --- | --- | --- | --- | --- | --- |
+| 1,000 tickets/mo | ~$50 (usage) | $19–$49 | $49 | $49 | $990 |
+| 10,000 tickets/mo | ~$500 (usage) | $19–$399 | $149+ | $149+ | $9,900 |
+| 50,000 tickets/mo | ~$2,500 (usage) | Custom | Custom | Custom | $49,500 |
+
+Intercom Fin's per-resolution pricing makes it the most expensive option at any scale above trivial volume. AgentDesk's usage-credit model and free tier make it the cheapest for teams willing to manage their knowledge base.
+
+## What's missing from the market
+
+No platform in the top five nails all of: open-source, native handoff, tenant isolation, hybrid search, and competitive pricing. AgentDesk is the closest — it's the only one combining open-source code with a native operator inbox and per-tenant vector isolation. The others each optimize for a different axis and treat handoff or isolation as secondary.
+
+That gap is why AgentDesk exists. If your support load needs the handoff-and-isolation combination, [it's the tool built for it](/ai-support-agent).
+
+## Methodology
+
+This comparison is based on: public documentation and pricing pages for each tool (accessed July 2026), hands-on testing of the four platforms with free tiers or trials, and aggregation of customer-reported deflection rates and CSAT changes. We are transparent about our bias — AgentDesk is our product — and we've flagged where each competitor genuinely wins (Chatbase for speed, DocsBot for doc quality, Fin for Intercom integration). Read our individual comparison pages for the detailed feature matrices: [Chatbase](/alternatives/chatbase), [DocsBot](/alternatives/docsbot), [SiteGPT](/alternatives/sitegpt).

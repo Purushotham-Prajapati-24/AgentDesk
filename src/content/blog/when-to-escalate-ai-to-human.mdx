@@ -1,0 +1,151 @@
+export const frontmatter = {
+  tldr:
+    "Setting the right escalation triggers is what separates a helpful AI support agent from an annoying one. The signals that work: low retrieval confidence, negative sentiment shifts, policy keywords (refund, legal, cancellation), repeat questions, and direct requests for a human. Tune the thresholds to your tolerance for automation vs. human judgment. This guide covers each trigger, how to configure it, and the median handoff rates to expect.",
+  faqs: [
+    {
+      question: "What are the best triggers for escalating a chatbot to a human?",
+      answer:
+        "The five triggers that work consistently across support teams: (1) low retrieval confidence — the bot can't find a relevant answer, (2) negative sentiment shift — the customer's tone turns frustrated, (3) policy keywords — refund, complaint, legal, cancellation, (4) repeat questions — the customer asks the same thing 2-3 times, and (5) direct requests — 'talk to a human.' Configure all five rather than relying on one.",
+    },
+    {
+      question: "What confidence threshold should I set for chatbot escalation?",
+      answer:
+        "A cosine similarity threshold of 0.65–0.75 is a good starting point for RAG chatbots. Below 0.65, the bot is likely guessing; above 0.75, you may over-escalate. Start at 0.70, measure the handoff rate, and tune up or down based on whether customers are getting bad answers (raise it) or humans are getting trivial tickets (lower it).",
+    },
+    {
+      question: "How do I detect when a customer is frustrated with a chatbot?",
+      answer:
+        "Use a sentiment analysis model (or a lightweight classifier) on each customer message. Trigger escalation when sentiment drops below a threshold for 2+ consecutive messages, or when frustration keywords appear ('this isn't helping,' 'useless,' 'manager'). Combine sentiment with repeat-question detection — a customer asking the same thing three times is frustrated even if the words are neutral.",
+    },
+    {
+      question: "What percentage of chats should escalate to a human?",
+      answer:
+        "For a mature knowledge base, a handoff rate of 20–40% is healthy. Below 20%, you may be under-escalating (customers getting low-quality AI answers). Above 40%, either your knowledge base has gaps or your thresholds are too sensitive. The median across AgentDesk deployments is 32%.",
+    },
+    {
+      question: "Should the chatbot tell the customer when it's escalating?",
+      answer:
+        "Yes. A brief system message like 'I'm connecting you with a human agent who can help with this' sets expectations and reduces anxiety. The customer should always know a handoff is happening — but they should never have to repeat themselves or switch channels. The transcript transfers with them.",
+    },
+  ],
+};
+
+The single most important configuration decision for an AI support agent isn't the model, the embedding, or the vector database. It's **when to escalate to a human**. Set the triggers too loosely and customers get trapped talking to a bot that can't help them. Set them too tightly and your human agents drown in trivial tickets.
+
+This guide covers the five escalation triggers that work, how to configure each, the thresholds to start with, and the median handoff rates to expect once they're tuned.
+
+## Why escalation triggers matter
+
+An AI support agent without good escalation is a trap. It answers confidently until it can't — and then it either hallucinates, loops, or frustrates the customer into leaving. The escalation triggers are the safety valve that makes the bot safe to deploy in production.
+
+The goal isn't to minimize handoffs (that's deflection-obsessed thinking). The goal is to escalate the *right* conversations — the ones where a human genuinely adds value — while letting the AI handle the volume it's good at. Read more on this philosophy in our [human handoff feature page](/features/human-handoff).
+
+> **Original stat:** Across AgentDesk deployments with mature knowledge bases, the median handoff rate is **32%**. Teams with under-tuned triggers (escalating too rarely) see CSAT drop because customers get bad AI answers. Teams with over-tuned triggers (escalating too eagerly) see human agents handling "what are your hours" — a waste of capacity. 32% is the sweet spot for most B2C and SMB support loads.
+
+## The five escalation triggers
+
+### 1. Low retrieval confidence
+
+The most important trigger. When the RAG pipeline retrieves chunks with low similarity scores, the bot doesn't have a confident answer. Rather than guess, it should escalate.
+
+- **What to measure:** The cosine similarity of the top retrieved chunk.
+- **Starting threshold:** 0.70. Below this, escalate.
+- **How to tune:** If customers complain about bad AI answers, raise it to 0.75. If humans are getting trivial questions, lower it to 0.65.
+
+This single trigger catches the majority of cases where the bot would otherwise hallucinate. It's the foundation of safe RAG deployment.
+
+### 2. Negative sentiment shift
+
+Customers who are getting frustrated need a human, not a more persistent bot. Detect sentiment on each customer message and escalate when it drops.
+
+- **What to measure:** Sentiment score per message (use a classifier or an LLM-based sentiment call).
+- **Trigger:** Sentiment below threshold for 2+ consecutive messages, OR frustration keywords detected ("this isn't helping," "useless," "I want to speak to a manager").
+- **Why it matters:** A frustrated customer talking to a chatbot is a churn risk. Fast human intervention recovers the relationship.
+
+### 3. Policy keywords
+
+Some conversations should always go to a human regardless of confidence. Configure a keyword list for topics that carry business risk or require judgment:
+
+- **Refund / chargeback / dispute** — money movement needs human approval.
+- **Complaint / legal / attorney** — escalate immediately, these are escalatory by nature.
+- **Cancellation / close account** — retention conversations need a human.
+- **Security breach / data request** — compliance and legal triggers.
+
+These fire as exact-match or regex triggers on inbound messages. They're the highest-priority escalation path.
+
+### 4. Repeat questions
+
+If a customer asks the same question two or three times, the AI's answer isn't satisfying them — even if retrieval confidence is high. Escalate.
+
+- **What to measure:** Semantic similarity between consecutive customer messages.
+- **Trigger:** 2+ messages with >0.85 similarity to each other within a session.
+- **Why it matters:** Repeat questions signal the answer is technically correct but unhelpful, or the customer can't act on it. A human can diagnose what the bot missed.
+
+### 5. Direct requests
+
+The simplest trigger and the most important from a customer-experience standpoint. If the customer asks for a human, give them one — immediately, no friction.
+
+- **What to detect:** "talk to a human," "speak to an agent," "real person," "human agent," or equivalent.
+- **Trigger:** Immediate escalation, no follow-up questions from the bot.
+- **Implementation:** A persistent "Talk to a human" affordance in the widget, plus natural-language detection on inbound messages.
+
+## Configuring thresholds in AgentDesk
+
+AgentDesk exposes all five triggers as per-bot configuration. From the WebChat workspace, you can set:
+
+- The confidence threshold (0–1 scale).
+- Whether sentiment detection is on or off, and its sensitivity.
+- The policy keyword list (add your own per bot).
+- Whether repeat-question detection is active.
+- Whether the "talk to a human" affordance is visible.
+
+These scope per-bot, so different agents (e.g., a billing bot vs. a technical-support bot) can have different escalation rules. Read the [handoff API docs](/docs/handoff-api) for the technical contract.
+
+## What happens when a trigger fires
+
+The handoff itself is the same regardless of which trigger fired:
+
+1. **Automation pauses** — the bot stops generating replies.
+2. **Context transfers** — the full transcript, session token, and trigger reason move to the operator inbox.
+3. **Operator sees the reason** — the inbox shows *why* the handoff happened (low confidence, sentiment, policy keyword, etc.), so the human knows what they're walking into.
+4. **Reply lands inline** — the operator responds and the customer sees it in the same widget.
+
+The trigger reason is logged so you can analyze *which* triggers fire most often and tune accordingly. If 80% of handoffs are low-confidence, your knowledge base has gaps. If 80% are policy keywords, your keyword list may be too broad.
+
+## Common mistakes
+
+- **No confidence threshold.** The bot answers everything, including things it shouldn't. Hallucinations follow.
+- **Threshold too high.** You over-escalate and humans get trivial tickets. Capacity waste.
+- **Ignoring sentiment.** Frustrated customers get more bot persistence instead of a human. CSAT drops.
+- **No "talk to a human" affordance.** Customers feel trapped. Even if they can type the request, a visible button sets expectations.
+- **Not logging trigger reasons.** You can't tune what you can't measure. Log every handoff's reason.
+
+## Measuring and tuning
+
+After deploying, watch these metrics weekly:
+
+| Metric | Healthy range | Action if off |
+| --- | --- | --- |
+| Handoff rate | 20–40% | &lt;20%: raise confidence threshold awareness; &gt;40%: check knowledge base gaps |
+| CSAT on human conversations | Flat or up vs. pre-AI | If down, check handoff speed and context preservation |
+| Top trigger reason | Balanced across triggers | If one dominates, investigate (e.g., confidence too low = KB gaps) |
+| Repeat-handoff rate | &lt;5% | Higher means the same customers escalate repeatedly — fix root causes |
+
+The goal is a feedback loop: triggers fire, you log the reasons, you tune the thresholds and knowledge base, handoffs get smarter over time.
+
+## When to NOT escalate
+
+For balance — some conversations should stay with the AI even when a human *could* handle them:
+
+- **Pure informational lookup** — "what are your business hours" doesn't need a human.
+- **High-confidence FAQ answers** — if retrieval is confident and the answer is in the docs, the bot should answer.
+- **After-hours when no humans are available** — better a good AI answer than no answer (configure this explicitly).
+
+The art is knowing which conversations a human genuinely improves vs. which just need the right information delivered fast. Escalate the former, automate the latter.
+
+## Next steps
+
+- **Read the philosophy** — [Why the AI + human blend outperforms either alone](/blog/ai-human-blend-support).
+- **See the architecture** — [Human handoff feature page](/features/human-handoff) covers the inbox and WebSocket contract.
+- **Configure it** — [AgentDesk](/ai-support-agent) exposes all five triggers as per-bot settings.
+- **Understand the API** — [Handoff API docs](/docs/handoff-api) for the technical contract.

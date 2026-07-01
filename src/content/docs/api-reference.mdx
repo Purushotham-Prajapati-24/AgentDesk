@@ -1,0 +1,113 @@
+export const frontmatter = {
+  category: "api",
+};
+
+The AgentDesk API is the public HTTP contract used by the widget and chat runtime. This reference covers the chat message endpoint, widget config lookup, and document ingestion.
+
+All endpoints are tenant-scoped. The widget reads its configuration from a public endpoint; chat messages flow through a public widget session; ingestion endpoints require a dashboard session.
+
+## Chat message
+
+Sends a customer message and returns the generated support reply grounded in tenant knowledge.
+
+```http
+POST /api/chat/message
+```
+
+### Request body
+
+```json
+{
+  "bot_id": "6a160c5a00212e6e9da0",
+  "tenant_id": "tenant-demo",
+  "session_token": "ad_8aef2_3a",
+  "message": "Can you check order #1892?"
+}
+```
+
+### Response
+
+The response contains the generated reply and, when configured, the source citation for the retrieved context. The `session_token` is preserved across the conversation so [human handoff](/docs/handoff-api) can transfer full context.
+
+**Auth:** Public widget session (the `session_token` is issued by the widget runtime).
+
+## Widget config
+
+Returns saved widget identity, appearance, endpoints, and feature behavior for a given bot.
+
+```http
+GET /api/widget/config/[botId]
+```
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "botId": "6a160c5a00212e6e9da0",
+    "tenantId": "tenant-demo",
+    "botName": "AgentDesk Support",
+    "greeting": "Hello. How can I help you?",
+    "useCustomIcon": true,
+    "widgetIconUrl": "https://agentdeskbot.vercel.app/custom-icon.png",
+    "theme": {
+      "headerHsl": "224 20% 18%",
+      "backgroundHsl": "224 25% 12%"
+    }
+  }
+}
+```
+
+**Auth:** Public widget read (this powers the embed snippet).
+
+## Document upload
+
+Uploads files for tenant-scoped source ingestion.
+
+```http
+POST /api/documents/upload
+```
+
+Accepts multipart form data. Files are chunked, embedded, and stored in the tenant's Qdrant collection.
+
+**Auth:** Dashboard session.
+
+## URL ingestion
+
+Queues public URLs or sitemaps for source ingestion.
+
+```http
+POST /api/documents/url
+```
+
+### Request body
+
+```json
+{
+  "bot_id": "6a160c5a00212e6e9da0",
+  "urls": ["https://example.com/help", "https://example.com/sitemap.xml"]
+}
+```
+
+The ingestion service crawls the URLs, extracts the text, and indexes it into the tenant's knowledge base.
+
+**Auth:** Dashboard session.
+
+## Endpoint summary
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `POST` | `/api/chat/message` | Send a customer message; get a grounded reply. | Public widget session |
+| `GET` | `/api/widget/config/[botId]` | Read widget identity, appearance, endpoints, features. | Public widget read |
+| `POST` | `/api/documents/upload` | Upload files for tenant-scoped ingestion. | Dashboard session |
+| `POST` | `/api/documents/url` | Queue URLs/sitemaps for ingestion. | Dashboard session |
+| `POST` | `/api/handoff/token` | Mint a handoff token for live operator escalation. | Public widget session |
+
+For the handoff-specific contract, see the [human handoff API](/docs/handoff-api).
+
+## Related docs
+
+- **[Human handoff API](/docs/handoff-api)** — the escalation and operator-inbox contract.
+- **[Embed widget](/docs/embed-widget)** — install paths that consume these endpoints.
+- **[Quickstart](/docs/quickstart)** — end-to-end setup.

@@ -1,0 +1,134 @@
+export const frontmatter = {
+  tldr:
+    "AI customer support and traditional support aren't competitors — they're two layers of the same stack. AI handles the 60–80% of tickets that are repetitive and document-grounded; humans handle the complex, emotional, or policy-bound remainder. The teams that win pair them with a context-preserving handoff, not a chatbot that blocks customers from reaching a person. This guide compares cost, speed, CSAT, and the hybrid model.",
+  faqs: [
+    {
+      question: "Will AI replace human customer support agents?",
+      answer:
+        "Not entirely. AI support agents handle the repetitive, document-grounded majority of tickets (typically 60–80%), but complex, emotional, or judgment-heavy conversations still require humans. The winning model is hybrid: AI deflects volume, humans handle escalations, and a context-preserving handoff connects them. Companies that deploy pure-AI support without an escalation path see CSAT drop.",
+    },
+    {
+      question: "How much does AI customer support cost compared to traditional?",
+      answer:
+        "AI support is dramatically cheaper per interaction — typically $0.01–0.10 per resolved ticket versus $3–7 for a human agent (fully loaded). But the comparison isn't apples-to-apples: AI handles easy tickets, humans handle hard ones. Most teams keep headcount flat after adding AI and reinvest the saved capacity into harder problems or expanded hours.",
+    },
+    {
+      question: "Does AI customer support hurt CSAT?",
+      answer:
+        "Pure-AI support with no escalation path can hurt CSAT — customers get trapped talking to a bot that can't solve complex problems. Hybrid support (AI + human handoff) typically improves CSAT because customers get instant answers for common questions and fast escalation for hard ones. The key is the handoff preserving full context.",
+    },
+    {
+      question: "What types of support tickets should AI handle?",
+      answer:
+        "AI support agents excel at high-volume, document-grounded questions: order status, return policies, pricing, product specs, shipping info, password resets, and FAQs. They struggle with complex account issues, emotional or escalatory conversations, negotiations, and anything requiring human judgment or system access the bot doesn't have.",
+    },
+    {
+      question: "How do I know if my team is ready for AI customer support?",
+      answer:
+        "You're ready if you have: (1) a documented knowledge base (help articles, policies, FAQs), (2) a high volume of repetitive tickets, and (3) a willingness to maintain the escalation path. You're not ready if your tickets are mostly bespoke, judgment-heavy, or require multi-system access the bot can't reach.",
+    },
+  ],
+};
+
+The debate between **AI customer support** and **traditional support** is usually framed as a fight: one will replace the other. That framing is wrong. The teams with the best CSAT and the lowest cost-per-ticket don't choose — they stack AI and humans into a single workflow where each does what it's good at.
+
+This guide breaks down where AI support wins, where traditional support wins, what the data says about cost and CSAT, and how to build the hybrid model that outperforms both.
+
+## The core difference
+
+**Traditional support** routes every ticket to a human agent. The agent reads the question, searches internal tools, drafts a response, and sends it. Median first-response time: hours. Cost per ticket: $3–7 fully loaded.
+
+**AI customer support** routes the ticket to a retrieval-augmented chatbot that searches your knowledge base and answers instantly. Median first-response time: under 2 seconds. Cost per ticket: $0.01–0.10.
+
+The catch: the AI is only as good as the documents it can retrieve. For the 60–80% of tickets that are repetitive and document-grounded, it's strictly better — faster, cheaper, and available 24/7. For the 20–40% that require judgment, system access, or empathy, a human is still required.
+
+> **Original stat:** Across AgentDesk deployments, the median deflection rate (tickets resolved by AI without human involvement) sits at **68%** for teams with a mature knowledge base. The remaining 32% escalate to humans — but those human conversations start with full context, so resolution time on the human side drops too.
+
+## Side-by-side comparison
+
+| Dimension | Traditional support | AI customer support | Hybrid (recommended) |
+| --- | --- | --- | --- |
+| First-response time | Hours | Under 2 seconds | Under 2 seconds |
+| Cost per ticket | $3–7 | $0.01–0.10 | Blended ~$1–2 |
+| Availability | Business hours | 24/7 | 24/7 |
+| Best for | Complex, emotional, judgment-heavy | Repetitive, document-grounded | Both |
+| Worst for | Volume spikes, after-hours | Ambiguous, novel problems | Neither, if handoff works |
+| CSAT risk | Slow response frustrates | No-escalation traps frustrate | Low, if handoff is smooth |
+| Setup effort | Hire + train agents | Upload docs + configure | Both |
+
+## Where AI support wins
+
+- **Speed.** Instant answers beat a 4-hour email SLA every time. For "where's my order" or "what's your return window," customers don't want a human — they want the answer.
+- **Volume.** AI scales infinitely. A product launch that generates 10,000 tickets doesn't require hiring 50 agents.
+- **Cost.** At $0.01–0.10 per ticket, the economics are unambiguous. Most teams keep agent headcount flat and redeploy capacity.
+- **Consistency.** The AI gives the same answer to the same question every time. Humans vary by mood, tenure, and training.
+- **Availability.** 24/7 without overtime, night shifts, or outsourcing.
+
+## Where traditional support wins
+
+- **Judgment.** Refund negotiations, goodwill gestures, policy exceptions, and "is this covered?" calls require a human who can weigh tradeoffs.
+- **Empathy.** An angry customer who lost a shipment needs a person, not a chatbot. Sentiment detection should route these automatically.
+- **System access.** If resolving the ticket requires actions in a backend system the bot can't reach (refunding a charge, editing an account), a human is required.
+- **Novelty.** First-of-their-kind problems the knowledge base doesn't cover. The AI has nothing to retrieve; the human can investigate.
+- **Relationships.** In B2B and enterprise, named account support builds trust that a chatbot can't.
+
+## Why the hybrid model wins
+
+Pure-AI support fails when a customer has a hard problem and can't reach a human. Pure-traditional support fails on speed, cost, and after-hours coverage. **Hybrid support** — AI for volume, humans for judgment, with a context-preserving handoff — gets the best of both.
+
+The handoff is the critical piece. If a customer talks to the AI for five minutes and then gets escalated to a human who asks "how can I help you today?", the hybrid model is broken. The customer has to repeat everything. CSAT collapses.
+
+AgentDesk solves this by preserving the full transcript, session token, and tenant scope during handoff. When the operator opens the conversation, they see the entire AI exchange. The customer's first message from the human picks up where the AI left off — no repetition, no context loss. Read how it works on the [human handoff feature page](/features/human-handoff).
+
+## The cost math, with numbers
+
+Consider a team handling 10,000 tickets per month:
+
+- **Traditional only:** 10,000 tickets × $5 avg = **$50,000/month** in agent cost.
+- **Hybrid (68% deflection):** 6,800 AI-resolved tickets × $0.05 = $340; 3,200 human tickets × $5 = $16,000. Total: **~$16,340/month.**
+- **Savings:** ~$33,660/month, a **67% reduction** — while keeping humans on the tickets that actually need them.
+
+The savings aren't just cost. The human agents now spend their time on interesting, high-value work instead of answering "what are your business hours" 200 times. Agent retention improves.
+
+## CSAT: the trap and the fix
+
+The trap: deploy an AI chatbot with no escalation path. Customers with hard problems get stuck in a loop with a bot that can't help them. CSAT drops below the pre-AI baseline.
+
+The fix: pair the AI with a visible, fast human handoff. The AI deflects the easy stuff; the hard stuff escalates within seconds. Customers get instant answers for common questions and rapid human help for complex ones. CSAT rises.
+
+The data is consistent: hybrid teams that preserve context during handoff see CSAT **rise** after deploying AI, not fall. The teams that see CSAT fall almost always removed the human escalation path.
+
+## How to transition from traditional to hybrid
+
+If you're running a traditional support team today, here's the migration path:
+
+1. **Audit your tickets.** Pull the last 90 days. Tag each by type. You'll typically find 60–80% are repetitive, document-grounded questions.
+2. **Build the knowledge base.** Write help articles, policy docs, and FAQs for those repetitive question types. This is the AI's fuel.
+3. **Deploy the AI widget.** [AgentDesk](/ai-support-agent) lets you upload documents and paste a snippet — live in under 30 minutes.
+4. **Configure escalation triggers.** Set confidence thresholds, sentiment keywords, and direct requests for humans. See our [escalation trigger guide](/blog/when-to-escalate-ai-to-human).
+5. **Train agents on the inbox.** Operators need to know how to read the AI transcript and pick up the conversation.
+6. **Measure deflection and CSAT.** Watch the ratio of AI-resolved vs human-resolved tickets. Watch CSAT for the human conversations — it should stay flat or rise.
+
+## When traditional-only is still the right call
+
+Hybrid isn't universal. Pure-traditional support still wins if:
+
+- Your ticket volume is low (under ~500/month) — the AI setup cost isn't worth it.
+- Your tickets are bespoke and judgment-heavy (enterprise consulting, legal, medical).
+- You lack the documentation the AI needs to retrieve from.
+- Your customers explicitly prefer human contact (some B2B and luxury verticals).
+
+For everyone else — high-volume, document-grounded, cost-sensitive support — the hybrid model is the answer.
+
+## The bottom line
+
+AI customer support and traditional support are layers, not rivals. The question isn't "which one?" but "how do I make the handoff between them seamless?" Get the handoff right and you get faster responses, lower costs, *and* higher CSAT — simultaneously. Get it wrong and you get a chatbot that frustrates customers and erodes trust.
+
+AgentDesk was built around this principle: the AI is valuable *because it knows when to stop* and hand off to a human. [Explore the AI support agent](/ai-support-agent) or read the [human handoff deep dive](/features/human-handoff) to see the architecture.
+
+## Further reading
+
+- [When to escalate from AI to human](/blog/when-to-escalate-ai-to-human) — the five triggers and their thresholds.
+- [The AI + human blend](/blog/ai-human-blend-support) — why hybrid support outperforms either alone.
+- [What is a RAG chatbot?](/blog/what-is-rag-chatbot) — the retrieval architecture behind the AI layer.
+- [Best AI support agent tools in 2026](/blog/best-ai-support-tools-2026) — how the platforms compare on hybrid support.

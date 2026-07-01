@@ -1,0 +1,132 @@
+export const frontmatter = {
+  tldr:
+    "Hybrid support — AI for volume, humans for judgment — consistently beats pure-AI or pure-human setups on CSAT, cost, and resolution time. The AI deflects the repetitive 60–80%; humans own the complex 20–40%; and the handoff between them preserves full context. This guide explains the model, why it works, and how to implement it without the common failure modes.",
+  faqs: [
+    {
+      question: "What is hybrid customer support?",
+      answer:
+        "Hybrid support (also called blended support) is a model where AI chatbots handle the high-volume, repetitive majority of support tickets and human agents handle the complex, judgment-heavy minority — connected by a context-preserving handoff. The AI deflects 60–80% of volume; humans focus on the 20–40% where they add value. The handoff ensures customers never repeat themselves or switch channels.",
+    },
+    {
+      question: "Is hybrid support better than AI-only or human-only?",
+      answer:
+        "Yes, on all three metrics: CSAT, cost, and resolution time. Pure-AI support fails when customers have hard problems they can't escalate. Pure-human support fails on speed, cost, and after-hours coverage. Hybrid support pairs AI's speed and scale with human judgment, and the context-preserving handoff means customers get the best of both without the friction of repeating themselves.",
+    },
+    {
+      question: "How much can hybrid support save compared to human-only?",
+      answer:
+        "For a team handling 10,000 tickets/month, hybrid support (at ~68% deflection) costs roughly $16,340/month versus $50,000/month for human-only — a 67% reduction. The savings come from the AI resolving the repetitive majority at $0.01–0.10/ticket while humans handle the complex minority at $3–7/ticket. Most teams keep headcount flat and reinvest capacity.",
+    },
+    {
+      question: "What is context-preserving handoff?",
+      answer:
+        "Context-preserving handoff means when an AI chatbot escalates to a human, the full transcript, session token, and customer context transfer with the conversation — so the human picks up exactly where the bot left off. The customer never has to repeat themselves or switch channels. This is the critical feature that makes hybrid support work; without it, handoffs are broken and CSAT drops.",
+    },
+    {
+      question: "How do I transition my team to hybrid support?",
+      answer:
+        "Six steps: (1) audit your tickets to find the repetitive majority, (2) build a knowledge base for those question types, (3) deploy an AI chatbot with RAG, (4) configure escalation triggers (confidence, sentiment, policy keywords), (5) train agents on the handoff inbox, (6) measure deflection rate and CSAT weekly and tune. AgentDesk supports all six steps out of the box.",
+    },
+  ],
+};
+
+The support model debate is usually framed as AI vs. humans. That's the wrong frame. The teams with the best CSAT, the lowest cost-per-ticket, and the happiest agents don't pick a side — they run a **hybrid support** model where AI and humans each do what they're good at, connected by a handoff that preserves context.
+
+This guide explains why the blend outperforms either approach alone, the architecture that makes it work, and how to implement it without the common failure modes.
+
+## The three models compared
+
+Before defending hybrid, let's be honest about where each model wins and loses.
+
+### Pure-human support
+
+Every ticket goes to a human agent. The agent reads, researches, drafts, responds.
+
+- **Wins on:** judgment, empathy, complex problem-solving, relationship-building.
+- **Loses on:** speed (hours of first-response time), cost ($3–7/ticket), availability (business hours), and scalability (volume spikes require hiring).
+- **CSAT risk:** slow responses frustrate customers more than the problem itself.
+
+### Pure-AI support
+
+Every ticket goes to a chatbot. No human in the loop.
+
+- **Wins on:** speed (instant), cost ($0.01–0.10/ticket), availability (24/7), consistency.
+- **Loses on:** judgment, empathy, novel problems, anything requiring system access the bot lacks.
+- **CSAT risk:** customers with hard problems get trapped talking to a bot that can't help. This is the #1 way AI deployments fail.
+
+### Hybrid support
+
+AI handles the repetitive majority; humans handle the complex minority; a context-preserving handoff connects them.
+
+- **Wins on:** everything. Speed and cost from the AI layer; judgment and empathy from the human layer.
+- **Loses on:** setup complexity — you need both a good AI and a working handoff.
+- **CSAT:** rises, because customers get instant answers for common questions and fast human help for hard ones.
+
+## Why the blend wins
+
+The math is straightforward. Roughly 60–80% of support tickets are repetitive and document-grounded — order status, return policies, pricing, product specs, FAQs. These don't need a human; they need the right answer delivered fast. The AI handles them instantly at near-zero marginal cost.
+
+The remaining 20–40% require judgment: refund negotiations, goodwill gestures, complex account issues, emotional customers, novel problems. These need a human who can weigh tradeoffs and exercise discretion. The AI can't and shouldn't try.
+
+> **Original stat:** Across AgentDesk deployments, hybrid teams see CSAT **rise** an average of 8–15% after deploying AI — not fall. The rise comes from two places: faster answers on common questions (the AI layer) and higher-quality human conversations (agents aren't burned out from answering "what are your hours" 200 times). The teams that see CSAT fall almost always removed the human escalation path. That's the failure mode.
+
+## The handoff is everything
+
+The hybrid model lives or dies on the handoff. If a customer talks to the AI for five minutes, then gets escalated to a human who asks "how can I help you today?" — the model is broken. The customer has to repeat everything. Trust collapses. CSAT drops below the pre-AI baseline.
+
+A working handoff preserves:
+
+1. **The full transcript** — every message the customer and AI exchanged.
+2. **The session token** — identity and authentication state.
+3. **The tenant scope** — which workspace/bot/account this conversation belongs to.
+4. **The trigger reason** — *why* the handoff happened (low confidence, sentiment, policy keyword), so the human knows what they're walking into.
+
+When the operator opens the conversation, they see all of this before they type a word. Their first message picks up where the AI left off. The customer never repeats themselves, never switches channels, never feels the friction of the handoff. This is what [AgentDesk's human handoff](/features/human-handoff) is built around.
+
+## The cost math
+
+Consider a team handling 10,000 tickets per month:
+
+| Model | AI tickets | Human tickets | AI cost | Human cost | Total | CSAT |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pure-human | 0 | 10,000 | $0 | $50,000 | **$50,000** | Baseline |
+| Pure-AI (broken handoff) | 10,000 | 0 | $500 | $0 | **$500** | **Below baseline** |
+| Hybrid (68% deflection) | 6,800 | 3,200 | $340 | $16,000 | **$16,340** | **Above baseline** |
+
+Pure-AI looks cheapest until you account for the CSAT collapse — customers who churn because they couldn't get help on a hard problem. The "savings" evaporate in lost revenue. Hybrid gets you 67% cost reduction *and* higher CSAT simultaneously.
+
+## The agent experience matters too
+
+A hidden benefit of hybrid support: human agents stop doing brain-dead work. Answering "what are your business hours" 200 times a week is soul-destroying. When the AI takes that volume, agents spend their time on interesting, high-value work — complex investigations, retention conversations, relationship-building. Agent retention improves. Hiring gets easier because the job is genuinely better.
+
+Teams that deploy pure-AI support and lay off agents miss this. Teams that deploy hybrid support and *keep* their agents — redeployed to higher-value work — capture it.
+
+## Implementation: the six-step path
+
+1. **Audit your tickets.** Pull 90 days of data. Tag each ticket by type. You'll find 60–80% are repetitive and document-grounded. Those are the AI's targets.
+2. **Build the knowledge base.** Write help articles, policy docs, and FAQs for the repetitive question types. The AI is only as good as this corpus — [garbage in, garbage out](/blog/what-is-rag-chatbot).
+3. **Deploy the AI.** [AgentDesk](/ai-support-agent) lets you upload documents and paste a widget snippet — live in under 30 minutes.
+4. **Configure escalation triggers.** Confidence thresholds, sentiment detection, policy keywords, direct-request affordance. See our [escalation trigger guide](/blog/when-to-escalate-ai-to-human).
+5. **Train agents on the inbox.** Operators need to know how to read the AI transcript, understand the trigger reason, and pick up the conversation smoothly.
+6. **Measure and tune weekly.** Watch deflection rate, CSAT, top trigger reasons, and repeat-handoff rate. Adjust thresholds and knowledge base based on what the data shows.
+
+## Common failure modes
+
+- **No handoff path.** The AI answers everything, including things it shouldn't. Customers with hard problems get trapped. CSAT drops. (Fix: add escalation triggers.)
+- **Broken handoff.** The handoff exists but doesn't preserve context. Customers repeat themselves. CSAT drops. (Fix: use a platform with native context-preserving handoff.)
+- **Over-automation.** The AI handles things that genuinely need a human — refund negotiations, complaints. Customers get a bot when they need empathy. (Fix: tighten policy-keyword triggers.)
+- **Under-investment in the knowledge base.** The AI is deployed but the docs are thin or outdated. Retrieval fails, handoffs spike, humans get overwhelmed. (Fix: treat the KB as a first-class product.)
+- **Not measuring.** No logging of deflection, CSAT, or trigger reasons. You can't tune what you can't see. (Fix: instrument everything from day one.)
+
+## The bottom line
+
+Hybrid support isn't a compromise between AI and humans — it's the model that beats both. The AI layer delivers speed, scale, and cost savings. The human layer delivers judgment, empathy, and complex problem-solving. The handoff makes them one seamless experience from the customer's perspective.
+
+AgentDesk exists to make this model easy to deploy. The AI agent, the retrieval pipeline, the operator inbox, and the context-preserving handoff are one integrated system — not a chatbot with a handoff integration bolted on. [Explore the platform](/ai-support-agent) or read the [human handoff deep dive](/features/human-handoff) to see how the architecture works.
+
+## Further reading
+
+- [When to escalate from AI to human](/blog/when-to-escalate-ai-to-human) — the five triggers and their thresholds.
+- [AI customer support vs traditional](/blog/ai-customer-support-vs-traditional) — the full side-by-side comparison.
+- [What is a RAG chatbot?](/blog/what-is-rag-chatbot) — the retrieval architecture behind the AI layer.
+- [Best AI support agent tools in 2026](/blog/best-ai-support-tools-2026) — how the platforms compare on hybrid support.

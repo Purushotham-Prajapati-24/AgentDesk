@@ -1,0 +1,25 @@
+# AgentDesk
+
+> AI support agent that grounds every answer in your own documents, embeds as a chat widget, and hands off to a human operator when judgment matters. RAG over tenant knowledge, live human takeover, tenant isolation.
+
+AgentDesk is a developer-facing support platform. Upload policies, manuals, and help-center pages; the bot answers from retrieved context and escalates to a live operator with the full transcript preserved. Ships as an embeddable widget (script, iframe, React, Vue) plus a real-time operator inbox.
+
+## Links
+
+- [Homepage](https://agentdeskbot.vercel.app/)
+- [Developer Docs](https://agentdeskbot.vercel.app/docs)
+- [GitHub Repository](https://github.com/Purushotham-Prajapati-24/AgentDesk)
+
+## Core capabilities
+
+- Retrieval-augmented generation over tenant documents (Appwrite + Qdrant)
+- Live human handoff via Socket.io with preserved session context
+- Embeddable chat widget: script tag, iframe, React/Next.js, Vue
+- Tenant isolation across knowledge base, widget config, and conversations
+- Real-time monitoring of active support sessions
+
+## Key concepts
+
+- **RAG chatbot**: the bot answers from your uploaded documents, not generic model memory
+- **Human handoff**: when confidence or policy requires it, the session escalates to a human operator who continues the same conversation
+- **Tenant isolation**: prompts, documents, widget settings, and conversations stay scoped to one workspace

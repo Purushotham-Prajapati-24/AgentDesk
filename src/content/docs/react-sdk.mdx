@@ -1,0 +1,92 @@
+export const frontmatter = {
+  category: "deploy",
+};
+
+The `@agentdeskbot/react` package ships a typed React component and an SSR-safe Next.js subpath so you can mount the AgentDesk widget once in your root layout and keep the launcher persistent across App Router route changes.
+
+## Install
+
+```bash
+npm install @agentdeskbot/react@0.1.0
+```
+
+The `@agentdeskbot/core` package (shared types and the widget instance registry) is pulled in transitively.
+
+## Basic usage
+
+```jsx
+import { AgentDeskWidget } from "@agentdeskbot/react";
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <AgentDeskWidget
+          botId="YOUR_BOT_ID"
+          theme="webchat-v1"
+          mode="launcher"
+        />
+      </body>
+    </html>
+  );
+}
+```
+
+Mount the widget once near the root layout or authenticated app shell. Render it once — not on every page. Navigating between routes should keep exactly one launcher active.
+
+## Next.js App Router (SSR-safe)
+
+For Next.js App Router apps, import from the `/nextjs` subpath. This variant avoids rendering the script tag during SSR and mounts it only on the client, which prevents hydration mismatches.
+
+```jsx
+import { AgentDeskWidget } from "@agentdeskbot/react/nextjs";
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        {children}
+        <AgentDeskWidget
+          botId="YOUR_BOT_ID"
+          theme="webchat-v1"
+          mode="launcher"
+        />
+      </body>
+    </html>
+  );
+}
+```
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `botId` | `string` | Yes | The tenant-scoped bot identifier from WebChat deploy settings. |
+| `theme` | `string` | No | Theme token (defaults to `webchat-v1`). |
+| `mode` | `"launcher" \| "inline"` | No | `launcher` for a floating button; `inline` for a fixed surface. |
+| `className` | `string` | No | Optional class applied to the wrapper element. |
+
+Only public values belong in the client bundle: `botId`, `theme`, and `mode`. Never embed secrets or dashboard credentials.
+
+## Packages overview
+
+| Package | Purpose |
+| --- | --- |
+| `@agentdeskbot/core` | Shared TypeScript types and the widget instance registry. Use when building a custom framework adapter. |
+| `@agentdeskbot/react` | React & Next.js SDK. Includes the `/nextjs` SSR-safe subpath. |
+| `@agentdeskbot/vue` | Vue 3 & Nuxt 3 SDK. Ships a global `AgentDeskPlugin` so the component can be used without per-file imports. |
+
+```bash
+npm install @agentdeskbot/core@0.1.0 \
+  @agentdeskbot/react@0.1.0 \
+  @agentdeskbot/vue@0.1.0
+```
+
+> **Versioning:** All three packages share the same version and are released together. Pin them in lockfiles to keep types in sync.
+
+## Related docs
+
+- **[Embed widget](/docs/embed-widget)** — script, iframe, and Vue install paths.
+- **[Quickstart](/docs/quickstart)** — the five-step end-to-end setup.
+- **[API reference](/docs/api-reference)** — widget config and chat endpoints.
