@@ -35,6 +35,17 @@ export const SITE_LOCALE_ALT = "en_IN";
 /** Where the project lives (used in SoftwareApplication schema). */
 export const SITE_REPOSITORY = "https://github.com/Purushotham-Prajapati-24/AgentDesk";
 
+/**
+ * Site-wide publication baseline — used as the fallback for sitemap last-modified
+ * timestamps and as the canonical `datePublished` on every page until per-page
+ * overrides are needed. ISO-8601 date string (YYYY-MM-DD).
+ *
+ * Google / AI crawlers treat this as the initial freshness signal; keeping it
+ * current improves E-E-A-T perception. Bump this date whenever the site receives
+ * a meaningful content update.
+ */
+export const SITE_PUBLISH_DATE = "2026-07-01";
+
 /** Join a path onto SITE_URL, normalizing duplicate slashes. */
 export function absoluteUrl(path = "/"): string {
   const normalized = path.startsWith("/") ? path : `/${path}`;

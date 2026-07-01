@@ -12,6 +12,8 @@
  * cross-links update automatically.
  */
 
+import { SITE_PUBLISH_DATE } from "@/lib/site";
+
 export interface BlogPostMeta {
   slug: string;
   title: string;
@@ -44,6 +46,7 @@ export interface DocPageMeta {
   description: string;
   category: "start" | "configure" | "deploy" | "api";
   datePublished: string;
+  readingTime: string;
   excerpt: string;
 }
 
@@ -191,6 +194,7 @@ export const docPages: DocPageMeta[] = [
       "The shortest path from an empty agent to a working, embedded support widget. Five steps: create the agent, add knowledge, customize, deploy, and verify.",
     category: "start",
     datePublished: "2026-07-01",
+    readingTime: "8 min read",
     excerpt:
       "Create an agent, upload knowledge, customize the widget, paste one snippet, and open the live preview. Your support widget, live in 30 minutes.",
   },
@@ -201,6 +205,7 @@ export const docPages: DocPageMeta[] = [
       "Every way to install the AgentDesk support widget on a website: floating script tag, inline iframe, React/Next.js component, and Vue plugin.",
     category: "deploy",
     datePublished: "2026-07-01",
+    readingTime: "6 min read",
     excerpt:
       "Choose your install path: a floating launcher script for marketing sites, an inline iframe for support pages, or the React/Vue SDK for app shells.",
   },
@@ -211,6 +216,7 @@ export const docPages: DocPageMeta[] = [
       "The @agentdeskbot/react package: SSR-safe component, props, the /nextjs subpath, and how to mount the widget once across an App Router layout.",
     category: "deploy",
     datePublished: "2026-07-01",
+    readingTime: "5 min read",
     excerpt:
       "Install @agentdeskbot/react, mount the widget once in your root layout, and keep the launcher persistent across Next.js App Router route changes.",
   },
@@ -221,6 +227,7 @@ export const docPages: DocPageMeta[] = [
       "The public HTTP contracts used by the AgentDesk widget and chat runtime: chat message, widget config, document upload, and URL ingestion endpoints.",
     category: "api",
     datePublished: "2026-07-01",
+    readingTime: "10 min read",
     excerpt:
       "Every public AgentDesk endpoint with method, path, auth level, and request/response shapes for the chat runtime and document ingestion.",
   },
@@ -231,6 +238,7 @@ export const docPages: DocPageMeta[] = [
       "How a customer session moves from the AI agent into the operator inbox: the handoff token, session preservation, and the real-time message contract.",
     category: "api",
     datePublished: "2026-07-01",
+    readingTime: "7 min read",
     excerpt:
       "The handoff token endpoint, session-scoped escalation, and the real-time message contract that keeps customer, bot, and operator on one conversation thread.",
   },
@@ -269,8 +277,8 @@ export function getDocPage(slug: string): DocPageMeta | undefined {
 /** All public content routes for the sitemap, derived from the manifests. */
 export function getAllContentRoutes(): Array<{ path: string; lastModified: string }> {
   const routes: Array<{ path: string; lastModified: string }> = [
-    { path: "/ai-support-agent", lastModified: "2026-07-01" },
-    { path: "/blog", lastModified: "2026-07-01" },
+    { path: "/ai-support-agent", lastModified: SITE_PUBLISH_DATE },
+    { path: "/blog", lastModified: SITE_PUBLISH_DATE },
     ...featurePages.map((f) => ({
       path: `/features/${f.slug}`,
       lastModified: f.datePublished,

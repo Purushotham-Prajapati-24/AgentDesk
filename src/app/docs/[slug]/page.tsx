@@ -100,7 +100,7 @@ export default async function DocPage({
         subtitle={doc.excerpt}
         eyebrow={`Docs · ${doc.category}`}
         lastUpdated={doc.datePublished}
-        readingTime={`${Math.max(4, Math.round(doc.title.length / 3))} min read`}
+        readingTime={doc.readingTime}
         breadcrumb={[
           { label: "Home", href: "/" },
           { label: "Docs", href: "/docs" },

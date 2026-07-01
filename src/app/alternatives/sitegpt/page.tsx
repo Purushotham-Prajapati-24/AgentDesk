@@ -5,10 +5,12 @@ import {
   Callout,
   ComparisonTable,
   ContentLayout,
+  RelatedGuides,
   SectionHeading,
   Tldr,
 } from "@/components/content/ContentLayout";
 import { FaqSection } from "@/components/content/FaqSection";
+import { SITE_PUBLISH_DATE } from "@/lib/site";
 import { articleSchema, breadcrumbSchema, faqSchema } from "@/lib/seo/jsonld";
 
 export const metadata: Metadata = {
@@ -26,7 +28,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 };
 
-const PUBLISHED = "2026-07-01";
+const PUBLISHED = SITE_PUBLISH_DATE;
 
 const capabilityRows = [
   [

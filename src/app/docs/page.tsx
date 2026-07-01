@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { breadcrumbSchema, techArticleSchema } from "@/lib/seo/jsonld";
+import { SITE_PUBLISH_DATE } from "@/lib/site";
 import {
   CapabilityRow,
   DeploymentRow,
@@ -70,7 +71,7 @@ const sectionMeta: DocSectionMeta[] = [
   { id: "api-reference", title: "API Reference", summary: "The public contracts used by the widget and chat runtime.", category: "api" },
 ];
 
-const publishedDate = "2026-07-01";
+const publishedDate = SITE_PUBLISH_DATE;
 
 export default function DocsPage() {
   return (

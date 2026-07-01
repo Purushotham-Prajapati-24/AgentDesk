@@ -3,7 +3,7 @@ import createMDX from "@next/mdx";
 
 const nextConfig: NextConfig = {
   // Allow .md / .mdx files to act as pages, routes, or imports.
-  pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
+  pageExtensions: ["js", "jsx", "mdx", "ts", "tsx"],
   serverExternalPackages: ["mammoth", "xlsx", "unpdf", "pdfjs-dist"],
 };
 
