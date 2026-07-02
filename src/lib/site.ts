@@ -9,14 +9,20 @@
  */
 
 /** Raw origin from env, with a safe fallback for local/preview. */
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  process.env.NEXT_PUBLIC_VERCEL_URL ??
-  "https://agentdeskbot.vercel.app"
-)
-  // Vercel doesn't include a protocol on NEXT_PUBLIC_VERCEL_URL.
-  .replace(/^\/\//, "https://")
-  .replace(/\/$/, "");
+const getRawSiteUrl = (): string => {
+  let url =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXT_PUBLIC_VERCEL_URL ??
+    "https://agentdeskbot.vercel.app";
+
+  // Prepend protocol if it is missing (as is the case with Vercel's automatic NEXT_PUBLIC_VERCEL_URL)
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`;
+  }
+  return url;
+};
+
+export const SITE_URL = getRawSiteUrl().replace(/\/$/, "");
 
 /** Parsed base URL — used for metadataBase and absolute URL composition. */
 export const siteOrigin = new URL(SITE_URL);

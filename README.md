@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="public/agentdesk-banner.png" alt="AgentDesk Banner" width="100%">
+  <picture>
+    <source srcset="public/agentdesk-banner.avif" type="image/avif">
+    <source srcset="public/agentdesk-banner.webp" type="image/webp">
+    <img src="public/agentdesk-banner.png" alt="AgentDesk Banner" width="100%">
+  </picture>
 </p>
 
 <h1 align="center">AgentDesk</h1>
