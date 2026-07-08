@@ -130,11 +130,18 @@ export async function getMonitorConversationList({
   | { success: false; error: string }
 > {
   try {
-    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
+    // Build cache key synchronously before any I/O — no await needed.
+    const cacheKey = `${monitorCachePrefix(tenantId, "conversations")}${stableCachePart(status)}:${stableCachePart(search)}:${stableCachePart(cursor ?? "")}`;
+
+    // Fire auth AND cache read in parallel. Auth is still enforced below before
+    // any tenant data is returned — the order of awaits guarantees this.
+    const [{ account }, { databases }, cached] = await Promise.all([
+      createSessionClient(),
+      createAdminClient(),
+      getCachedJson<{ conversations: MonitorConversation[]; nextCursor: string | null }>(cacheKey),
+    ]);
     await assertTenantAccess(account, tenantId);
 
-    const cacheKey = `${monitorCachePrefix(tenantId, "conversations")}${stableCachePart(status)}:${stableCachePart(search)}:${stableCachePart(cursor ?? "")}`;
-    const cached = await getCachedJson<{ conversations: MonitorConversation[]; nextCursor: string | null }>(cacheKey);
     if (cached) {
       return { success: true, data: cached };
     }
@@ -150,7 +157,8 @@ export async function getMonitorConversationList({
     const conversations = visibleSessions.map((session) => mapSessionSummary(session) as MonitorConversation);
 
     const data = { conversations, nextCursor };
-    await setCachedJson(cacheKey, data, LIST_CACHE_TTL_SECONDS);
+    // Fire-and-forget: don't block the response waiting for the Redis write.
+    void setCachedJson(cacheKey, data, LIST_CACHE_TTL_SECONDS);
     return { success: true, data };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load monitor conversations." };
@@ -197,11 +205,18 @@ export async function getMonitorUsers({
   cursor?: string | null;
 }): Promise<{ success: true; data: { users: MonitorUser[]; nextCursor: string | null } } | { success: false; error: string }> {
   try {
-    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
+    // Build cache key synchronously before any I/O — no await needed.
+    const cacheKey = `${monitorCachePrefix(tenantId, "users")}${stableCachePart(search)}:${stableCachePart(cursor ?? "")}`;
+
+    // Fire auth AND cache read in parallel. Auth is still enforced below before
+    // any tenant data is returned — the order of awaits guarantees this.
+    const [{ account }, { databases }, cached] = await Promise.all([
+      createSessionClient(),
+      createAdminClient(),
+      getCachedJson<{ users: MonitorUser[]; nextCursor: string | null }>(cacheKey),
+    ]);
     await assertTenantAccess(account, tenantId);
 
-    const cacheKey = `${monitorCachePrefix(tenantId, "users")}${stableCachePart(search)}:${stableCachePart(cursor ?? "")}`;
-    const cached = await getCachedJson<{ users: MonitorUser[]; nextCursor: string | null }>(cacheKey);
     if (cached) {
       return { success: true, data: cached };
     }
@@ -233,7 +248,8 @@ export async function getMonitorUsers({
     }));
 
     const data = { users, nextCursor };
-    await setCachedJson(cacheKey, data, LIST_CACHE_TTL_SECONDS);
+    // Fire-and-forget: don't block the response waiting for the Redis write.
+    void setCachedJson(cacheKey, data, LIST_CACHE_TTL_SECONDS);
     return { success: true, data };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load monitor users." };
@@ -244,11 +260,18 @@ export async function getMonitorAnalyticsSnapshot(
   tenantId: string,
 ): Promise<{ success: true; data: MonitorAnalyticsSnapshot } | { success: false; error: string }> {
   try {
-    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
+    // Build cache key synchronously before any I/O — no await needed.
+    const cacheKey = `${monitorCachePrefix(tenantId, "analytics")}snapshot`;
+
+    // Fire auth AND cache read in parallel. Auth is still enforced below before
+    // any tenant data is returned — the order of awaits guarantees this.
+    const [{ account }, { databases }, cached] = await Promise.all([
+      createSessionClient(),
+      createAdminClient(),
+      getCachedJson<MonitorAnalyticsSnapshot>(cacheKey),
+    ]);
     await assertTenantAccess(account, tenantId);
 
-    const cacheKey = `${monitorCachePrefix(tenantId, "analytics")}snapshot`;
-    const cached = await getCachedJson<MonitorAnalyticsSnapshot>(cacheKey);
     if (cached) {
       return { success: true, data: { ...cached, source: "cache" } };
     }
@@ -260,7 +283,8 @@ export async function getMonitorAnalyticsSnapshot(
         ...rollupSnapshot,
         attentionConversations,
       };
-      await setCachedJson(cacheKey, data, ANALYTICS_CACHE_TTL_SECONDS);
+      // Fire-and-forget: don't block the response waiting for the Redis write.
+      void setCachedJson(cacheKey, data, ANALYTICS_CACHE_TTL_SECONDS);
       return { success: true, data };
     }
 
@@ -321,7 +345,8 @@ export async function getMonitorAnalyticsSnapshot(
         topBots,
         attentionConversations: conversations.filter((conversation) => conversation.status !== "closed").slice(0, 5),
     };
-    await setCachedJson(cacheKey, data, ANALYTICS_CACHE_TTL_SECONDS);
+    // Fire-and-forget: don't block the response waiting for the Redis write.
+    void setCachedJson(cacheKey, data, ANALYTICS_CACHE_TTL_SECONDS);
     return { success: true, data };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load monitor analytics." };
