@@ -31,6 +31,7 @@
     "@next/mdx": "^16.2.9",
     "@qdrant/js-client-rest": "^1.18.0",
     "@splinetool/react-spline": "^4.1.0",
+    "@splinetool/runtime": "^1.12.98",
     "@types/mdx": "^2.0.14",
     "appwrite": "^25.2.0",
     "framer-motion": "^12.40.0",
