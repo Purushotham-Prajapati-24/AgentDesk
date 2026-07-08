@@ -110,6 +110,18 @@ export async function deleteCachedPrefix(prefix: string) {
   }
 }
 
+export async function deleteCachedKey(key: string) {
+  if (hasRedisConfig()) {
+    try {
+      await redisCommand(["DEL", key]);
+    } catch (error) {
+      console.warn("[monitor-cache] Redis key delete failed; cached data will expire by TTL.", error);
+    }
+    return;
+  }
+  memoryCache.delete(key);
+}
+
 export function __clearMonitorMemoryCacheForTests() {
   memoryCache.clear();
 }

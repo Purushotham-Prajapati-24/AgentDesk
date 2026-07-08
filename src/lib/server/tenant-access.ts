@@ -2,8 +2,17 @@ import { createAdminClient, createSessionClient } from "./appwrite.ts";
 import { tenantAllowsUser, type TenantDocument } from "./auth-tenants.ts";
 export type { TenantDocument };
 import { cache } from "react";
+import { createHash } from "node:crypto";
+import { getCachedJson, setCachedJson } from "./monitor-cache";
 
 export type TenantAction = "read" | "update" | "delete";
+
+/**
+ * Short TTL for the tenant-access Redis cache.
+ * Tenant membership changes are rare admin operations; 60s staleness is acceptable.
+ * Reduce if your app has frequent permission changes.
+ */
+const AUTH_CACHE_TTL_SECONDS = 60;
 
 /**
  * Authorizes a user for a tenant at a specific permission level.
@@ -11,6 +20,11 @@ export type TenantAction = "read" | "update" | "delete";
  * Wrapped in React cache() so within a single render pass / server-component
  * tree, repeated calls with the same (userId, tenantId, action) tuple hit
  * Appwrite exactly once.
+ *
+ * Additionally backed by a short-TTL Redis cache so that the Appwrite DB
+ * round-trip (~150ms) is skipped on cross-request hits. account.get() is
+ * still called on every request to validate the session — only the tenant
+ * document lookup is cached.
  *
  * @param userId  the current user's Appwrite account ID
  * @param tenantId  the tenant document ID
@@ -21,6 +35,11 @@ export const getAuthorizedTenantDocument = cache(async function getAuthorizedTen
   tenantId: string,
   action: "read" | "update" | "delete" = "read",
 ) {
+  // Check Redis cache first — saves ~150ms Appwrite DB call on warm requests.
+  const cacheKey = `auth:tenant:${authCacheKey(userId, tenantId, action)}`;
+  const cached = await getCachedJson<TenantDocument>(cacheKey);
+  if (cached) return cached;
+
   const { databases, users } = await createAdminClient();
   const tenant = (await databases.getDocument(databaseId(), tenantsCollectionId(), tenantId)) as TenantDocument;
   if (!tenantAllowsUser(tenant, userId, action)) {
@@ -28,12 +47,15 @@ export const getAuthorizedTenantDocument = cache(async function getAuthorizedTen
     const prefs = user.prefs as { tenant_id?: unknown };
     // Legacy fallback: users with tenant_id in prefs are granted read-only access
     if (action === "read" && prefs.tenant_id === tenantId) {
+      void setCachedJson(cacheKey, tenant, AUTH_CACHE_TTL_SECONDS);
       return tenant;
     }
 
     throw new Error("You do not have access to this tenant.");
   }
 
+  // Cache successful auth result — fire-and-forget so it doesn't block the response.
+  void setCachedJson(cacheKey, tenant, AUTH_CACHE_TTL_SECONDS);
   return tenant;
 });
 
@@ -82,4 +104,12 @@ function tenantsCollectionId() {
 
 function isSafeId(value: string) {
   return /^[a-zA-Z0-9_-]{3,160}$/.test(value);
+}
+
+/**
+ * Produces a short opaque cache key segment from userId + tenantId + action.
+ * SHA-256 ensures no tenant/user ID leaks into the Redis key namespace.
+ */
+function authCacheKey(userId: string, tenantId: string, action: string) {
+  return createHash("sha256").update(`${userId}:${tenantId}:${action}`).digest("hex").slice(0, 32);
 }

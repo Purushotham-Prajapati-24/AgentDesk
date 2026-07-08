@@ -173,8 +173,19 @@ export async function getMonitorConversationMessages({
   sessionId: string;
 }): Promise<{ success: true; data: { messages: MonitorMessage[] } } | { success: false; error: string }> {
   try {
-    const [{ account }, { databases }] = await Promise.all([createSessionClient(), createAdminClient()]);
+    // Build cache key before any I/O — pure computation, no await needed.
+    const cacheKey = `${monitorCachePrefix(tenantId, "messages")}${sessionId}`;
+
+    // Fire auth AND cache read in parallel. Auth is enforced before data is returned.
+    const [{ account }, { databases }, cached] = await Promise.all([
+      createSessionClient(),
+      createAdminClient(),
+      getCachedJson<{ messages: MonitorMessage[] }>(cacheKey),
+    ]);
     await assertTenantAccess(account, tenantId);
+
+    if (cached) return { success: true, data: cached };
+
     await assertSessionTenant(databases, tenantId, sessionId);
 
     const messages = await databases.listDocuments(databaseId(), messagesCollectionId(), [
@@ -184,12 +195,12 @@ export async function getMonitorConversationMessages({
       Query.limit(MESSAGE_LIMIT),
     ]);
 
-    return {
-      success: true,
-      data: {
-        messages: messages.documents.map((document) => mapMessage(document as MessageDocument)),
-      },
+    const data = {
+      messages: messages.documents.map((document) => mapMessage(document as MessageDocument)),
     };
+    // 15s TTL: short enough to reflect new messages quickly, long enough to absorb re-opens.
+    void setCachedJson(cacheKey, data, 15);
+    return { success: true, data };
   } catch (error: unknown) {
     return { success: false, error: error instanceof Error ? error.message : "Unable to load conversation messages." };
   }

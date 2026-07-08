@@ -1,8 +1,10 @@
 "use server";
 
 import { Query, type Models } from "node-appwrite";
+import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/server/appwrite";
 import { assertTenantAccess } from "@/lib/server/tenant-access";
+import { getCachedJson, setCachedJson, deleteCachedKey } from "@/lib/server/monitor-cache";
 import {
   DEFAULT_WEBCHAT_CONFIG,
   WebChatConfigSchema,
@@ -54,14 +56,25 @@ const databaseId = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.A
 const botsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_BOTS_COLLECTION_ID || process.env.APPWRITE_BOTS_COLLECTION_ID || "bots";
 const webChatConfigsCollectionId = process.env.NEXT_PUBLIC_APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID || process.env.APPWRITE_WEBCHAT_CONFIGS_COLLECTION_ID || "webchat_configs";
 
+const WEBCHAT_BOTS_CACHE_TTL_SECONDS = 30;
+
 export async function listWebChatBots(tenantId: string): Promise<
   | { success: true; bots: WebChatBotSummary[] }
   | { success: false; error: string }
 > {
   try {
-    const { databases } = await createAdminClient();
-    await assertTenantAccess(tenantId, "read");
+    // Build cache key before any I/O — pure computation, no await needed.
+    const cacheKey = webchatCacheKey(tenantId);
 
+    // Fire auth AND cache read in parallel. Auth is enforced before data is returned.
+    const [, cached] = await Promise.all([
+      assertTenantAccess(tenantId, "read"),
+      getCachedJson<WebChatBotSummary[]>(cacheKey),
+    ]);
+
+    if (cached) return { success: true, bots: cached };
+
+    const { databases } = await createAdminClient();
     const [response, configResponse] = await Promise.all([
       databases.listDocuments(databaseId, botsCollectionId, [
       Query.equal("tenant_id", tenantId),
@@ -89,6 +102,8 @@ export async function listWebChatBots(tenantId: string): Promise<
         };
       });
 
+    // Fire-and-forget: don't block the response waiting for the Redis write.
+    void setCachedJson(cacheKey, bots, WEBCHAT_BOTS_CACHE_TTL_SECONDS);
     return { success: true, bots };
   } catch (error: unknown) {
     return { success: false, error: getErrorMessage(error) };
@@ -123,6 +138,9 @@ export async function saveWebChatBotConfig({
       name: parsedConfig.identity.botName.trim(),
       theme_config: JSON.stringify(webChatConfigToThemeConfig(parsedConfig)),
     });
+
+    // Invalidate the bots list cache so the next listWebChatBots call reflects the save.
+    void deleteCachedKey(webchatCacheKey(tenantId));
 
     return { success: true, config: parsedConfig };
   } catch (error: unknown) {
@@ -473,4 +491,12 @@ function isSafeId(value: string) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "WebChat request failed.";
+}
+
+/**
+ * Stable Redis cache key for a tenant's webchat bots list.
+ * SHA-1 of tenantId keeps the key short and avoids leaking IDs into Redis.
+ */
+function webchatCacheKey(tenantId: string) {
+  return `webchat:${createHash("sha1").update(tenantId).digest("hex").slice(0, 16)}:bots`;
 }

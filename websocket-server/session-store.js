@@ -13,12 +13,10 @@ export function createSessionStore(options = {}) {
   }
 
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const redis = new UpstashRedis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+    // Reuse the module-level singleton — avoids a second TCP connection pool
+    // to the same Upstash endpoint.
     console.info("Using Upstash Redis REST for websocket session state.");
-    return createUpstashSessionStore(redis);
+    return createUpstashSessionStore(getMonitorCacheRedis());
   }
 
   console.info("Using in-memory websocket session state. Set Upstash Redis REST env vars for durable shared state.");
