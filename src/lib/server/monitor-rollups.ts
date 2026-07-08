@@ -294,7 +294,7 @@ export async function invalidateMonitorCache(tenantId: string, scopes: Array<"co
   await Promise.all(scopes.map((scope) => deleteCachedPrefix(monitorCachePrefix(tenantId, scope))));
 }
 
-export function monitorCachePrefix(tenantId: string, scope: "conversations" | "users" | "analytics") {
+export function monitorCachePrefix(tenantId: string, scope: "conversations" | "users" | "analytics" | "messages") {
   return `monitor:${cacheTenantPart(tenantId)}:${scope}:`;
 }
 
