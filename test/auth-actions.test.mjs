@@ -29,6 +29,10 @@ let mockIncrementValue = 1;
 const mockMonitorCache = {
   incrementCacheKey: async () => mockIncrementValue,
   __clearMonitorMemoryCacheForTests: () => {},
+  getCachedJson: async () => null,
+  setCachedJson: async () => {},
+  deleteCachedKey: async () => {},
+  deleteCachedPrefix: async () => {},
 };
 mock.module(new URL("../src/lib/server/monitor-cache.ts", import.meta.url).href, { namedExports: mockMonitorCache });
 

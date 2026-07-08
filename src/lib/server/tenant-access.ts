@@ -3,7 +3,7 @@ import { tenantAllowsUser, type TenantDocument } from "./auth-tenants.ts";
 export type { TenantDocument };
 import { cache } from "react";
 import { createHash } from "node:crypto";
-import { getCachedJson, setCachedJson } from "./monitor-cache";
+import { getCachedJson, setCachedJson } from "./monitor-cache.ts";
 
 export type TenantAction = "read" | "update" | "delete";
 
