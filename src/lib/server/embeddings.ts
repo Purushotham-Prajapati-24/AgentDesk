@@ -87,7 +87,7 @@ export async function createEmbedding(input: string) {
   }
 }
 
-export async function createEmbeddings(inputs: string[]) {
+async function createEmbeddingsBatch(inputs: string[]) {
   if (inputs.length === 0) {
     return [];
   }
@@ -162,6 +162,17 @@ export async function createEmbeddings(inputs: string[]) {
       }
     }
   }
+}
+
+export async function createEmbeddings(inputs: string[]): Promise<number[][]> {
+  const BATCH_SIZE = 100;
+  const results: number[][] = [];
+  for (let i = 0; i < inputs.length; i += BATCH_SIZE) {
+    const chunk = inputs.slice(i, i + BATCH_SIZE);
+    const batchRes = await createEmbeddingsBatch(chunk);
+    results.push(...batchRes);
+  }
+  return results;
 }
 
 export function isEmbeddingVector(value: number[] | undefined): value is number[] {
