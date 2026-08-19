@@ -138,7 +138,8 @@ export async function POST(request: Request) {
         }
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("[chat/message error]:", error);
     return streamStaticMessage("I cannot reach the support engine right now. Please try again in a moment.");
   }
 }

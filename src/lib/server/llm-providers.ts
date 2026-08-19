@@ -156,7 +156,7 @@ function groqProvider(): Provider {
           for await (const token of openAiCompatibleStream({
             url: "https://api.groq.com/openai/v1/chat/completions",
             apiKey: key,
-            model: process.env.GROQ_CHAT_MODEL ?? "llama-3.3-70b-versatile",
+            model: process.env.GROQ_CHAT_MODEL ?? "openai/gpt-oss-120b",
             messages,
             signal,
           })) {

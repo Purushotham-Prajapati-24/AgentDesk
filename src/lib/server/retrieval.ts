@@ -19,7 +19,10 @@ export async function retrieveContextChunks(query: string, tenantId: string, bot
   const embedding = await createEmbedding(query);
 
   const [denseResults, bm25Results] = await Promise.all([
-    denseSearch(embedding, tenantId, botId, rerankLimit),
+    denseSearch(embedding, tenantId, botId, rerankLimit).catch((err) => {
+      console.warn("[rag] dense search failed:", err.message);
+      return [];
+    }),
     bm25Search(query, tenantId, botId, rerankLimit).catch(() => []),
   ]);
 
