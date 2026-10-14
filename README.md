@@ -95,7 +95,7 @@ Runtime flow:
 | Layer | Implementation |
 | --- | --- |
 | Web app | Next.js 16 App Router, React 19, TypeScript |
-| Styling | Tailwind CSS 4, custom UI primitives, Lucide icons |
+| Styling | Tailwind CSS 4, custom UI primitives, Lucide icon |
 | Auth and persistence | Appwrite Cloud, `appwrite`, `node-appwrite` |
 | Retrieval | Qdrant Cloud hybrid collection |
 | Document parsing | `mammoth`, `unpdf`, `xlsx`, `jsdom`, Readability, Turndown |
